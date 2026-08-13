@@ -6,6 +6,7 @@ import { StatTile } from '@/components/brand/stat-tile';
 import { BarBreakdown } from '@/components/brand/bar-breakdown';
 import { TrendChart } from '@/components/ui/trend-chart';
 import { PlatformBadge } from '@/components/brand/platform-badge';
+import { EmptyState } from '@/components/brand/empty-state';
 import { formatNumber } from '@/lib/utils';
 import type { BrandMentionStats, BrandCreator, BrandCompetitor } from '@/types';
 
@@ -122,10 +123,7 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
             <button type="submit" className="brand-btn-primary btn btn-sm"><Plus size={13} /> Add</button>
           </form>
           {competitors.length === 0 ? (
-            <div className="text-center py-6 space-y-1">
-              <Trophy size={26} className="mx-auto text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Add competitors to compare performance.</p>
-            </div>
+            <EmptyState icon={Trophy} description="Add competitors to compare performance." variant="compact" />
           ) : (
             <div className="grid md:grid-cols-3 gap-3">
               {competitors.map(c => (

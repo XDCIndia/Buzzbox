@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Bell, RadioTower } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils';
+import { EmptyState } from '@/components/brand/empty-state';
 import type { BrandAlert } from '@/types';
 
 export function AlertsTab({ brandId }: { brandId: string }) {
@@ -69,10 +70,7 @@ export function AlertsTab({ brandId }: { brandId: string }) {
         <div className="panel-header"><h2 className="section-title">{alerts.length} Alert{alerts.length === 1 ? '' : 's'}</h2></div>
         <div className="panel-body space-y-2">
           {alerts.length === 0 ? (
-            <div className="text-center py-10 space-y-2">
-              <Bell size={32} className="mx-auto text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">No alerts configured yet.</p>
-            </div>
+            <EmptyState icon={Bell} description="No alerts configured yet." />
           ) : alerts.map(a => (
             <div key={a.id} className="brand-stat-tile space-y-1.5">
               <div className="flex items-center justify-between">

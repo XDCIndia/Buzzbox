@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Megaphone } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { EmptyState } from '@/components/brand/empty-state';
 import type { BrandCampaign } from '@/types';
 
 export function CampaignsTab({ brandId }: { brandId: string }) {
@@ -50,11 +51,11 @@ export function CampaignsTab({ brandId }: { brandId: string }) {
         <div className="panel-header"><h2 className="section-title">Campaigns ({campaigns.length})</h2></div>
         <div className="panel-body">
           {campaigns.length === 0 ? (
-            <div className="text-center py-10 space-y-2">
-              <Megaphone size={32} className="mx-auto text-muted-foreground" />
-              <p className="font-semibold">No campaigns yet</p>
-              <p className="text-sm text-muted-foreground">Create your first campaign to track and analyze keyword performance.</p>
-            </div>
+            <EmptyState
+              icon={Megaphone}
+              title="No campaigns yet"
+              description="Create your first campaign to track and analyze keyword performance."
+            />
           ) : (
             <div className="space-y-2">
               {campaigns.map(c => (

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Sparkles, FileText } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { EmptyState } from '@/components/brand/empty-state';
 import type { BrandDigest } from '@/types';
 
 export function DigestsTab({ brandId }: { brandId: string }) {
@@ -59,9 +60,8 @@ export function DigestsTab({ brandId }: { brandId: string }) {
             <div className="whitespace-pre-line text-sm leading-relaxed pt-2">{active.body}</div>
           </div>
         ) : (
-          <div className="panel-body flex flex-col items-center justify-center text-center py-16 space-y-2">
-            <FileText size={32} className="text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Generate a digest to see an auto-written summary of recent mention activity.</p>
+          <div className="panel-body">
+            <EmptyState icon={FileText} description="Generate a digest to see an auto-written summary of recent mention activity." />
           </div>
         )}
       </section>
