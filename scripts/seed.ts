@@ -107,11 +107,49 @@ db.exec(`
   );
 `);
 
+// ── Brand mentions tables (same shape as db.ts migrate()) ────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS brands (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL,
+    keywords TEXT NOT NULL DEFAULT '[]', sources TEXT NOT NULL DEFAULT '[]',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS brand_mentions (
+    id TEXT PRIMARY KEY, brand_id TEXT NOT NULL REFERENCES brands(id),
+    source_type TEXT NOT NULL, platform TEXT NOT NULL,
+    author_name TEXT, author_handle TEXT, author_avatar_url TEXT, author_reach INTEGER DEFAULT 0,
+    text TEXT NOT NULL, url TEXT, likes INTEGER DEFAULT 0, comments INTEGER DEFAULT 0,
+    sentiment TEXT, emotion TEXT, intent TEXT,
+    is_crisis INTEGER DEFAULT 0, is_high_impact INTEGER DEFAULT 0,
+    published_at DATETIME, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS brand_competitors (
+    id TEXT PRIMARY KEY, brand_id TEXT NOT NULL REFERENCES brands(id),
+    name TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS brand_campaigns (
+    id TEXT PRIMARY KEY, brand_id TEXT NOT NULL REFERENCES brands(id),
+    name TEXT NOT NULL, keywords TEXT NOT NULL DEFAULT '[]',
+    starts_at DATETIME, ends_at DATETIME, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS brand_alerts (
+    id TEXT PRIMARY KEY, brand_id TEXT NOT NULL REFERENCES brands(id),
+    name TEXT NOT NULL, filters TEXT NOT NULL DEFAULT '{}',
+    last_checked_at DATETIME, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS brand_digests (
+    id TEXT PRIMARY KEY, brand_id TEXT NOT NULL REFERENCES brands(id),
+    title TEXT, body TEXT, period_start TEXT, period_end TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
 // ── Wipe existing seed data ──────────────────────────────────────────
 
 const tables = [
   'activity_log', 'daily_metrics', 'learnings', 'experiments',
   'signals', 'engagements', 'suppression', 'sequences', 'leads', 'content_posts',
+  'brand_mentions', 'brand_competitors', 'brand_campaigns', 'brand_alerts', 'brand_digests', 'brands',
 ];
 for (const t of tables) db.exec(`DELETE FROM ${t}`);
 db.exec('DELETE FROM seed_registry');
@@ -568,6 +606,133 @@ for (const row of db.prepare('SELECT id FROM activity_log').all() as { id: numbe
 }
 console.log(`✓ Inserted ${activityEntries.length} activity log entries`);
 
+// ── 11. Brand Mentions (Hermes) ───────────────────────────────────────
+// Same UUID as DEFAULT_BRAND_ID in src/lib/brand-constants.ts.
+const BRAND_ID = '97cdb115-2c90-42a8-b904-d14abce1d682';
+
+db.prepare(`INSERT INTO brands (id, name, keywords, sources) VALUES (?, ?, ?, ?)`).run(
+  BRAND_ID,
+  'Hermes',
+  JSON.stringify(['hermes', 'hermes ai', 'hermes dashboard', '#hermes']),
+  JSON.stringify(['x', 'linkedin', 'reddit', 'threads', 'news']),
+);
+registerSeed.run('brands', BRAND_ID);
+
+type MentionSeed = {
+  platform: string; sourceType?: 'social' | 'news';
+  author: string; handle?: string; reach: number;
+  text: string; likes: number; comments: number;
+  sentiment: string; emotion: string; intent: string;
+  days: number; crisis?: boolean; highImpact?: boolean; url?: string;
+};
+
+const socialMentionData: MentionSeed[] = [
+  { platform: 'x', author: 'Sarah Chen', handle: 'sarahbuilds', reach: 12400, text: 'Just switched our SDR workflow to Hermes and the signal-to-lead pipeline is unreal. Booked 3 calls in the first week.', likes: 89, comments: 12, sentiment: 'positive', emotion: 'joy', intent: 'praise', days: 0 },
+  { platform: 'x', author: 'DevOps Marcus', handle: 'marcusbuilds', reach: 8100, text: 'Quoted a Hermes thread on cold email frameworks in our internal wiki — best breakdown I\'ve seen on signal-based outbound.', likes: 54, comments: 6, sentiment: 'positive', emotion: 'joy', intent: 'praise', days: 0 },
+  { platform: 'x', author: 'GrowthOpsDaily', handle: 'growthopsdaily', reach: 22000, text: 'Comparing AI outbound tools this week: Apollo, Instantly, and Hermes. Hermes wins on signal quality but the UI still needs work.', likes: 41, comments: 19, sentiment: 'neutral', emotion: 'neutral', intent: 'other', days: 1 },
+  { platform: 'x', author: 'IndieMaker42', handle: 'indiemaker42', reach: 5600, text: 'Mentioned Hermes in a thread about AI-native marketing tools — genuinely one of the few that doesn\'t feel like a wrapper.', likes: 63, comments: 8, sentiment: 'positive', emotion: 'joy', intent: 'praise', days: 1 },
+  { platform: 'x', author: 'ScalingOps', handle: 'scalingops', reach: 9300, text: 'Hermes\'s pricing page confused our finance team for a solid 20 minutes. Someone please fix the tier names.', likes: 22, comments: 15, sentiment: 'negative', emotion: 'anger', intent: 'complaint', days: 2 },
+  { platform: 'x', author: 'Priya Patel', handle: 'priyabuilds', reach: 3400, text: 'Anyone else notice Hermes dropped a few engagement notifications yesterday? Support said they\'re on it.', likes: 9, comments: 4, sentiment: 'negative', emotion: 'fear', intent: 'complaint', days: 2 },
+  { platform: 'x', author: 'SaaS Weekly', handle: 'saasweekly', reach: 41000, text: 'Hermes just shipped agent-to-agent messaging inside their dashboard. Wild that a marketing tool ships this fast.', likes: 210, comments: 34, sentiment: 'positive', emotion: 'surprise', intent: 'news', days: 3, highImpact: true },
+  { platform: 'x', author: 'techfounder99', handle: 'techfounder99', reach: 4200, text: 'Does Hermes support LinkedIn comment queues yet or is that still roadmap?', likes: 5, comments: 3, sentiment: 'neutral', emotion: 'neutral', intent: 'question', days: 4 },
+  { platform: 'x', author: 'cloudguru', handle: 'cloudguru', reach: 6700, text: 'Our SDR team costs $200k/year and books 5 meetings/week. Hermes\'s signal-based approach is the first thing that\'s actually moved that number.', likes: 77, comments: 11, sentiment: 'positive', emotion: 'joy', intent: 'praise', days: 5 },
+  { platform: 'x', author: 'bytebridgeio', handle: 'bytebridgeio', reach: 2900, text: 'Hermes onboarding took longer than expected but support was responsive the whole way.', likes: 14, comments: 2, sentiment: 'neutral', emotion: 'neutral', intent: 'other', days: 6 },
+  { platform: 'linkedin', author: 'Dana Whitfield', reach: 18500, text: 'Six weeks into using Hermes for our outbound motion. Reply rates up 34%, and the team finally trusts the lead scoring. Worth the switch.', likes: 145, comments: 22, sentiment: 'positive', emotion: 'joy', intent: 'praise', days: 0 },
+  { platform: 'linkedin', author: 'RevOps Collective', reach: 31000, text: 'Panel discussion recap: three RevOps leaders on why signal-based tools like Hermes are replacing static lead scoring models.', likes: 98, comments: 17, sentiment: 'positive', emotion: 'neutral', intent: 'news', days: 1 },
+  { platform: 'linkedin', author: 'Marcus Ade', reach: 7800, text: 'Hermes\'s memory/learnings feature is underrated — it actually surfaces what worked last quarter instead of making you dig through spreadsheets.', likes: 61, comments: 5, sentiment: 'positive', emotion: 'joy', intent: 'praise', days: 2 },
+  { platform: 'linkedin', author: 'Founder Weekly', reach: 26000, text: 'Hermes raised eyebrows this week after a pricing change that pushed several small teams to the next tier without notice.', likes: 33, comments: 41, sentiment: 'negative', emotion: 'anger', intent: 'complaint', days: 3, crisis: true },
+  { platform: 'linkedin', author: 'Nadia Ibrahim', reach: 5200, text: 'Curious if anyone has migrated from a legacy CRM workflow to Hermes\'s pipeline view — how painful was the switch?', likes: 8, comments: 6, sentiment: 'neutral', emotion: 'neutral', intent: 'question', days: 4 },
+  { platform: 'linkedin', author: 'B2B Growth Lab', reach: 14200, text: 'Hermes case study: a 4-person GTM team using agent squads to run outbound at the pace of a 15-person team.', likes: 120, comments: 9, sentiment: 'positive', emotion: 'surprise', intent: 'news', days: 5 },
+  { platform: 'linkedin', author: 'Chris Okafor', reach: 3100, text: 'Small note to Hermes\'s team: the mobile nav is genuinely great. Rare to see that much polish on an internal tool.', likes: 27, comments: 1, sentiment: 'positive', emotion: 'joy', intent: 'praise', days: 6 },
+  { platform: 'reddit', author: 'r/SaaS', handle: 'u/growthhacker22', reach: 116000, text: 'Has anyone actually gotten ROI from Hermes or is it another "AI marketing platform" that\'s just a fancy CRM wrapper?', likes: 34, comments: 52, sentiment: 'negative', emotion: 'anger', intent: 'complaint', days: 0 },
+  { platform: 'reddit', author: 'r/startups', handle: 'u/foundermode', reach: 89000, text: 'PSA: Hermes\'s signal detection actually caught a hiring-intent post I would\'ve missed manually. Converted into a real deal within a week.', likes: 156, comments: 28, sentiment: 'positive', emotion: 'surprise', intent: 'praise', days: 1, highImpact: true },
+  { platform: 'reddit', author: 'r/marketing', handle: 'u/contentqueen', reach: 45000, text: 'Why I stopped using Instantly for cold email and moved to Hermes — reliability issues on the old tool, cleaner deliverability data on the new one.', likes: 71, comments: 19, sentiment: 'positive', emotion: 'joy', intent: 'other', days: 2 },
+  { platform: 'reddit', author: 'r/SaaS', handle: 'u/skepticalCTO', reach: 116000, text: 'Hermes support took 3 days to respond to a billing question. Not great for a tool at this price point.', likes: 19, comments: 14, sentiment: 'negative', emotion: 'anger', intent: 'complaint', days: 3 },
+  { platform: 'reddit', author: 'r/Entrepreneur', handle: 'u/bootstrapped_bee', reach: 210000, text: 'Question for the group — is Hermes worth it for a 2-person team or is it overkill?', likes: 12, comments: 22, sentiment: 'neutral', emotion: 'neutral', intent: 'question', days: 5 },
+  { platform: 'reddit', author: 'r/marketing', handle: 'u/dataisdead', reach: 45000, text: 'Ran the numbers — Hermes\'s open-source-adjacent pricing actually beats three of the "enterprise" competitors we evaluated.', likes: 88, comments: 10, sentiment: 'positive', emotion: 'surprise', intent: 'other', days: 6 },
+  { platform: 'threads', author: '9to5marketing', reach: 41200, text: 'Hermes\'s new agent squads feature is the first "multi-agent" marketing pitch that actually made sense to me on first read.', likes: 33, comments: 4, sentiment: 'positive', emotion: 'joy', intent: 'news', days: 0 },
+  { platform: 'threads', author: 'ops_with_opal', reach: 6300, text: 'Hermes dashboard down for like 10 minutes this morning. Back now but that\'s the second time this month.', likes: 7, comments: 9, sentiment: 'negative', emotion: 'fear', intent: 'complaint', days: 1 },
+  { platform: 'threads', author: 'thefounderpod', reach: 18900, text: 'Hermes\'s founder just did an AMA on signal-based GTM. Genuinely one of the better technical explanations of "AI marketing" I\'ve heard.', likes: 102, comments: 13, sentiment: 'positive', emotion: 'surprise', intent: 'praise', days: 2 },
+  { platform: 'threads', author: 'quietbuilder', reach: 2100, text: 'Anyone know if Hermes has a public API for the signals table yet?', likes: 4, comments: 2, sentiment: 'neutral', emotion: 'neutral', intent: 'question', days: 4 },
+  { platform: 'facebook', author: 'Marketing Ops Group', reach: 15400, text: 'Group discussion: is Hermes\'s approval-based content queue better than a traditional editorial calendar? Split opinions here.', likes: 41, comments: 37, sentiment: 'neutral', emotion: 'neutral', intent: 'other', days: 1 },
+  { platform: 'facebook', author: 'Lena Ortiz', reach: 890, text: 'Loving Hermes for keeping our small team\'s outbound organized. Wish the calendar view synced with Google Calendar though.', likes: 18, comments: 3, sentiment: 'positive', emotion: 'joy', intent: 'praise', days: 3 },
+  { platform: 'facebook', author: 'Small Biz Growth Hub', reach: 22000, text: 'Warning from a member: Hermes billed an extra seat without a clear heads-up. Double check your invoice.', likes: 25, comments: 44, sentiment: 'negative', emotion: 'anger', intent: 'complaint', days: 4, crisis: true },
+  { platform: 'instagram', author: 'startuplifedaily', reach: 34000, text: 'Behind the scenes: our SDR using Hermes\'s live feed to catch a brand mention in real time. Oddly satisfying to watch.', likes: 512, comments: 21, sentiment: 'positive', emotion: 'joy', intent: 'other', days: 0 },
+  { platform: 'instagram', author: 'b2b.growth.tips', reach: 51000, text: 'Carousel: 5 tools we swapped this year, #3 is Hermes replacing our old spreadsheet-based lead tracker.', likes: 640, comments: 38, sentiment: 'positive', emotion: 'joy', intent: 'praise', days: 2, highImpact: true },
+  { platform: 'instagram', author: 'foundermemes', reach: 88000, text: 'When the AI marketing tool actually books the meeting instead of just making a nice-looking dashboard 😅 (looking at you, Hermes)', likes: 980, comments: 56, sentiment: 'positive', emotion: 'joy', intent: 'other', days: 5, highImpact: true },
+  { platform: 'tiktok', author: 'saastoolreviews', reach: 62000, text: '60 second review of Hermes for solo founders — the good, the confusing pricing, and whether it\'s worth it.', likes: 2100, comments: 89, sentiment: 'neutral', emotion: 'neutral', intent: 'other', days: 1, highImpact: true },
+  { platform: 'tiktok', author: 'growthhackergirl', reach: 41000, text: 'POV: you finally automate cold outbound with Hermes and your Sunday dread disappears', likes: 3400, comments: 120, sentiment: 'positive', emotion: 'joy', intent: 'praise', days: 3, highImpact: true },
+  { platform: 'tiktok', author: 'techcritiquetok', reach: 28000, text: 'Hermes\'s onboarding flow made me rage-quit twice before it clicked. Once it clicks though, it\'s genuinely good.', likes: 890, comments: 65, sentiment: 'negative', emotion: 'anger', intent: 'complaint', days: 5 },
+  { platform: 'youtube', author: 'The RevOps Channel', reach: 156000, text: 'Full walkthrough: setting up Hermes\'s agent squads for a 3-person GTM team from zero.', likes: 1240, comments: 87, sentiment: 'positive', emotion: 'joy', intent: 'news', days: 2, highImpact: true },
+  { platform: 'youtube', author: 'SaaS Teardown', reach: 98000, text: 'Teardown: what Hermes gets right (signal detection) and wrong (pricing clarity) in this deep dive.', likes: 670, comments: 112, sentiment: 'neutral', emotion: 'neutral', intent: 'other', days: 4, highImpact: true },
+];
+
+const newsMentionData: MentionSeed[] = [
+  { platform: 'news', sourceType: 'news', author: 'TechCrunch', reach: 2100000, text: 'Hermes raises new funding to expand its "agent-native" marketing operations platform for early-stage GTM teams.', likes: 0, comments: 0, sentiment: 'positive', emotion: 'joy', intent: 'news', days: 0, highImpact: true, url: 'https://example.com/news/hermes-funding' },
+  { platform: 'news', sourceType: 'news', author: 'MarketingDive', reach: 340000, text: 'How signal-based outbound tools like Hermes are reshaping SDR hiring at early-stage startups.', likes: 0, comments: 0, sentiment: 'positive', emotion: 'neutral', intent: 'news', days: 1, url: 'https://example.com/news/signal-based-outbound' },
+  { platform: 'news', sourceType: 'news', author: 'SaaStr Daily', reach: 210000, text: 'Hermes founder on why "agent squads" beat single-agent copilots for revenue teams.', likes: 0, comments: 0, sentiment: 'positive', emotion: 'joy', intent: 'news', days: 2, url: 'https://example.com/news/agent-squads' },
+  { platform: 'news', sourceType: 'news', author: 'The Information', reach: 890000, text: 'Hermes faces scrutiny after a billing complaint thread goes viral on Reddit and Facebook groups.', likes: 0, comments: 0, sentiment: 'negative', emotion: 'anger', intent: 'news', days: 3, crisis: true, highImpact: true, url: 'https://example.com/news/billing-scrutiny' },
+  { platform: 'news', sourceType: 'news', author: 'GrowthUnhinged', reach: 76000, text: 'Product review: Hermes dashboard vs three competitors for solo-founder GTM stacks.', likes: 0, comments: 0, sentiment: 'neutral', emotion: 'neutral', intent: 'other', days: 4, url: 'https://example.com/news/dashboard-comparison' },
+  { platform: 'news', sourceType: 'news', author: 'VentureBeat', reach: 540000, text: 'Hermes ships agent-to-agent messaging, betting that internal comms belong inside the GTM tool, not Slack.', likes: 0, comments: 0, sentiment: 'positive', emotion: 'surprise', intent: 'news', days: 5, highImpact: true, url: 'https://example.com/news/agent-messaging' },
+  { platform: 'news', sourceType: 'news', author: 'Startup Weekly', reach: 63000, text: 'Customer spotlight: a 4-person team using Hermes to run outbound at 15-person-team pace.', likes: 0, comments: 0, sentiment: 'positive', emotion: 'joy', intent: 'news', days: 6, url: 'https://example.com/news/customer-spotlight' },
+  { platform: 'news', sourceType: 'news', author: 'B2B Rev Report', reach: 51000, text: 'Hermes\'s memory/learnings module singled out as a "quiet differentiator" in RevOps tooling roundup.', likes: 0, comments: 0, sentiment: 'positive', emotion: 'joy', intent: 'news', days: 7, url: 'https://example.com/news/quiet-differentiator' },
+  { platform: 'news', sourceType: 'news', author: 'MarTech Signal', reach: 39000, text: 'Pricing tier confusion prompts Hermes to promise a UI refresh for its billing page next quarter.', likes: 0, comments: 0, sentiment: 'negative', emotion: 'sadness', intent: 'news', days: 8, url: 'https://example.com/news/pricing-refresh' },
+  { platform: 'news', sourceType: 'news', author: 'IndieHackers Digest', reach: 28000, text: 'Weekly roundup includes Hermes among tools solo founders are quietly standardizing on for outbound.', likes: 0, comments: 0, sentiment: 'positive', emotion: 'neutral', intent: 'news', days: 9, url: 'https://example.com/news/indie-roundup' },
+];
+
+const mentionInsert = db.prepare(`
+  INSERT INTO brand_mentions
+    (id, brand_id, source_type, platform, author_name, author_handle, author_avatar_url, author_reach,
+     text, url, likes, comments, sentiment, emotion, intent, is_crisis, is_high_impact, published_at, created_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+
+let mentionCount = 0;
+for (const m of [...socialMentionData, ...newsMentionData]) {
+  const id = `bm_${uid()}${uid()}`;
+  const ts = daysAgo(m.days);
+  mentionInsert.run(
+    id, BRAND_ID, m.sourceType || 'social', m.platform,
+    m.author, m.handle || null, null, m.reach,
+    m.text, m.url || null, m.likes, m.comments,
+    m.sentiment, m.emotion, m.intent,
+    m.crisis ? 1 : 0, m.highImpact ? 1 : 0,
+    ts, ts,
+  );
+  registerSeed.run('brand_mentions', id);
+  mentionCount++;
+}
+console.log(`✓ Inserted ${mentionCount} brand mentions`);
+
+// ── 12. Brand Competitors, Campaign & Alerts ──────────────────────────
+const competitorInsert = db.prepare(`INSERT INTO brand_competitors (id, brand_id, name) VALUES (?, ?, ?)`);
+for (const name of ['Apollo.io', 'Instantly']) {
+  const id = `bcomp_${uid()}`;
+  competitorInsert.run(id, BRAND_ID, name);
+  registerSeed.run('brand_competitors', id);
+}
+console.log('✓ Inserted 2 brand competitors');
+
+const campaignInsert = db.prepare(`INSERT INTO brand_campaigns (id, brand_id, name, keywords, starts_at, ends_at) VALUES (?, ?, ?, ?, ?, ?)`);
+{
+  const id = `bcamp_${uid()}`;
+  campaignInsert.run(id, BRAND_ID, 'Launch Week Buzz', JSON.stringify(['hermes launch', 'agent squads']), dateStr(7), dateStr(-7));
+  registerSeed.run('brand_campaigns', id);
+}
+console.log('✓ Inserted 1 brand campaign');
+
+const alertInsert = db.prepare(`INSERT INTO brand_alerts (id, brand_id, name, filters) VALUES (?, ?, ?, ?)`);
+for (const a of [
+  { name: 'All Mentions', filters: {} },
+  { name: 'Positive Sentiment', filters: { sentiment: 'positive' } },
+  { name: 'Negative Sentiment', filters: { sentiment: 'negative' } },
+]) {
+  const id = `balert_${uid()}`;
+  alertInsert.run(id, BRAND_ID, a.name, JSON.stringify(a.filters));
+  registerSeed.run('brand_alerts', id);
+}
+console.log('✓ Inserted 3 brand alerts');
+
 // ── Done ─────────────────────────────────────────────────────────────
 
 const counts = {
@@ -581,6 +746,7 @@ const counts = {
   learnings: learningsData.length,
   daily_metrics: (db.prepare('SELECT COUNT(*) as c FROM daily_metrics').get() as {c: number}).c,
   activity_log: activityEntries.length,
+  brand_mentions: mentionCount,
   seed_registry: (db.prepare('SELECT COUNT(*) as c FROM seed_registry').get() as {c: number}).c,
 };
 

@@ -404,3 +404,103 @@ export interface ChatConversation {
   unread_count: number;
   last_message: ChatMessage | null;
 }
+
+// ─── Brand Mentions ────────────────────────────────────
+export type MentionSourceType = 'social' | 'news';
+export type MentionPlatform = 'x' | 'facebook' | 'instagram' | 'linkedin' | 'reddit' | 'tiktok' | 'threads' | 'youtube' | 'news';
+export type MentionSentiment = 'positive' | 'negative' | 'neutral';
+export type MentionEmotion = 'joy' | 'sadness' | 'anger' | 'fear' | 'surprise' | 'neutral';
+export type MentionIntent = 'news' | 'question' | 'promotion' | 'praise' | 'complaint' | 'other';
+
+export interface Brand {
+  id: string;
+  name: string;
+  keywords: string[];
+  sources: string[];
+  created_at: string;
+}
+
+export interface BrandMention {
+  id: string;
+  brand_id: string;
+  source_type: MentionSourceType;
+  platform: MentionPlatform;
+  author_name: string | null;
+  author_handle: string | null;
+  author_avatar_url: string | null;
+  author_reach: number;
+  text: string;
+  url: string | null;
+  likes: number;
+  comments: number;
+  sentiment: MentionSentiment | null;
+  emotion: MentionEmotion | null;
+  intent: MentionIntent | null;
+  is_crisis: boolean;
+  is_high_impact: boolean;
+  published_at: string | null;
+  created_at: string;
+}
+
+export interface BrandMentionStats {
+  mentions: number;
+  reach: number;
+  interactions: number;
+  positive: number;
+  negative: number;
+  neutral: number;
+  healthScore: number;
+  platformBreakdown: { platform: string; count: number }[];
+  emotionBreakdown: { emotion: string; count: number }[];
+  intentBreakdown: { intent: string; count: number }[];
+  trend: { date: string; positive: number; negative: number; neutral: number }[];
+  crisisCount: number;
+  highImpactCount: number;
+  totalArticles: number;
+  topMention: BrandMention | null;
+}
+
+export interface BrandCreator {
+  author_handle: string;
+  author_name: string | null;
+  platform: string;
+  mentionCount: number;
+  reach: number;
+  engagement: number;
+}
+
+export interface BrandCompetitor {
+  id: string;
+  brand_id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface BrandCampaign {
+  id: string;
+  brand_id: string;
+  name: string;
+  keywords: string[];
+  starts_at: string | null;
+  ends_at: string | null;
+  created_at: string;
+}
+
+export interface BrandAlert {
+  id: string;
+  brand_id: string;
+  name: string;
+  filters: { sentiment?: string; platform?: string; keyword?: string };
+  last_checked_at: string | null;
+  created_at: string;
+}
+
+export interface BrandDigest {
+  id: string;
+  brand_id: string;
+  title: string | null;
+  body: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  created_at: string;
+}

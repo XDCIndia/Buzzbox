@@ -154,3 +154,79 @@ export async function fetchXAccountAnalytics(opts: {
 
   return { summary, series };
 }
+
+export interface XMentionResult {
+  id: string;
+  text: string;
+  url: string;
+  author_name: string | null;
+  author_handle: string | null;
+  author_reach: number;
+  likes: number;
+  comments: number;
+  published_at: string | null;
+}
+
+interface XSearchUser {
+  id?: string;
+  name?: string;
+  username?: string;
+  public_metrics?: { followers_count?: number | string };
+}
+
+interface XSearchTweet {
+  id?: string;
+  text?: string;
+  author_id?: string;
+  created_at?: string;
+  public_metrics?: {
+    like_count?: number | string;
+    reply_count?: number | string;
+  };
+}
+
+interface XSearchResponse {
+  data?: XSearchTweet[];
+  includes?: { users?: XSearchUser[] };
+  meta?: { next_token?: string };
+}
+
+/** Searches recent public posts matching `query` (e.g. a brand keyword). Requires an X_BEARER_TOKEN with elevated search access. */
+export async function searchXMentions(opts: {
+  bearerToken: string;
+  query: string;
+  maxResults?: number;
+}): Promise<XMentionResult[]> {
+  const params = new URLSearchParams({
+    query: `${opts.query} -is:retweet`,
+    max_results: String(Math.min(Math.max(opts.maxResults ?? 50, 10), 100)),
+    "tweet.fields": "created_at,public_metrics,author_id",
+    expansions: "author_id",
+    "user.fields": "username,name,public_metrics",
+  });
+
+  const res = await xGet<XSearchResponse>(
+    opts.bearerToken,
+    `https://api.x.com/2/tweets/search/recent?${params.toString()}`
+  );
+
+  const usersById = new Map<string, XSearchUser>();
+  for (const u of res.includes?.users ?? []) {
+    if (u.id) usersById.set(u.id, u);
+  }
+
+  return (res.data ?? []).map((t): XMentionResult => {
+    const author = t.author_id ? usersById.get(t.author_id) : undefined;
+    return {
+      id: t.id || crypto.randomUUID(),
+      text: t.text || '',
+      url: author?.username && t.id ? `https://x.com/${author.username}/status/${t.id}` : '',
+      author_name: author?.name ?? null,
+      author_handle: author?.username ?? null,
+      author_reach: num(author?.public_metrics?.followers_count),
+      likes: num(t.public_metrics?.like_count),
+      comments: num(t.public_metrics?.reply_count),
+      published_at: t.created_at ?? null,
+    };
+  });
+}

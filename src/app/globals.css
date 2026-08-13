@@ -479,3 +479,79 @@ textarea:focus {
 @media (min-width: 769px) {
   .mobile-nav { display: none !important; }
 }
+
+/* ─── Brand Mentions section (coral accent, scoped) ────── */
+:root {
+  --brand-coral: #ff6d4a;
+  --brand-coral-foreground: #ffffff;
+}
+.dark {
+  --brand-coral: #ff7a5c;
+}
+
+.brand-nav-group-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0 8px;
+}
+
+.brand-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  text-decoration: none;
+  transition: all 0.15s;
+}
+.brand-nav-item:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}
+.brand-nav-item.active {
+  color: var(--brand-coral);
+  background: color-mix(in srgb, var(--brand-coral) 14%, transparent);
+  font-weight: 600;
+}
+
+.brand-btn-primary {
+  background: var(--brand-coral);
+  color: var(--brand-coral-foreground);
+}
+.brand-btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand-coral) 88%, black);
+}
+
+.brand-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.brand-chip:hover {
+  border-color: color-mix(in srgb, var(--foreground) 14%, transparent);
+}
+.brand-chip-positive { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
+.brand-chip-negative { background: color-mix(in srgb, var(--destructive) 15%, transparent); color: var(--destructive); }
+.brand-chip-neutral { background: color-mix(in srgb, var(--muted-foreground) 14%, transparent); color: var(--muted-foreground); }
+
+.brand-stat-tile {
+  background: color-mix(in srgb, var(--card) 96%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+}
