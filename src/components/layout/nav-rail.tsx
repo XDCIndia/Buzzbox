@@ -5,10 +5,11 @@ import { usePathname } from 'next/navigation';
 import {
   Gauge, Bot, PenLine, MessageCircle, Mail, Contact, Zap,
   Search, BarChart3, LineChart, BrainCircuit, Rocket, Clock, List, Settings,
-  FolderOpen,
+  FolderOpen, AtSign,
 } from 'lucide-react';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { useDashboard } from '@/store';
+import { DEFAULT_BRAND_ID } from '@/lib/brand-constants';
 
 interface NavCounts {
   content: number;
@@ -40,6 +41,12 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/agents/squads', label: 'Squads', icon: Bot },
       { href: '/agents/comms', label: 'Comms', icon: MessageCircle },
       { href: '/agents/workspace', label: 'Workspace', icon: FolderOpen },
+    ],
+  },
+  {
+    label: 'BRAND',
+    items: [
+      { href: `/brand/${DEFAULT_BRAND_ID}`, label: 'Brand Mentions', icon: AtSign },
     ],
   },
   {

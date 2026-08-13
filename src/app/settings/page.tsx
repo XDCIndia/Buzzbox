@@ -4,11 +4,16 @@ import { useState, useEffect } from 'react';
 import {
   Settings, Database, Shield, Info, ExternalLink,
   RefreshCw, Trash2, Users, UserPlus, KeyRound, BrainCircuit, BellRing,
+  AtSign, Plus, X,
 } from 'lucide-react';
 import { toast } from '@/components/ui/toast';
 import { timeAgo } from '@/lib/utils';
 import { getRoleMatrix } from '@/lib/rbac';
+import { DEFAULT_BRAND_ID } from '@/lib/brand-constants';
+import type { Brand } from '@/types';
 import pkg from '../../../package.json';
+
+const BRAND_SOURCES = ['facebook', 'instagram', 'linkedin', 'reddit', 'tiktok', 'threads', 'x', 'youtube'];
 
 interface SyncInfo {
   db_path: string;
@@ -37,7 +42,7 @@ interface SyncInfo {
 }
 
 type Role = 'admin' | 'editor' | 'viewer';
-type SettingsTab = 'general' | 'memory' | 'access' | 'about';
+type SettingsTab = 'general' | 'memory' | 'access' | 'brand' | 'about';
 
 interface UserRecord {
   id: number;
@@ -123,6 +128,12 @@ export default function SettingsPage() {
   const [createPassword, setCreatePassword] = useState('');
   const [createRole, setCreateRole] = useState<Role>('editor');
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  const [brand, setBrand] = useState<Brand | null>(null);
+  const [brandName, setBrandName] = useState('');
+  const [brandKeywords, setBrandKeywords] = useState<string[]>([]);
+  const [brandNewKeyword, setBrandNewKeyword] = useState('');
+  const [brandSources, setBrandSources] = useState<string[]>([]);
+  const [brandSaved, setBrandSaved] = useState(false);
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [passwordDrafts, setPasswordDrafts] = useState<Record<number, string>>({});
   const [requestRoleDrafts, setRequestRoleDrafts] = useState<Record<string, Role>>({});
@@ -243,6 +254,36 @@ export default function SettingsPage() {
     loadLoginRequests().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.role]);
+
+  useEffect(() => {
+    fetch(`/api/brand/${DEFAULT_BRAND_ID}`).then(r => r.json()).then((b: Brand) => {
+      if (!b?.id) return;
+      setBrand(b);
+      setBrandName(b.name);
+      setBrandKeywords(b.keywords);
+      setBrandSources(b.sources);
+    }).catch(() => {});
+  }, []);
+
+  function addBrandKeyword() {
+    if (!brandNewKeyword.trim() || brandKeywords.includes(brandNewKeyword.trim())) return;
+    setBrandKeywords([...brandKeywords, brandNewKeyword.trim()]);
+    setBrandNewKeyword('');
+  }
+
+  function toggleBrandSource(source: string) {
+    setBrandSources(prev => (prev.includes(source) ? prev.filter(s => s !== source) : [...prev, source]));
+  }
+
+  async function saveBrand() {
+    await fetch(`/api/brand/${DEFAULT_BRAND_ID}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: brandName, keywords: brandKeywords, sources: brandSources }),
+    });
+    setBrandSaved(true);
+    setTimeout(() => setBrandSaved(false), 2000);
+  }
 
   async function triggerSync() {
     setSyncing(true);
@@ -421,11 +462,12 @@ export default function SettingsPage() {
           </p>
         </div>
         <div className="panel-body">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {[
               { key: 'general', label: 'General' },
               { key: 'memory', label: 'Memory' },
               { key: 'access', label: 'Access' },
+              { key: 'brand', label: 'Brand' },
               { key: 'about', label: 'About' },
             ].map((tab) => (
               <button
@@ -1093,6 +1135,68 @@ export default function SettingsPage() {
           </>
         )}
       </div>
+      )}
+
+      {/* Brand Monitoring */}
+      {activeTab === 'brand' && (
+      <>
+      <div className="panel p-5 space-y-4">
+        <h2 className="text-sm font-medium flex items-center gap-2">
+          <AtSign size={14} className="text-primary" /> Brand Monitoring
+        </h2>
+        {!brand ? (
+          <div className="h-24 flex items-center justify-center text-sm text-muted-foreground">Loading...</div>
+        ) : (
+          <div className="space-y-5 max-w-xl">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Brand Name</label>
+              <input value={brandName} onChange={e => setBrandName(e.target.value)} className="w-full" />
+            </div>
+
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Keywords</label>
+              <div className="space-y-1.5">
+                {brandKeywords.map(k => (
+                  <div key={k} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-muted/30">
+                    <span className="text-sm">{k}</span>
+                    <button onClick={() => setBrandKeywords(brandKeywords.filter(kw => kw !== k))} className="text-muted-foreground hover:text-destructive">
+                      <X size={13} />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex gap-2">
+                  <input
+                    value={brandNewKeyword}
+                    onChange={e => setBrandNewKeyword(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addBrandKeyword())}
+                    placeholder="Enter keyword"
+                    className="flex-1"
+                  />
+                  <button onClick={addBrandKeyword} className="btn btn-ghost btn-sm"><Plus size={13} /> Add</button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Select Sources</label>
+              <div className="grid grid-cols-2 gap-2">
+                {BRAND_SOURCES.map(s => (
+                  <label key={s} className="flex items-center gap-2 text-sm px-2.5 py-1.5 rounded-lg bg-muted/30 cursor-pointer">
+                    <input type="checkbox" checked={brandSources.includes(s)} onChange={() => toggleBrandSource(s)} />
+                    <span className="capitalize">{s}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button onClick={saveBrand} className="btn btn-primary">Save Preferences</button>
+              {brandSaved && <span className="text-xs text-success">Saved.</span>}
+            </div>
+          </div>
+        )}
+      </div>
+      </>
       )}
 
       {/* About */}

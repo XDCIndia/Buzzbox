@@ -228,6 +228,81 @@ function migrate(db: Database.Database) {
       last_synced_at INTEGER
     );
 
+    CREATE TABLE IF NOT EXISTS brands (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      keywords TEXT NOT NULL DEFAULT '[]',
+      sources TEXT NOT NULL DEFAULT '[]',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS brand_mentions (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL REFERENCES brands(id),
+      source_type TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      author_name TEXT,
+      author_handle TEXT,
+      author_avatar_url TEXT,
+      author_reach INTEGER DEFAULT 0,
+      text TEXT NOT NULL,
+      url TEXT,
+      likes INTEGER DEFAULT 0,
+      comments INTEGER DEFAULT 0,
+      sentiment TEXT,
+      emotion TEXT,
+      intent TEXT,
+      is_crisis INTEGER DEFAULT 0,
+      is_high_impact INTEGER DEFAULT 0,
+      published_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_brand_mentions_brand ON brand_mentions(brand_id);
+    CREATE INDEX IF NOT EXISTS idx_brand_mentions_source_type ON brand_mentions(source_type);
+    CREATE INDEX IF NOT EXISTS idx_brand_mentions_platform ON brand_mentions(platform);
+    CREATE INDEX IF NOT EXISTS idx_brand_mentions_sentiment ON brand_mentions(sentiment);
+    CREATE INDEX IF NOT EXISTS idx_brand_mentions_published ON brand_mentions(published_at);
+
+    CREATE TABLE IF NOT EXISTS brand_competitors (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL REFERENCES brands(id),
+      name TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_brand_competitors_brand ON brand_competitors(brand_id);
+
+    CREATE TABLE IF NOT EXISTS brand_campaigns (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL REFERENCES brands(id),
+      name TEXT NOT NULL,
+      keywords TEXT NOT NULL DEFAULT '[]',
+      starts_at DATETIME,
+      ends_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_brand_campaigns_brand ON brand_campaigns(brand_id);
+
+    CREATE TABLE IF NOT EXISTS brand_alerts (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL REFERENCES brands(id),
+      name TEXT NOT NULL,
+      filters TEXT NOT NULL DEFAULT '{}',
+      last_checked_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_brand_alerts_brand ON brand_alerts(brand_id);
+
+    CREATE TABLE IF NOT EXISTS brand_digests (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL REFERENCES brands(id),
+      title TEXT,
+      body TEXT,
+      period_start TEXT,
+      period_end TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_brand_digests_brand ON brand_digests(brand_id);
+
   `);
 
   // Column migrations (safe to re-run)
