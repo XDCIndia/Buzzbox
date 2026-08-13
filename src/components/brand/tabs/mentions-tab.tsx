@@ -1,13 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { RefreshCw, Search, Download, ExternalLink } from 'lucide-react';
+import { RefreshCw, Download, ExternalLink } from 'lucide-react';
 import { MentionCard } from '@/components/brand/mention-card';
+import { FilterPanel } from '@/components/brand/filter-panel';
+import { MENTION_PLATFORMS, MENTION_SENTIMENTS } from '@/lib/brand-constants';
 import { timeAgo } from '@/lib/utils';
 import type { BrandMention } from '@/types';
 
-const PLATFORMS = ['x', 'facebook', 'instagram', 'linkedin', 'reddit', 'tiktok', 'threads', 'youtube'];
-const SENTIMENTS = ['positive', 'negative', 'neutral'];
+const SORT_OPTIONS = [
+  { key: 'newest', label: 'Newest first' },
+  { key: 'popular', label: 'Popularity' },
+  { key: 'reach', label: 'Reach' },
+];
 
 export function MentionsTab({ brandId, realOnly, sourceType }: { brandId: string; realOnly: boolean; sourceType: 'social' | 'news' }) {
   const [mentions, setMentions] = useState<BrandMention[]>([]);
@@ -50,10 +55,6 @@ export function MentionsTab({ brandId, realOnly, sourceType }: { brandId: string
 
   function downloadCsv() {
     window.location.href = `/api/brand/${brandId}/export?source_type=${sourceType}${realOnly ? '&real=true' : ''}`;
-  }
-
-  function toggle(list: string[], setList: (v: string[]) => void, value: string) {
-    setList(list.includes(value) ? list.filter(v => v !== value) : [...list, value]);
   }
 
   const topStory = sourceType === 'news' ? mentions[0] : null;
@@ -101,45 +102,19 @@ export function MentionsTab({ brandId, realOnly, sourceType }: { brandId: string
         )}
       </div>
 
-      <aside className="w-64 shrink-0 space-y-3">
-        <div className="panel p-3 space-y-2">
-          <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search" className="w-full pl-8" />
-          </div>
-        </div>
-
-        <div className="panel p-3 space-y-1.5">
-          <div className="section-title mb-1">Sort by</div>
-          {[{ key: 'newest', label: 'Newest first' }, { key: 'popular', label: 'Popularity' }, { key: 'reach', label: 'Reach' }].map(s => (
-            <button key={s.key} onClick={() => setSort(s.key)} className={`brand-nav-item w-full text-left ${sort === s.key ? 'active' : ''}`}>
-              {s.label}
-            </button>
-          ))}
-        </div>
-
-        {sourceType === 'social' && (
-          <div className="panel p-3 space-y-1.5">
-            <div className="section-title mb-1">Platforms</div>
-            {PLATFORMS.map(p => (
-              <label key={p} className="flex items-center gap-2 text-sm px-1 py-0.5 cursor-pointer">
-                <input type="checkbox" checked={platforms.includes(p)} onChange={() => toggle(platforms, setPlatforms, p)} />
-                <span className="capitalize">{p}</span>
-              </label>
-            ))}
-          </div>
-        )}
-
-        <div className="panel p-3 space-y-1.5">
-          <div className="section-title mb-1">Sentiment</div>
-          {SENTIMENTS.map(s => (
-            <label key={s} className="flex items-center gap-2 text-sm px-1 py-0.5 cursor-pointer">
-              <input type="checkbox" checked={sentiments.includes(s)} onChange={() => toggle(sentiments, setSentiments, s)} />
-              <span className="capitalize">{s}</span>
-            </label>
-          ))}
-        </div>
-      </aside>
+      <FilterPanel
+        search={search}
+        onSearchChange={setSearch}
+        sort={sort}
+        onSortChange={setSort}
+        sortOptions={SORT_OPTIONS}
+        platformOptions={sourceType === 'social' ? MENTION_PLATFORMS : undefined}
+        platforms={sourceType === 'social' ? platforms : undefined}
+        onPlatformsChange={sourceType === 'social' ? setPlatforms : undefined}
+        sentimentOptions={MENTION_SENTIMENTS}
+        sentiments={sentiments}
+        onSentimentsChange={setSentiments}
+      />
     </div>
   );
 }
