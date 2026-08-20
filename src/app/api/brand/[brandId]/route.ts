@@ -15,6 +15,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ br
   const auth = requireApiUser(req as Request);
   if (auth) return auth;
   const { brandId } = await params;
+  const existing = getBrand(brandId);
+  if (!existing) return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
   const body = await req.json();
   updateBrand(brandId, { name: body.name, keywords: body.keywords, sources: body.sources });
   const brand = getBrand(brandId);

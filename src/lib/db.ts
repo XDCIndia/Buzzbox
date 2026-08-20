@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { seedChatMessages } from './seed-chat';
 import { getHermesStateDir } from './hermes-state';
+import { DEFAULT_BRAND_ID } from './brand-constants';
 
 const DB_PATH =
   process.env.HERMES_DB_PATH || path.join(getHermesStateDir(), 'hermes.db');
@@ -303,8 +304,46 @@ function migrate(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_brand_digests_brand ON brand_digests(brand_id);
 
+    CREATE TABLE IF NOT EXISTS llm_usage_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      day TEXT,
+      agent_id TEXT,
+      model TEXT,
+      total_tokens INTEGER,
+      cost_usd REAL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_llm_usage_events_day ON llm_usage_events(day);
+    CREATE INDEX IF NOT EXISTS idx_llm_usage_events_day_agent ON llm_usage_events(day, agent_id);
+
+    CREATE TABLE IF NOT EXISTS content_queue_items (
+      id TEXT PRIMARY KEY,
+      platform TEXT NOT NULL,
+      format TEXT NOT NULL,
+      pillar INTEGER,
+      text_preview TEXT,
+      full_content TEXT,
+      image_url TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      scheduled_for DATETIME,
+      queue_json TEXT,
+      source TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_content_queue_items_status ON content_queue_items(status);
+
   `);
 
   // Column migrations (safe to re-run)
   try { db.exec("ALTER TABLE leads ADD COLUMN pause_outreach INTEGER DEFAULT 0"); } catch { /* column exists */ }
+  try { db.exec("ALTER TABLE content_posts ADD COLUMN image_url TEXT"); } catch { /* column exists */ }
+
+  // Guarantee the default brand row exists even on a fresh/unseeded DB — brand-scoped
+  // API routes and FK-constrained inserts (brand_mentions, brand_digests, etc.) assume
+  // DEFAULT_BRAND_ID resolves to a real row instead of leaving the Brand module in a
+  // permanent "no brand exists" state.
+  db.prepare(
+    `INSERT OR IGNORE INTO brands (id, name, keywords, sources) VALUES (?, ?, ?, ?)`
+  ).run(DEFAULT_BRAND_ID, 'My Brand', '[]', '[]');
 }
