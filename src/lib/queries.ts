@@ -138,6 +138,17 @@ export function updateContentStatus(id: string, status: string): void {
   db.prepare('UPDATE content_posts SET status = ? WHERE id = ?').run(status, id);
 }
 
+export function getContentPostById(id: string): ContentPost | undefined {
+  const db = getDb();
+  return db.prepare('SELECT * FROM content_posts WHERE id = ?').get(id) as ContentPost | undefined;
+}
+
+/** Marks a post published (with published_at) -- used once it has actually gone out (e.g. posted to X). */
+export function markContentPublished(id: string): void {
+  const db = getDb();
+  db.prepare("UPDATE content_posts SET status = 'published', published_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
+}
+
 // ─── Leads ─────────────────────────────────────────────
 export function getLeads(filters?: {
   status?: string;

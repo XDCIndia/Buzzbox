@@ -1,3 +1,5 @@
+import { recordXSearchCall } from '@/lib/x-budget';
+
 export interface XSummary {
   username: string;
   followers: number;
@@ -59,6 +61,9 @@ async function xGet<T>(bearerToken: string, url: string): Promise<T> {
     headers: { Authorization: `Bearer ${bearerToken}` },
     cache: "no-store",
   });
+  // Counts against the daily search-call budget regardless of outcome --
+  // the call was made (and consumed rate-limit quota) either way.
+  recordXSearchCall(url);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`X API failed (${res.status}): ${text.slice(0, 300)}`);
@@ -229,4 +234,49 @@ export async function searchXMentions(opts: {
       published_at: t.created_at ?? null,
     };
   });
+}
+
+interface XPostTweetResponse {
+  data?: { id?: string; text?: string };
+}
+
+export interface XPostResult {
+  id: string;
+  text: string;
+}
+
+/**
+ * Publishes a tweet via POST https://api.x.com/2/tweets.
+ *
+ * IMPORTANT: unlike xGet's app-only bearer token (X_BEARER_TOKEN, used for
+ * read-only analytics/search above), posting on behalf of an account
+ * requires OAuth 1.0a user context or an OAuth 2.0 user-context access token
+ * with the `tweet.write` scope. A plain app-only bearer token CANNOT post --
+ * it will be rejected by the API. Callers must supply a distinct
+ * user-context credential (e.g. from an `X_ACCESS_TOKEN` env var), never the
+ * app-only `X_BEARER_TOKEN`.
+ */
+export async function postXTweet(opts: {
+  accessToken: string;
+  text: string;
+}): Promise<XPostResult> {
+  const res = await fetch("https://api.x.com/2/tweets", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${opts.accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text: opts.text }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`X post failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+
+  const json = (await res.json()) as XPostTweetResponse;
+  const id = json?.data?.id;
+  if (!id) throw new Error("X post succeeded but response had no tweet id");
+
+  return { id, text: json?.data?.text ?? opts.text };
 }
