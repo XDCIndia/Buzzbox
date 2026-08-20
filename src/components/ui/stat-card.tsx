@@ -15,28 +15,31 @@ interface StatCardProps {
 
 export function StatCard({ label, value, icon: Icon, trend, sparkline, color = 'var(--primary)' }: StatCardProps) {
   return (
-    <div className="card card-hover stat-glow p-4 relative">
-      <div className="flex items-start justify-between relative z-10">
-        <div>
-          <p className="text-xs text-muted-foreground mb-1">{label}</p>
-          <p className="text-2xl font-bold font-mono tracking-tight">{formatNumber(value)}</p>
+    <div className="card card-hover relative p-6 flex flex-col justify-between">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <p className="mt-2 text-4xl font-semibold tracking-tight font-mono">{formatNumber(value)}</p>
           {trend !== undefined && (
-            <p className={`text-xs mt-1 ${trend >= 0 ? 'text-success' : 'text-destructive'}`}>
+            <p className={`text-sm mt-2 ${trend >= 0 ? 'text-success' : 'text-destructive'}`}>
               {trend >= 0 ? '+' : ''}{trend.toFixed(1)}% vs last week
             </p>
           )}
         </div>
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: `color-mix(in srgb, ${color} 15%, transparent)` }}>
-          <Icon size={18} style={{ color }} />
+        <div
+          className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: `color-mix(in srgb, ${color} 12%, var(--surface-2))`, color }}
+        >
+          <Icon size={20} />
         </div>
       </div>
       {sparkline && sparkline.length > 1 && (
-        <div className="h-10 mt-2 relative z-10">
+        <div className="h-14 mt-5">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={sparkline}>
               <defs>
                 <linearGradient id={`gradient-${label}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+                  <stop offset="5%" stopColor={color} stopOpacity={0.22} />
                   <stop offset="95%" stopColor={color} stopOpacity={0} />
                 </linearGradient>
               </defs>

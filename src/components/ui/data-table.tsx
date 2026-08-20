@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import { EmptyState, type EmptyStateAction } from '@/components/brand/empty-state';
+import { TableSkeleton } from '@/components/ui/loading-skeleton';
 
 interface Column<T> {
   key: string;
@@ -14,6 +17,13 @@ interface DataTableProps<T> {
   data: T[];
   keyField: string;
   emptyMessage?: string;
+  emptyIcon?: LucideIcon;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  emptyPrimaryAction?: EmptyStateAction;
+  emptySecondaryAction?: EmptyStateAction;
+  emptyState?: React.ReactNode;
+  loading?: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -22,9 +32,20 @@ export function DataTable<T extends Record<string, any>>({
   data,
   keyField,
   emptyMessage = 'No data',
+  emptyIcon,
+  emptyTitle,
+  emptyDescription,
+  emptyPrimaryAction,
+  emptySecondaryAction,
+  emptyState,
+  loading = false,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  if (loading) {
+    return <TableSkeleton rows={4} cols={columns.length} />;
+  }
 
   const sorted = sortKey
     ? [...data].sort((a, b) => {
@@ -50,6 +71,23 @@ export function DataTable<T extends Record<string, any>>({
   };
 
   if (data.length === 0) {
+    if (emptyState) {
+      return <>{emptyState}</>;
+    }
+
+    if (emptyIcon) {
+      return (
+        <EmptyState
+          icon={emptyIcon}
+          title={emptyTitle}
+          description={emptyDescription || emptyMessage}
+          primaryAction={emptyPrimaryAction}
+          secondaryAction={emptySecondaryAction}
+          variant="compact"
+        />
+      );
+    }
+
     return (
       <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
         {emptyMessage}

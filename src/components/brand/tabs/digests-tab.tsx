@@ -4,27 +4,43 @@ import { useEffect, useState } from 'react';
 import { Sparkles, FileText } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { EmptyState } from '@/components/brand/empty-state';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import type { BrandDigest } from '@/types';
 
 export function DigestsTab({ brandId }: { brandId: string }) {
   const [digests, setDigests] = useState<BrandDigest[]>([]);
   const [active, setActive] = useState<BrandDigest | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function loadDigests() {
+    setError(null);
+    fetch(`/api/brand/${brandId}/digests`)
+      .then(r => {
+        if (!r.ok) throw new Error('Failed to fetch digests');
+        return r.json();
+      })
+      .then((data: BrandDigest[]) => {
+        setDigests(Array.isArray(data) ? data : []);
+        if (Array.isArray(data) && data.length) setActive(data[0]);
+      })
+      .catch(err => setError((err as Error).message));
+  }
 
   useEffect(() => {
-    fetch(`/api/brand/${brandId}/digests`).then(r => r.json()).then((data: BrandDigest[]) => {
-      setDigests(data);
-      if (data.length) setActive(data[0]);
-    }).catch(() => {});
+    loadDigests();
   }, [brandId]);
 
   async function generate() {
     setGenerating(true);
+    setError(null);
     try {
       const res = await fetch(`/api/brand/${brandId}/digests`, { method: 'POST' });
       const digest = await res.json();
       setDigests(prev => [digest, ...prev]);
       setActive(digest);
+    } catch {
+      setError('Failed to generate new digest');
     } finally {
       setGenerating(false);
     }
@@ -40,6 +56,7 @@ export function DigestsTab({ brandId }: { brandId: string }) {
           </button>
         </div>
         <div className="panel-body space-y-1">
+          {error && <ErrorBanner message={error} variant="inline" onRetry={loadDigests} />}
           {digests.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No digests yet</p>
           ) : digests.map(d => (
@@ -61,7 +78,16 @@ export function DigestsTab({ brandId }: { brandId: string }) {
           </div>
         ) : (
           <div className="panel-body">
-            <EmptyState icon={FileText} description="Generate a digest to see an auto-written summary of recent mention activity." />
+            <EmptyState
+              icon={FileText}
+              title="No digests generated"
+              description="Generate a digest to see an auto-written summary of recent mention activity."
+              primaryAction={{
+                label: generating ? 'Generating…' : 'Generate First Digest',
+                onClick: generate,
+                icon: Sparkles,
+              }}
+            />
           </div>
         )}
       </section>

@@ -144,6 +144,15 @@ export default function SettingsPage() {
   const [memoryEffects, setMemoryEffects] = useState<Record<InstanceId, MemoryEffectPayload | null>>({});
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const paramTab = new URLSearchParams(window.location.search).get('tab') as SettingsTab | null;
+      if (paramTab && ['general', 'memory', 'access', 'brand', 'about'].includes(paramTab)) {
+        setActiveTab(paramTab);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     let alive = true;
 
     (async () => {
@@ -1209,7 +1218,7 @@ export default function SettingsPage() {
           <div className="space-y-2 text-xs">
             <div className="flex items-center justify-between py-1">
               <span className="text-muted-foreground">Dashboard</span>
-              <span>Marketing Dashboard v{dashboardVersion}</span>
+              <span>Buzzbox v{dashboardVersion}</span>
             </div>
             <div className="flex items-center justify-between py-1">
               <span className="text-muted-foreground">Runtime</span>

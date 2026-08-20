@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Bot, Lock, User, AlertCircle, Loader2 } from 'lucide-react';
 
 function LoginForm() {
   const [username, setUsername] = useState('');
@@ -38,7 +39,7 @@ function LoginForm() {
 
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error || 'Login failed');
+        setError(data.error || 'Invalid credentials');
         return;
       }
 
@@ -46,7 +47,7 @@ function LoginForm() {
       router.push(redirect);
       router.refresh();
     } catch {
-      setError('Connection error');
+      setError('Connection error. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -55,52 +56,74 @@ function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="username" className="block text-sm font-medium text-[var(--foreground)] mb-1.5">
+        <label htmlFor="username" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
           Username
         </label>
-        <input
-          id="username"
-          type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-          autoFocus
-          required
-        />
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
+            <User size={15} />
+          </div>
+          <input
+            id="username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Enter username"
+            autoComplete="username"
+            className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-border bg-surface-1 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+            autoFocus
+            required
+          />
+        </div>
       </div>
 
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-[var(--foreground)] mb-1.5">
+        <label htmlFor="password" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
           Password
         </label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-          required
-        />
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
+            <Lock size={15} />
+          </div>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter password"
+            autoComplete="current-password"
+            className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-border bg-surface-1 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+            required
+          />
+        </div>
       </div>
 
       {error && (
-        <p className="text-sm text-[var(--destructive)] bg-[var(--destructive)]/10 px-3 py-2 rounded-lg">
-          {error}
-        </p>
+        <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 p-3 rounded-lg animate-in" role="alert">
+          <AlertCircle size={15} className="mt-0.5 shrink-0" />
+          <span className="leading-relaxed">{error}</span>
+        </div>
       )}
 
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-2.5 rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+        className="w-full py-2.5 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
       >
-        {loading ? 'Signing in...' : 'Sign in'}
+        {loading ? (
+          <>
+            <Loader2 size={16} className="animate-spin" />
+            <span>Signing in...</span>
+          </>
+        ) : (
+          <span>Sign in</span>
+        )}
       </button>
 
       {googleEnabled && (
         <a
           href={`/api/auth/google/start?from=${encodeURIComponent(searchParams.get('from') || '/')}`}
-          className="block w-full py-2.5 rounded-lg border border-[var(--border)] text-center text-sm font-medium hover:bg-[var(--muted)] transition-colors"
+          className="block w-full py-2.5 px-4 rounded-lg border border-border text-center text-sm font-medium hover:bg-muted transition-colors text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
         >
           Sign in with Google
         </a>
@@ -111,17 +134,28 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
-      <div className="w-full max-w-sm p-8 rounded-xl border border-[var(--border)] bg-[var(--card)]">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background relative overflow-hidden">
+      {/* Background ambient lighting */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="w-full max-w-md p-6 sm:p-8 rounded-xl border border-border bg-card shadow-2xl relative z-10 animate-in">
         <div className="text-center mb-8">
-          <div className="text-3xl mb-2">&#127963;&#65039;</div>
-          <h1 className="text-xl font-semibold text-[var(--foreground)]">Marketing Dashboard</h1>
-          <p className="text-sm text-[var(--muted-foreground)] mt-1">Marketing Engine Control Center</p>
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/15 border border-primary/30 text-primary mb-3 shadow-inner">
+            <Bot size={24} />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Buzzbox</h1>
+          <p className="text-xs text-muted-foreground mt-1">Marketing Operations & Agent Control Center</p>
         </div>
 
-        <Suspense fallback={<div className="h-48" />}>
+        <Suspense fallback={<div className="h-48 flex items-center justify-center text-muted-foreground"><Loader2 size={24} className="animate-spin" /></div>}>
           <LoginForm />
         </Suspense>
+
+        <div className="mt-8 pt-4 border-t border-border/50 text-center">
+          <p className="text-[11px] text-muted-foreground">
+            Buzzbox v0.2.0 • Local-First Agent System
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import {
   Gauge, Bot, PenLine, MessageCircle, Mail, Contact, Zap,
   Search, BarChart3, LineChart, BrainCircuit, Rocket, Clock, List, Settings,
   FolderOpen, AtSign, Newspaper, PieChart, Megaphone, Sparkles, Bell,
+  CheckSquare, Plug,
 } from 'lucide-react';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { useDashboard } from '@/store';
@@ -61,6 +62,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'OPERATE',
     items: [
       { href: '/content', label: 'Content', icon: PenLine, countKey: 'content' },
+      { href: '/approvals', label: 'Approvals', icon: CheckSquare, countKey: 'total_pending' },
       { href: '/engagement', label: 'Engagement', icon: MessageCircle },
       { href: '/outreach', label: 'Outreach', icon: Mail, countKey: 'outreach' },
       { href: '/crm', label: 'CRM', icon: Contact, countKey: 'new_leads' },
@@ -73,6 +75,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/research', label: 'Research', icon: Search, countKey: 'signals_today' },
       { href: '/kpis', label: 'KPIs', icon: BarChart3 },
       { href: '/analytics', label: 'Analytics', icon: LineChart },
+      { href: '/integrations', label: 'Integrations', icon: Plug },
       { href: '/memory', label: 'Memory', icon: BrainCircuit },
       { href: '/deploy', label: 'Deploy', icon: Rocket },
       { href: '/cron', label: 'Cron', icon: Clock },
@@ -91,21 +94,11 @@ export function NavRail() {
   );
 
   return (
-    <nav className="nav-rail fixed left-0 top-[var(--header-height)] bottom-0 w-[var(--nav-width)] bg-card/92 backdrop-blur-lg border-r border-border/70 z-40 hidden md:flex flex-col">
-      <div className="px-3 py-3 border-b border-border/60 flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">
-          H
-        </div>
-        <div className="min-w-0">
-          <div className="text-sm font-semibold leading-none">Hermes</div>
-          <div className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wide">Mission View</div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-2 py-2">
+    <nav className="nav-rail fixed left-0 top-[var(--header-height)] bottom-0 w-[var(--nav-width)] bg-surface-0/95 backdrop-blur-md border-r border-border z-40 hidden md:flex flex-col select-none">
+      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
         {NAV_GROUPS.map((group, idx) => (
-          <div key={group.label} className={idx > 0 ? 'mt-3 pt-3 border-t border-border/50' : ''}>
-            <div className="px-2 pb-1 text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">
+          <div key={group.label} className={idx > 0 ? 'pt-4 border-t border-border/40' : ''}>
+            <div className="px-2.5 pb-2 text-[10px] font-semibold tracking-widest text-muted-foreground/60">
               {group.label}
             </div>
             <div className="space-y-0.5">
@@ -117,24 +110,30 @@ export function NavRail() {
                 return (
                   <div key={item.href}>
                     {showSubLabel && (
-                      <div className="px-2 pt-2 pb-0.5 text-[9px] uppercase tracking-wider text-muted-foreground/50 font-semibold">
+                      <div className="px-2.5 pt-2 pb-0.5 text-[9px] uppercase font-semibold tracking-wider text-muted-foreground/50">
                         {item.subLabel}
                       </div>
                     )}
                     <Link
                       href={item.href}
-                      className={`relative w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-smooth ${
+                      aria-current={active ? 'page' : undefined}
+                      aria-label={item.label}
+                      className={`group relative w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
                         active
-                          ? 'bg-primary/14 text-primary'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-surface-2/80'
+                          ? 'bg-primary/12 text-primary font-semibold'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-surface-2/70 font-medium'
                       }`}
                     >
-                      {active && <span className="absolute left-0 w-0.5 h-5 bg-primary rounded-r" />}
-                      <Icon size={16} />
+                      {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-primary rounded-r-full shadow-sm" />}
+                      <Icon size={15} className={active ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} />
                       <span className="flex-1 truncate">{item.label}</span>
                       {count > 0 && (
                         <span className={`min-w-[18px] h-4 px-1 text-[9px] font-bold rounded-full flex items-center justify-center ${
-                          item.countKey === 'signals_today' ? 'count-badge-info' : 'count-badge'
+                          item.countKey === 'total_pending'
+                            ? 'bg-warning/20 text-warning border border-warning/30'
+                            : item.countKey === 'signals_today'
+                            ? 'bg-info/20 text-info border border-info/30'
+                            : 'bg-primary/20 text-primary border border-primary/30'
                         }`}>
                           {count > 99 ? '99+' : count}
                         </span>
@@ -148,17 +147,19 @@ export function NavRail() {
         ))}
       </div>
 
-      <div className="px-2 py-2 border-t border-border/60">
+      <div className="p-2.5 border-t border-border/60 bg-surface-1/40">
         <Link
           href="/settings"
-          className={`relative w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-smooth ${
+          aria-current={pathname === '/settings' ? 'page' : undefined}
+          aria-label="Settings"
+          className={`relative w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
             pathname === '/settings'
-              ? 'bg-primary/14 text-primary'
-              : 'text-muted-foreground hover:text-foreground hover:bg-surface-2/80'
+              ? 'bg-primary/12 text-primary font-semibold'
+              : 'text-muted-foreground hover:text-foreground hover:bg-surface-2/70'
           }`}
         >
-          {pathname === '/settings' && <span className="absolute left-0 w-0.5 h-5 bg-primary rounded-r" />}
-          <Settings size={16} />
+          {pathname === '/settings' && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-primary rounded-r-full shadow-sm" />}
+          <Settings size={15} className={pathname === '/settings' ? 'text-primary' : 'text-muted-foreground'} />
           <span>Settings</span>
         </Link>
       </div>
