@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { seedChatMessages } from './seed-chat';
 import { getHermesStateDir } from './hermes-state';
+import { DEFAULT_BRAND_ID } from './brand-constants';
 
 const DB_PATH =
   process.env.HERMES_DB_PATH || path.join(getHermesStateDir(), 'hermes.db');
@@ -337,4 +338,12 @@ function migrate(db: Database.Database) {
   // Column migrations (safe to re-run)
   try { db.exec("ALTER TABLE leads ADD COLUMN pause_outreach INTEGER DEFAULT 0"); } catch { /* column exists */ }
   try { db.exec("ALTER TABLE content_posts ADD COLUMN image_url TEXT"); } catch { /* column exists */ }
+
+  // Guarantee the default brand row exists even on a fresh/unseeded DB — brand-scoped
+  // API routes and FK-constrained inserts (brand_mentions, brand_digests, etc.) assume
+  // DEFAULT_BRAND_ID resolves to a real row instead of leaving the Brand module in a
+  // permanent "no brand exists" state.
+  db.prepare(
+    `INSERT OR IGNORE INTO brands (id, name, keywords, sources) VALUES (?, ?, ?, ?)`
+  ).run(DEFAULT_BRAND_ID, 'My Brand', '[]', '[]');
 }
