@@ -18,7 +18,7 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Marketing Dashboard",
+  title: "Buzzbox",
   description: "Local-first marketing operations control center for human and agent workflows",
 };
 

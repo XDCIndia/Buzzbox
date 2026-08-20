@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { RefreshCw, Download, ExternalLink } from 'lucide-react';
+import { RefreshCw, Download, ExternalLink, AtSign } from 'lucide-react';
 import { MentionCard } from '@/components/brand/mention-card';
 import { FilterPanel } from '@/components/brand/filter-panel';
 import { MENTION_PLATFORMS, MENTION_SENTIMENTS } from '@/lib/brand-constants';
 import { timeAgo } from '@/lib/utils';
+import { EmptyState } from '@/components/brand/empty-state';
+import { CardSkeletonList } from '@/components/ui/loading-skeleton';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import type { BrandMention } from '@/types';
 
 const SORT_OPTIONS = [
@@ -17,6 +20,7 @@ const SORT_OPTIONS = [
 export function MentionsTab({ brandId, realOnly, sourceType }: { brandId: string; realOnly: boolean; sourceType: 'social' | 'news' }) {
   const [mentions, setMentions] = useState<BrandMention[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('newest');
   const [platforms, setPlatforms] = useState<string[]>([]);
@@ -24,19 +28,36 @@ export function MentionsTab({ brandId, realOnly, sourceType }: { brandId: string
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
-  useEffect(() => {
+  function loadMentions() {
     const params = new URLSearchParams({ source_type: sourceType, sort });
     if (realOnly) params.set('real', 'true');
     platforms.forEach(p => params.append('platform', p));
     sentiments.forEach(s => params.append('sentiment', s));
     if (search) params.set('search', search);
     setLoading(true);
-    fetch(`/api/brand/${brandId}/mentions?${params.toString()}`).then(r => r.json()).then(setMentions).finally(() => setLoading(false));
+    setError(null);
+
+    fetch(`/api/brand/${brandId}/mentions?${params.toString()}`)
+      .then(async r => {
+        if (!r.ok) throw new Error('Failed to load mentions');
+        return r.json();
+      })
+      .then((data: BrandMention[]) => setMentions(Array.isArray(data) ? data : []))
+      .catch(err => setError((err as Error).message || 'Could not fetch mentions'))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadMentions();
   }, [brandId, realOnly, sourceType, sort, platforms, sentiments, search]);
 
   function onPatch(id: string, patch: Record<string, string>) {
     setMentions(prev => prev.map(m => (m.id === id ? { ...m, ...patch } as BrandMention : m)));
-    fetch(`/api/brand/${brandId}/mentions/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
+    fetch(`/api/brand/${brandId}/mentions/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
   }
 
   async function syncNow() {
@@ -45,9 +66,14 @@ export function MentionsTab({ brandId, realOnly, sourceType }: { brandId: string
     try {
       const res = await fetch(`/api/brand/${brandId}/mentions/sync`, { method: 'POST' });
       const data = await res.json();
-      setSyncMsg(res.ok ? `Synced ${data.synced} new mention${data.synced === 1 ? '' : 's'} from X.` : data.error);
+      if (res.ok) {
+        setSyncMsg(`Synced ${data.synced} new mention${data.synced === 1 ? '' : 's'}.`);
+        loadMentions();
+      } else {
+        setSyncMsg(data.error ? 'Sync failed — provider not connected.' : 'Sync failed');
+      }
     } catch {
-      setSyncMsg('Sync failed — check server logs.');
+      setSyncMsg('Sync failed — check network connection.');
     } finally {
       setSyncing(false);
     }
@@ -58,6 +84,7 @@ export function MentionsTab({ brandId, realOnly, sourceType }: { brandId: string
   }
 
   const topStory = sourceType === 'news' ? mentions[0] : null;
+  const hasActiveFilters = Boolean(search || platforms.length > 0 || sentiments.length > 0);
 
   return (
     <div className="flex gap-4 items-start">
@@ -92,9 +119,41 @@ export function MentionsTab({ brandId, realOnly, sourceType }: { brandId: string
         )}
 
         {loading ? (
-          <div className="panel p-8 text-center text-muted-foreground text-sm">Loading mentions…</div>
+          <CardSkeletonList count={4} />
+        ) : error ? (
+          <ErrorBanner
+            title="Unable to load mentions"
+            message={error}
+            onRetry={loadMentions}
+          />
         ) : mentions.length === 0 ? (
-          <div className="panel p-8 text-center text-muted-foreground text-sm">No mentions match these filters yet.</div>
+          <EmptyState
+            icon={AtSign}
+            title={hasActiveFilters ? 'No matching mentions' : 'Start monitoring your brand'}
+            description={
+              hasActiveFilters
+                ? 'No mentions matched your active filter criteria. Try adjusting search or sentiment filters.'
+                : 'Connect your data source and sync mentions to begin tracking conversations.'
+            }
+            primaryAction={
+              sourceType === 'social'
+                ? { label: 'Sync Mentions', onClick: syncNow, icon: RefreshCw }
+                : undefined
+            }
+            secondaryAction={
+              hasActiveFilters
+                ? {
+                    label: 'Clear Filters',
+                    onClick: () => {
+                      setSearch('');
+                      setPlatforms([]);
+                      setSentiments([]);
+                    },
+                  }
+                : undefined
+            }
+            variant="card"
+          />
         ) : (
           <div className="space-y-3">
             {mentions.map(m => <MentionCard key={m.id} mention={m} onPatch={onPatch} />)}

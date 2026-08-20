@@ -11,11 +11,17 @@ interface TrendChartProps {
   height?: number;
 }
 
-export function TrendChart({ data, xKey, lines, height = 200 }: TrendChartProps) {
+export function TrendChart({ data, xKey, lines, height = 260 }: TrendChartProps) {
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center text-muted-foreground text-sm" style={{ height }}>
-        No data yet
+      <div className="flex flex-col items-center justify-center gap-3 text-center" style={{ height }}>
+        <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center text-muted-foreground">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">No trend data yet</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Performance trends will appear once activity is recorded.</p>
+        </div>
       </div>
     );
   }

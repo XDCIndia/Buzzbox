@@ -23,6 +23,8 @@ import { useDashboard } from "@/store";
 import { StatCard } from "@/components/ui/stat-card";
 import { TrendChart } from "@/components/ui/trend-chart";
 import { DataTable } from "@/components/ui/data-table";
+import { ChartSkeleton } from "@/components/ui/loading-skeleton";
+import { ProviderConfigCard } from "@/components/ui/provider-config-card";
 import type { SocialAnalyticsPoint, SocialAnalyticsSummary } from "@/lib/analytics";
 import { formatDurationSeconds } from "@/lib/analytics";
 import { timeAgo } from "@/lib/utils";
@@ -161,12 +163,14 @@ export default function AnalyticsPage() {
     return (
       <div className="space-y-6 animate-in">
         <div className="panel">
-          <div className="panel-header">
+          <div className="panel-header flex items-center justify-between">
             <h1 className="text-xl font-semibold">Analytics</h1>
           </div>
-          <div className="panel-body">
-            <div className="text-sm text-muted-foreground">Loading…</div>
-          </div>
+        </div>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <ChartSkeleton height={240} />
+          <ChartSkeleton height={240} />
+          <ChartSkeleton height={240} />
         </div>
       </div>
     );
@@ -574,23 +578,15 @@ function WebsitePanel({ website }: { website: WebsitePayload }) {
         ) : website.provider === "iframe" ? (
           <AnalyticsEmbed title="Website analytics embed" src={website.iframeUrl} />
         ) : (
-          <div className="space-y-2">
-            <div className="text-sm text-muted-foreground">Website analytics not configured.</div>
-            {"error" in website && website.error && (
-              <div className="text-xs text-warning">{website.error}</div>
-            )}
-            <div className="text-xs text-muted-foreground">
-              Configure either:
-              <div className="mt-1 font-mono text-[11px]">GA4_PROPERTY_ID + GA4_SERVICE_ACCOUNT_JSON</div>
-              <div className="mt-1">
-                or an embed URL:
-                <div className="mt-1 font-mono text-[11px]">HERMES_ANALYTICS_WEBSITE_IFRAME_URL</div>
-              </div>
-            </div>
-            {"iframeUrl" in website && website.iframeUrl && (
-              <AnalyticsEmbed title="Website analytics embed" src={website.iframeUrl} />
-            )}
-          </div>
+          <ProviderConfigCard
+            providerName="Google Analytics / Plausible"
+            title="Website analytics isn't connected"
+            description="Connect Google Analytics (GA4) or Plausible to monitor visitors, traffic sources, and web page performance."
+            configureHref="/integrations"
+            configureLabel="Configure Integrations"
+            error={"error" in website ? website.error : undefined}
+            icon={Globe}
+          />
         )}
       </div>
     </div>
@@ -657,15 +653,15 @@ function XPanel({ x, days }: { x: AnalyticsPayload["x"]; days: number }) {
             )}
           </>
         ) : (
-          <div className="space-y-2">
-            <div className="text-sm text-muted-foreground">X native analytics not configured.</div>
-            {x.error && <div className="text-xs text-warning">{x.error}</div>}
-            <div className="text-xs text-muted-foreground">
-              Set:
-              <div className="mt-1 font-mono text-[11px]">X_BEARER_TOKEN</div>
-              <div className="mt-1 font-mono text-[11px]">X_USERNAME</div>
-            </div>
-          </div>
+          <ProviderConfigCard
+            providerName="X (Twitter)"
+            title="X integration isn't connected"
+            description="Connect the X API to load live social analytics, follower counts, and post metrics."
+            configureHref="/integrations"
+            configureLabel="Configure Integration"
+            error={x.error}
+            icon={X}
+          />
         )}
       </div>
     </div>
@@ -740,15 +736,15 @@ function LinkedInPanel({
             )}
           </>
         ) : (
-          <div className="space-y-2">
-            <div className="text-sm text-muted-foreground">LinkedIn native analytics not configured.</div>
-            {linkedin.error && <div className="text-xs text-warning">{linkedin.error}</div>}
-            <div className="text-xs text-muted-foreground">
-              Set:
-              <div className="mt-1 font-mono text-[11px]">LINKEDIN_ACCESS_TOKEN</div>
-              <div className="mt-1 font-mono text-[11px]">LINKEDIN_ORGANIZATION_URN</div>
-            </div>
-          </div>
+          <ProviderConfigCard
+            providerName="LinkedIn"
+            title="LinkedIn integration isn't connected"
+            description="Connect LinkedIn API credentials to track page impressions, follower counts, and post engagement."
+            configureHref="/integrations"
+            configureLabel="Configure Integration"
+            error={linkedin.error}
+            icon={Linkedin}
+          />
         )}
       </div>
     </div>

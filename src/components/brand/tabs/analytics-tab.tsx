@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { AtSign, ThumbsUp, HeartHandshake, Smile, Frown, Plus, Trash2, Trophy } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { AtSign, ThumbsUp, HeartHandshake, Smile, Frown, Plus, Trash2, Trophy, Users } from 'lucide-react';
 import { StatTile } from '@/components/brand/stat-tile';
 import { BarBreakdown } from '@/components/brand/bar-breakdown';
 import { TrendChart } from '@/components/ui/trend-chart';
 import { PlatformBadge } from '@/components/brand/platform-badge';
 import { EmptyState } from '@/components/brand/empty-state';
+import { StatCardSkeleton, ChartSkeleton } from '@/components/ui/loading-skeleton';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { formatNumber } from '@/lib/utils';
 import type { BrandMentionStats, BrandCreator, BrandCompetitor } from '@/types';
 
@@ -15,22 +17,49 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
   const [creators, setCreators] = useState<BrandCreator[]>([]);
   const [competitors, setCompetitors] = useState<BrandCompetitor[]>([]);
   const [competitorName, setCompetitorName] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  function loadCompetitors() {
-    fetch(`/api/brand/${brandId}/competitors`).then(r => r.json()).then(setCompetitors).catch(() => {});
-  }
+  const loadCompetitors = useCallback(() => {
+    fetch(`/api/brand/${brandId}/competitors`)
+      .then(r => r.json())
+      .then(data => setCompetitors(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [brandId]);
+
+  const loadAll = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    const real = realOnly ? '?real=true' : '';
+    Promise.all([
+      fetch(`/api/brand/${brandId}/stats${real}`).then(r => {
+        if (!r.ok) throw new Error('Failed to load brand statistics');
+        return r.json();
+      }),
+      fetch(`/api/brand/${brandId}/creators${real}`).then(r => r.json()).catch(() => []),
+      fetch(`/api/brand/${brandId}/competitors`).then(r => r.json()).catch(() => []),
+    ])
+      .then(([statsData, creatorsData, competitorsData]) => {
+        setStats(statsData);
+        setCreators(Array.isArray(creatorsData) ? creatorsData : []);
+        setCompetitors(Array.isArray(competitorsData) ? competitorsData : []);
+      })
+      .catch(err => setError((err as Error).message || 'Failed to load brand analytics'))
+      .finally(() => setLoading(false));
+  }, [brandId, realOnly]);
 
   useEffect(() => {
-    const real = realOnly ? '?real=true' : '';
-    fetch(`/api/brand/${brandId}/stats${real}`).then(r => r.json()).then(setStats).catch(() => {});
-    fetch(`/api/brand/${brandId}/creators${real}`).then(r => r.json()).then(setCreators).catch(() => {});
-    fetch(`/api/brand/${brandId}/competitors`).then(r => r.json()).then(setCompetitors).catch(() => {});
-  }, [brandId, realOnly]);
+    loadAll();
+  }, [loadAll]);
 
   async function addCompetitor(e: React.FormEvent) {
     e.preventDefault();
     if (!competitorName.trim()) return;
-    await fetch(`/api/brand/${brandId}/competitors`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: competitorName.trim() }) });
+    await fetch(`/api/brand/${brandId}/competitors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: competitorName.trim() }),
+    });
     setCompetitorName('');
     loadCompetitors();
   }
@@ -40,7 +69,28 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
     loadCompetitors();
   }
 
-  if (!stats) return <div className="panel p-8 text-center text-muted-foreground text-sm">Loading…</div>;
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {[1, 2, 3, 4, 5].map(i => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+        <ChartSkeleton height={200} />
+      </div>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <ErrorBanner
+        title="Unable to load analytics"
+        message={error || 'Failed to fetch brand analytics data'}
+        onRetry={loadAll}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -75,7 +125,7 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
         <section className="panel">
           <div className="panel-header"><h2 className="section-title">Top Emotions</h2></div>
           <div className="panel-body space-y-2">
-            {stats.emotionBreakdown.length === 0 ? <p className="text-sm text-muted-foreground">No data yet</p> : stats.emotionBreakdown.map(e => (
+            {stats.emotionBreakdown.length === 0 ? <p className="text-sm text-muted-foreground">No emotion data yet</p> : stats.emotionBreakdown.map(e => (
               <BreakdownBar key={e.emotion} label={e.emotion} count={e.count} total={stats.mentions} />
             ))}
           </div>
@@ -83,7 +133,7 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
         <section className="panel">
           <div className="panel-header"><h2 className="section-title">Top Intents</h2></div>
           <div className="panel-body space-y-2">
-            {stats.intentBreakdown.length === 0 ? <p className="text-sm text-muted-foreground">No data yet</p> : stats.intentBreakdown.map(i => (
+            {stats.intentBreakdown.length === 0 ? <p className="text-sm text-muted-foreground">No intent data yet</p> : stats.intentBreakdown.map(i => (
               <BreakdownBar key={i.intent} label={i.intent} count={i.count} total={stats.mentions} />
             ))}
           </div>
@@ -94,7 +144,12 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
         <div className="panel-header"><h2 className="section-title">Top Creators</h2></div>
         <div className="panel-body">
           {creators.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">No creator activity yet</p>
+            <EmptyState
+              icon={Users}
+              title="No creator activity yet"
+              description="Top author profiles will appear here as social mentions are tracked."
+              variant="compact"
+            />
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
               {creators.map(c => (
@@ -123,7 +178,7 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
             <button type="submit" className="brand-btn-primary btn btn-sm"><Plus size={13} /> Add</button>
           </form>
           {competitors.length === 0 ? (
-            <EmptyState icon={Trophy} description="Add competitors to compare performance." variant="compact" />
+            <EmptyState icon={Trophy} title="No competitors added" description="Add competitors to compare performance and share of voice." variant="compact" />
           ) : (
             <div className="grid md:grid-cols-3 gap-3">
               {competitors.map(c => (
@@ -145,13 +200,13 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
 function BreakdownBar({ label, count, total }: { label: string; count: number; total: number }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
-    <div>
-      <div className="flex items-center justify-between text-xs mb-1">
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs">
         <span className="capitalize">{label}</span>
-        <span className="text-muted-foreground">{pct}%</span>
+        <span className="font-mono text-muted-foreground">{count} ({pct}%)</span>
       </div>
-      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--muted)' }}>
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'var(--brand-coral)' }} />
+      <div className="w-full bg-muted/40 h-1.5 rounded-full overflow-hidden">
+        <div className="bg-primary h-full rounded-full transition-all" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );

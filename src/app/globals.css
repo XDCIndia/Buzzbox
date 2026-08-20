@@ -14,9 +14,20 @@
   --color-border: var(--border);
   --color-ring: var(--ring);
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+
+  /* Surface palette */
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
   --font-sans: var(--font-inter);
   --font-mono: var(--font-jetbrains);
 }
@@ -28,52 +39,71 @@
   --radius: 0.625rem;
 
   /* Light mode (default for :root, overridden by .dark) */
-  --background: #ffffff;
-  --foreground: #0f1014;
+  --background: #fafafa;
+  --foreground: #09090b;
   --card: #ffffff;
-  --card-foreground: #151820;
-  --muted: #f1f3f7;
-  --muted-foreground: #6c7284;
-  --primary: #2f6bff;
+  --card-foreground: #09090b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --primary: #ff6d4a;
   --primary-foreground: #ffffff;
-  --accent: #e9edf7;
-  --accent-foreground: #141a2a;
-  --border: #e3e7ef;
-  --ring: #2f6bff;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --border: #e4e4e7;
+  --border-subtle: #f4f4f5;
+  --border-strong: #d4d4d8;
+  --ring: #ff6d4a;
   --success: #16a34a;
+  --success-foreground: #ffffff;
   --warning: #d97706;
+  --warning-foreground: #422006;
   --destructive: #dc2626;
-  --info: #2f6bff;
+  --destructive-foreground: #ffffff;
+  --info: #2563eb;
+  --info-foreground: #ffffff;
 
-  /* Surface hierarchy (Mission Control style) */
+  /* Surface hierarchy */
   --surface-0: #ffffff;
-  --surface-1: #f5f7fb;
-  --surface-2: #edf0f6;
-  --surface-3: #e5e9f2;
+  --surface-1: #f8fafc;
+  --surface-2: #f1f5f9;
+  --surface-3: #e2e8f0;
+
+  /* Brand section scoped tokens */
+  --brand-coral: #ff6d4a;
+  --brand-coral-foreground: #ffffff;
 }
 
 .dark {
-  --background: #0b0d12;
-  --foreground: #f2f4f8;
-  --card: #10131a;
-  --card-foreground: #e8ebf4;
-  --muted: #171b24;
-  --muted-foreground: #8a91a3;
-  --primary: #3892ff;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #111113;
+  --card-foreground: #fafafa;
+  --muted: #161619;
+  --muted-foreground: #a1a1aa;
+  --primary: #ff6d4a;
   --primary-foreground: #ffffff;
-  --accent: #171d2a;
-  --accent-foreground: #dce7ff;
-  --border: #232937;
-  --ring: #3892ff;
+  --accent: #1c1c1f;
+  --accent-foreground: #f4f4f5;
+  --border: #27272a;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --ring: #ff6d4a;
   --success: #22c55e;
+  --success-foreground: #052e16;
   --warning: #f59e0b;
-  --destructive: #e85a6b;
-  --info: #3892ff;
+  --warning-foreground: #422006;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --info: #3b82f6;
+  --info-foreground: #ffffff;
 
-  --surface-0: #0b0d12;
-  --surface-1: #0f141d;
-  --surface-2: #131a24;
-  --surface-3: #1b2431;
+  --surface-0: #09090b;
+  --surface-1: #0e0e10;
+  --surface-2: #141416;
+  --surface-3: #1c1c1f;
+
+  --brand-coral: #ff7a5c;
+  --brand-coral-foreground: #ffffff;
 }
 
 /* ─── Base ─────────────────────────────────────────────── */
@@ -99,7 +129,7 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
 
-/* ─── Glass Effect ─────────────────────────────────────── */
+/* ─── Utilities ────────────────────────────────────────── */
 .glass {
   backdrop-filter: blur(12px);
   background: color-mix(in srgb, var(--card) 85%, transparent);
@@ -117,270 +147,6 @@ body {
 .surface-2 { background: var(--surface-2); }
 .surface-3 { background: var(--surface-3); }
 
-/* ─── Card Variants ────────────────────────────────────── */
-.card {
-  background: color-mix(in srgb, var(--card) 96%, transparent);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent);
-  overflow: hidden;
-}
-
-.card-hover {
-  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-}
-.card-hover:hover {
-  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 10%, transparent), 0 8px 20px color-mix(in srgb, var(--foreground) 8%, transparent);
-  transform: translateY(-1px);
-}
-
-/* ─── Badge ────────────────────────────────────────────── */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 9999px;
-  padding: 2px 10px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  line-height: 1.25rem;
-  white-space: nowrap;
-}
-
-/* Count badges used in nav/header notifications */
-.count-badge {
-  background: color-mix(in srgb, var(--primary) 14%, transparent);
-  color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
-}
-
-.count-badge-info {
-  background: color-mix(in srgb, var(--info) 14%, transparent);
-  color: var(--info);
-  border: 1px solid color-mix(in srgb, var(--info) 30%, transparent);
-}
-
-.badge-success {
-  background: color-mix(in srgb, var(--success) 16%, transparent);
-  color: var(--success);
-  border: 1px solid color-mix(in srgb, var(--success) 24%, transparent);
-}
-.badge-warning {
-  background: color-mix(in srgb, var(--warning) 16%, transparent);
-  color: var(--warning);
-  border: 1px solid color-mix(in srgb, var(--warning) 24%, transparent);
-}
-.badge-error {
-  background: color-mix(in srgb, var(--destructive) 16%, transparent);
-  color: var(--destructive);
-  border: 1px solid color-mix(in srgb, var(--destructive) 24%, transparent);
-}
-.badge-info {
-  background: color-mix(in srgb, var(--info) 16%, transparent);
-  color: var(--info);
-  border: 1px solid color-mix(in srgb, var(--info) 24%, transparent);
-}
-.badge-neutral {
-  background: color-mix(in srgb, var(--surface-1) 85%, transparent);
-  color: var(--muted-foreground);
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-}
-
-/* ─── Stat Card Glow ───────────────────────────────────── */
-.stat-glow {
-  position: relative;
-  overflow: hidden;
-}
-.stat-glow::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--primary) 6%, transparent), transparent 70%);
-  pointer-events: none;
-}
-
-/* ─── Table ────────────────────────────────────────────── */
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.data-table th {
-  text-align: left;
-  padding: 10px 12px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: var(--muted-foreground);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
-  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
-}
-.data-table td {
-  padding: 9px 12px;
-  font-size: 0.8125rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-}
-.data-table tbody tr {
-  transition: background 0.15s;
-}
-.data-table tbody tr:hover {
-  background: color-mix(in srgb, var(--surface-1) 72%, transparent);
-}
-
-/* ─── Button Variants ──────────────────────────────────── */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  line-height: 1.1;
-  transition: all 0.15s ease-out;
-  cursor: pointer;
-  white-space: nowrap;
-  min-height: 32px;
-}
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.btn-primary {
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-.btn-primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--primary) 85%, white);
-}
-.btn-ghost {
-  background: transparent;
-  color: var(--foreground);
-  border: 1px solid var(--border);
-}
-.btn-ghost:hover:not(:disabled) {
-  background: var(--muted);
-}
-.btn-success {
-  background: color-mix(in srgb, var(--success) 15%, transparent);
-  color: var(--success);
-  border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
-}
-.btn-success:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--success) 25%, transparent);
-}
-.btn-destructive {
-  background: color-mix(in srgb, var(--destructive) 15%, transparent);
-  color: var(--destructive);
-  border: 1px solid color-mix(in srgb, var(--destructive) 30%, transparent);
-}
-.btn-destructive:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--destructive) 25%, transparent);
-}
-.btn-sm {
-  min-height: 26px;
-  padding: 3px 9px;
-  font-size: 0.6875rem;
-}
-
-/* ─── Form Controls ───────────────────────────────────── */
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
-select,
-textarea {
-  background: color-mix(in srgb, var(--surface-1) 86%, transparent);
-  border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
-  color: var(--foreground);
-  border-radius: 8px;
-  font-size: 0.8125rem;
-  line-height: 1.2;
-  transition: border-color 0.15s ease-out, box-shadow 0.15s ease-out, background 0.15s ease-out;
-}
-
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
-select {
-  min-height: 32px;
-  padding: 6px 10px;
-}
-
-textarea {
-  padding: 8px 10px;
-}
-
-input::placeholder,
-textarea::placeholder {
-  color: color-mix(in srgb, var(--muted-foreground) 85%, transparent);
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-  outline: none;
-  border-color: color-mix(in srgb, var(--primary) 48%, var(--border));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 18%, transparent);
-}
-
-/* ─── Nav Rail ─────────────────────────────────────────── */
-.nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-  padding: 6px 4px;
-  border-radius: 10px;
-  color: var(--muted-foreground);
-  font-size: 0.58rem;
-  line-height: 1;
-  transition: all 0.15s;
-  cursor: pointer;
-  text-decoration: none;
-}
-.nav-item:hover {
-  color: var(--foreground);
-  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
-}
-.nav-item.active {
-  color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 12%, var(--surface-2));
-  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
-}
-
-.panel {
-  background: color-mix(in srgb, var(--card) 96%, transparent);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.panel-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.panel-body {
-  padding: 16px;
-}
-
-.stat-tile {
-  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
-  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  border-radius: 10px;
-  padding: 10px;
-}
-
-.section-title {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--muted-foreground);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .transition-smooth {
   transition: all 0.2s ease-out;
 }
@@ -391,6 +157,476 @@ textarea:focus {
 
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ─── Editorial typography helpers ──────────────────────── */
+.page-headline {
+  font-size: clamp(1.875rem, 5vw, 2.25rem);
+  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.page-subheadline {
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--muted-foreground);
+}
+
+.section-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.section-heading {
+  font-size: 0.75rem;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* ─── Component Layer ─────────────────────────────────── */
+/*
+ * Component defaults are defined inside @layer components so that Tailwind
+ * utility classes (e.g. px-2, py-1, pl-9, pr-3, gap-2, bg-*, text-*) can
+ * reliably override them when explicitly applied on JSX elements.
+ */
+@layer components {
+  /* ─── Card Variants ────────────────────────────────────── */
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 1px 2px color-mix(in srgb, #000000 20%, transparent);
+    overflow: hidden;
+  }
+
+  .card-hover {
+    transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out, transform 0.2s ease-out;
+  }
+  .card-hover:hover {
+    border-color: color-mix(in srgb, var(--primary) 24%, var(--border));
+    box-shadow: 0 8px 24px color-mix(in srgb, #000000 30%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .stat-glow {
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-glow::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at center, color-mix(in srgb, var(--primary) 6%, transparent), transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ─── Unified Metric Bar ───────────────────────────────── */
+  .metric-bar {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-1);
+    overflow: hidden;
+  }
+
+  .metric-bar-item {
+    position: relative;
+    padding: 20px 24px;
+    min-height: 128px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: background 0.15s ease-out;
+  }
+
+  .metric-bar-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 20%;
+    height: 60%;
+    width: 1px;
+    background: var(--border);
+  }
+
+  .metric-bar-item:hover {
+    background: color-mix(in srgb, var(--surface-2) 45%, transparent);
+  }
+
+  @media (max-width: 1024px) {
+    .metric-bar {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .metric-bar-item::after {
+      display: none;
+    }
+    .metric-bar-item:nth-child(odd)::after {
+      display: block;
+      top: auto;
+      right: 0;
+      left: auto;
+      bottom: 10%;
+      width: 1px;
+      height: 80%;
+    }
+    .metric-bar-item:nth-child(-n+2)::before {
+      content: '';
+      position: absolute;
+      left: 5%;
+      right: 5%;
+      bottom: 0;
+      height: 1px;
+      background: var(--border);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .metric-bar {
+      grid-template-columns: 1fr;
+    }
+    .metric-bar-item::after,
+    .metric-bar-item::before {
+      display: none !important;
+    }
+    .metric-bar-item:not(:last-child) {
+      border-bottom: 1px solid var(--border);
+    }
+  }
+
+  /* ─── Badge ────────────────────────────────────────────── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    padding: 2px 10px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    white-space: nowrap;
+  }
+
+  /* Count badges used in nav/header notifications */
+  .count-badge {
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
+    color: var(--primary);
+    border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  }
+
+  .count-badge-info {
+    background: color-mix(in srgb, var(--info) 14%, transparent);
+    color: var(--info);
+    border: 1px solid color-mix(in srgb, var(--info) 30%, transparent);
+  }
+
+  .badge-success {
+    background: color-mix(in srgb, var(--success) 16%, transparent);
+    color: var(--success);
+    border: 1px solid color-mix(in srgb, var(--success) 24%, transparent);
+  }
+  .badge-warning {
+    background: color-mix(in srgb, var(--warning) 16%, transparent);
+    color: var(--warning);
+    border: 1px solid color-mix(in srgb, var(--warning) 24%, transparent);
+  }
+  .badge-error {
+    background: color-mix(in srgb, var(--destructive) 16%, transparent);
+    color: var(--destructive);
+    border: 1px solid color-mix(in srgb, var(--destructive) 24%, transparent);
+  }
+  .badge-info {
+    background: color-mix(in srgb, var(--info) 16%, transparent);
+    color: var(--info);
+    border: 1px solid color-mix(in srgb, var(--info) 24%, transparent);
+  }
+  .badge-neutral {
+    background: color-mix(in srgb, var(--surface-1) 85%, transparent);
+    color: var(--muted-foreground);
+    border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  }
+
+  /* ─── Table ────────────────────────────────────────────── */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .data-table th {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+    background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+  }
+  .data-table td {
+    padding: 9px 12px;
+    font-size: 0.8125rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  }
+  .data-table tbody tr {
+    transition: background 0.15s;
+  }
+  .data-table tbody tr:hover {
+    background: color-mix(in srgb, var(--surface-1) 72%, transparent);
+  }
+
+  /* ─── Button Variants ──────────────────────────────────── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.1;
+    transition: all 0.15s ease-out;
+    cursor: pointer;
+    white-space: nowrap;
+    min-height: 32px;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--primary) 85%, white);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--foreground);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--muted);
+  }
+  .btn-success {
+    background: color-mix(in srgb, var(--success) 15%, transparent);
+    color: var(--success);
+    border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
+  }
+  .btn-success:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--success) 25%, transparent);
+  }
+  .btn-destructive {
+    background: color-mix(in srgb, var(--destructive) 15%, transparent);
+    color: var(--destructive);
+    border: 1px solid color-mix(in srgb, var(--destructive) 30%, transparent);
+  }
+  .btn-destructive:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--destructive) 25%, transparent);
+  }
+  .btn-sm {
+    min-height: 26px;
+    padding: 3px 9px;
+    font-size: 0.6875rem;
+  }
+
+  .btn-lg {
+    min-height: 40px;
+    padding: 9px 18px;
+    font-size: 0.9375rem;
+    border-radius: 10px;
+  }
+
+  /* ─── Form Controls ───────────────────────────────────── */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea {
+    background: color-mix(in srgb, var(--surface-1) 86%, transparent);
+    border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+    color: var(--foreground);
+    border-radius: 8px;
+    font-size: 0.8125rem;
+    line-height: 1.2;
+    transition: border-color 0.15s ease-out, box-shadow 0.15s ease-out, background 0.15s ease-out;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select {
+    min-height: 32px;
+    padding: 6px 10px;
+  }
+
+  textarea {
+    padding: 8px 10px;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: color-mix(in srgb, var(--muted-foreground) 85%, transparent);
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--primary) 48%, var(--border));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 18%, transparent);
+  }
+
+  /* ─── Nav Rail Items ───────────────────────────────────── */
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 6px 4px;
+    border-radius: 10px;
+    color: var(--muted-foreground);
+    font-size: 0.58rem;
+    line-height: 1;
+    transition: all 0.15s;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .nav-item:hover {
+    color: var(--foreground);
+    background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  }
+  .nav-item.active {
+    color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 12%, var(--surface-2));
+    border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  }
+
+  /* ─── Panels & Tiles ──────────────────────────────────── */
+  .panel {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .panel-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .panel-body {
+    padding: 18px;
+  }
+
+  .stat-tile {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+
+  .section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* ─── Tab Component ────────────────────────────────────── */
+  .tab {
+    padding: 8px 16px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    cursor: pointer;
+  }
+  .tab:hover {
+    color: var(--foreground);
+  }
+  .tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+  }
+
+  /* ─── Brand Scoped Components ─────────────────────────── */
+  .brand-nav-group-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0 8px;
+  }
+
+  .brand-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+    text-decoration: none;
+    transition: all 0.15s;
+  }
+  .brand-nav-item:hover {
+    color: var(--foreground);
+    background: var(--muted);
+  }
+  .brand-nav-item.active {
+    color: var(--brand-coral);
+    background: color-mix(in srgb, var(--brand-coral) 14%, transparent);
+    font-weight: 600;
+  }
+
+  .brand-btn-primary {
+    background: var(--brand-coral);
+    color: var(--brand-coral-foreground);
+  }
+  .brand-btn-primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--brand-coral) 88%, black);
+  }
+
+  .brand-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+  .brand-chip:hover {
+    border-color: color-mix(in srgb, var(--foreground) 14%, transparent);
+  }
+  .brand-chip-positive { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
+  .brand-chip-negative { background: color-mix(in srgb, var(--destructive) 15%, transparent); color: var(--destructive); }
+  .brand-chip-neutral { background: color-mix(in srgb, var(--muted-foreground) 14%, transparent); color: var(--muted-foreground); }
+
+  .brand-stat-tile {
+    background: color-mix(in srgb, var(--card) 96%, transparent);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+  }
 }
 
 /* ─── Animations ───────────────────────────────────────── */
@@ -442,25 +678,7 @@ textarea:focus {
   animation: count-up 0.4s ease-out;
 }
 
-/* ─── Tab Component ────────────────────────────────────── */
-.tab {
-  padding: 8px 16px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--muted-foreground);
-  border-bottom: 2px solid transparent;
-  transition: all 0.15s;
-  cursor: pointer;
-}
-.tab:hover {
-  color: var(--foreground);
-}
-.tab.active {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
-}
-
-/* ─── Mobile Nav ───────────────────────────────────────── */
+/* ─── Mobile Nav & Media Queries ───────────────────────── */
 @media (max-width: 768px) {
   .nav-rail { display: none !important; }
   .mobile-nav { display: flex !important; }
@@ -478,80 +696,4 @@ textarea:focus {
 
 @media (min-width: 769px) {
   .mobile-nav { display: none !important; }
-}
-
-/* ─── Brand Mentions section (coral accent, scoped) ────── */
-:root {
-  --brand-coral: #ff6d4a;
-  --brand-coral-foreground: #ffffff;
-}
-.dark {
-  --brand-coral: #ff7a5c;
-}
-
-.brand-nav-group-label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: var(--muted-foreground);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 0 8px;
-}
-
-.brand-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 0.8125rem;
-  color: var(--muted-foreground);
-  text-decoration: none;
-  transition: all 0.15s;
-}
-.brand-nav-item:hover {
-  color: var(--foreground);
-  background: var(--muted);
-}
-.brand-nav-item.active {
-  color: var(--brand-coral);
-  background: color-mix(in srgb, var(--brand-coral) 14%, transparent);
-  font-weight: 600;
-}
-
-.brand-btn-primary {
-  background: var(--brand-coral);
-  color: var(--brand-coral-foreground);
-}
-.brand-btn-primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--brand-coral) 88%, black);
-}
-
-.brand-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 9px;
-  border-radius: 9999px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background 0.15s, border-color 0.15s;
-  white-space: nowrap;
-}
-.brand-chip:hover {
-  border-color: color-mix(in srgb, var(--foreground) 14%, transparent);
-}
-.brand-chip-positive { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
-.brand-chip-negative { background: color-mix(in srgb, var(--destructive) 15%, transparent); color: var(--destructive); }
-.brand-chip-neutral { background: color-mix(in srgb, var(--muted-foreground) 14%, transparent); color: var(--muted-foreground); }
-
-.brand-stat-tile {
-  background: color-mix(in srgb, var(--card) 96%, transparent);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  position: relative;
-  overflow: hidden;
 }
