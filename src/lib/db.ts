@@ -307,4 +307,5 @@ function migrate(db: Database.Database) {
 
   // Column migrations (safe to re-run)
   try { db.exec("ALTER TABLE leads ADD COLUMN pause_outreach INTEGER DEFAULT 0"); } catch { /* column exists */ }
+  try { db.exec("ALTER TABLE content_posts ADD COLUMN image_url TEXT"); } catch { /* column exists */ }
 }
