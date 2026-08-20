@@ -315,8 +315,26 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_llm_usage_events_day ON llm_usage_events(day);
     CREATE INDEX IF NOT EXISTS idx_llm_usage_events_day_agent ON llm_usage_events(day, agent_id);
 
+    CREATE TABLE IF NOT EXISTS content_queue_items (
+      id TEXT PRIMARY KEY,
+      platform TEXT NOT NULL,
+      format TEXT NOT NULL,
+      pillar INTEGER,
+      text_preview TEXT,
+      full_content TEXT,
+      image_url TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      scheduled_for DATETIME,
+      queue_json TEXT,
+      source TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_content_queue_items_status ON content_queue_items(status);
+
   `);
 
   // Column migrations (safe to re-run)
   try { db.exec("ALTER TABLE leads ADD COLUMN pause_outreach INTEGER DEFAULT 0"); } catch { /* column exists */ }
+  try { db.exec("ALTER TABLE content_posts ADD COLUMN image_url TEXT"); } catch { /* column exists */ }
 }
