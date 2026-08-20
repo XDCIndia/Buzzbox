@@ -5,15 +5,18 @@ import { Sparkles, FileText } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { EmptyState } from '@/components/brand/empty-state';
 import { ErrorBanner } from '@/components/ui/error-banner';
+import { CardSkeletonList } from '@/components/ui/loading-skeleton';
 import type { BrandDigest } from '@/types';
 
 export function DigestsTab({ brandId }: { brandId: string }) {
   const [digests, setDigests] = useState<BrandDigest[]>([]);
   const [active, setActive] = useState<BrandDigest | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   function loadDigests() {
+    setLoading(true);
     setError(null);
     fetch(`/api/brand/${brandId}/digests`)
       .then(r => {
@@ -24,7 +27,8 @@ export function DigestsTab({ brandId }: { brandId: string }) {
         setDigests(Array.isArray(data) ? data : []);
         if (Array.isArray(data) && data.length) setActive(data[0]);
       })
-      .catch(err => setError((err as Error).message));
+      .catch(err => setError((err as Error).message || 'Failed to fetch digests'))
+      .finally(() => setLoading(false));
   }
 
   useEffect(() => {
@@ -44,6 +48,15 @@ export function DigestsTab({ brandId }: { brandId: string }) {
     } finally {
       setGenerating(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="grid md:grid-cols-[260px_1fr] gap-4">
+        <CardSkeletonList count={3} />
+        <CardSkeletonList count={1} />
+      </div>
+    );
   }
 
   return (
