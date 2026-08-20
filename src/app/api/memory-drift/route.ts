@@ -24,7 +24,34 @@ export async function GET(request: Request) {
     const driftJson = path.join(healthDir, 'memory-drift-weekly.json');
 
     if (!fs.existsSync(driftJson)) {
-      return NextResponse.json({ error: 'Memory drift report not found' }, { status: 404 });
+      return NextResponse.json({
+        namespace: instance.id,
+        collected_at: new Date().toISOString(),
+        window_days: 7,
+        collective_total: 0,
+        contradictions: {
+          count: 0,
+          top_events: [],
+          by_agent: {},
+        },
+        duplicates: {
+          count: 0,
+          top_clusters: [],
+        },
+        access: {
+          hot_count: 0,
+          cold_count: 0,
+          never_accessed_count: 0,
+          total: 0,
+          top_accessed: [],
+        },
+        contributions: {
+          agents: [],
+          weak_agents: [],
+          weak_ratio_threshold: 0.2,
+          weak_min_sessions: 5,
+        },
+      });
     }
     const raw = fs.readFileSync(driftJson, 'utf-8');
     const data = JSON.parse(raw);
@@ -34,4 +61,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Failed to read memory drift report' }, { status: 500 });
   }
 }
-

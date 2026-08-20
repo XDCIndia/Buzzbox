@@ -24,7 +24,19 @@ export async function GET(request: Request) {
     const healthJson = path.join(healthDir, 'memory-health.json');
 
     if (!fs.existsSync(healthJson)) {
-      return NextResponse.json({ error: 'Memory health report not found' }, { status: 404 });
+      return NextResponse.json({
+        namespace: instance.id,
+        collected_at: new Date().toISOString(),
+        collective: {
+          shared_dir: healthDir,
+          md_exists: false,
+          jsonl_exists: false,
+          md_mtime: null,
+          jsonl_mtime: null,
+          entries: 0,
+        },
+        agents: [],
+      });
     }
     const raw = fs.readFileSync(healthJson, 'utf-8');
     const data = JSON.parse(raw);
@@ -34,4 +46,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Failed to read memory health report' }, { status: 500 });
   }
 }
-
