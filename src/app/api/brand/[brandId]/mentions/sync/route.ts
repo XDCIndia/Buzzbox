@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireApiUser } from '@/lib/api-auth';
 import { getBrand, insertBrandMention } from '@/lib/brand-queries';
 import { searchXMentions } from '@/lib/x-api';
+import { searchYouTubeMentions } from '@/lib/youtube-api';
 import { classifyMention } from '@/lib/mention-classify';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
@@ -21,9 +22,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
   if (!brand) return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
   const query = brand.keywords[0] || brand.name;
 
+  let inserted = 0;
+  const skipped: string[] = [];
+  const errors: Record<string, string> = {};
+
   try {
     const results = await searchXMentions({ bearerToken, query, maxResults: 50 });
-    let inserted = 0;
     for (const r of results) {
       const { sentiment, emotion } = classifyMention(r.text);
       insertBrandMention({
@@ -48,8 +52,44 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
       });
       inserted++;
     }
-    return NextResponse.json({ synced: inserted });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 502 });
   }
+
+  const youtubeApiKey = process.env.YOUTUBE_API_KEY;
+  if (!youtubeApiKey) {
+    skipped.push('youtube');
+  } else {
+    try {
+      const results = await searchYouTubeMentions({ apiKey: youtubeApiKey, query, maxResults: 25 });
+      for (const r of results) {
+        const { sentiment, emotion } = classifyMention(r.text);
+        insertBrandMention({
+          id: `youtube_${r.id}`,
+          brand_id: brandId,
+          source_type: 'social',
+          platform: 'youtube',
+          author_name: r.author_name,
+          author_handle: r.author_handle,
+          author_avatar_url: null,
+          author_reach: r.author_reach,
+          text: r.text,
+          url: r.url || null,
+          likes: r.likes,
+          comments: r.comments,
+          sentiment,
+          emotion,
+          intent: null,
+          is_crisis: false,
+          is_high_impact: r.author_reach > 100_000,
+          published_at: r.published_at,
+        });
+        inserted++;
+      }
+    } catch (err) {
+      errors.youtube = (err as Error).message;
+    }
+  }
+
+  return NextResponse.json({ synced: inserted, skipped, errors });
 }
