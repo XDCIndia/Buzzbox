@@ -527,7 +527,11 @@ function MetricColumn({
       </div>
       {sparkline && sparkline.length > 1 && (
         <div className="h-10 mt-3">
-          <ResponsiveContainer width="100%" height="100%">
+          {/* Fixed pixel height (matches h-10) instead of "100%" so Recharts has a
+              real, non-percentage size to measure on first mount -- a percentage
+              height resolves to the ResponsiveContainer's -1 initial dimension
+              before ResizeObserver fires, which triggers its zero-size warning. */}
+          <ResponsiveContainer width="100%" height={40}>
             <AreaChart data={sparkline}>
               <defs>
                 <linearGradient id={`gradient-${label}`} x1="0" y1="0" x2="0" y2="1">
