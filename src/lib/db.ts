@@ -303,6 +303,18 @@ function migrate(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_brand_digests_brand ON brand_digests(brand_id);
 
+    CREATE TABLE IF NOT EXISTS llm_usage_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      day TEXT,
+      agent_id TEXT,
+      model TEXT,
+      total_tokens INTEGER,
+      cost_usd REAL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_llm_usage_events_day ON llm_usage_events(day);
+    CREATE INDEX IF NOT EXISTS idx_llm_usage_events_day_agent ON llm_usage_events(day, agent_id);
+
   `);
 
   // Column migrations (safe to re-run)
