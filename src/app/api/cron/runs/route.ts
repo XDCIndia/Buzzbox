@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'node:fs';
-import path from 'node:path';
-import { requireApiUser } from '@/lib/api-auth';
+import { requireApiCapability } from '@/lib/api-auth';
+import { resolveCronRunFilePath } from '@/lib/cron-jobs';
 import { getInstance, resolveOpenClawPaths } from '@/lib/instances';
 
 export const dynamic = 'force-dynamic';
@@ -15,19 +15,21 @@ function getInstanceId(req: NextRequest): string | null {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = requireApiUser(req as unknown as Request);
+  const auth = requireApiCapability(req as unknown as Request, 'manage_system');
   if (auth) return auth;
 
   try {
     const instance = getInstance(getInstanceId(req));
     const { cronDir } = resolveOpenClawPaths(instance);
-    const runsDir = path.join(cronDir, 'runs');
 
     const id = req.nextUrl.searchParams.get('id');
     if (!id) {
       return NextResponse.json({ error: 'Missing id' }, { status: 400 });
     }
-    const file = path.join(runsDir, `${id}.jsonl`);
+    const file = resolveCronRunFilePath(cronDir, id);
+    if (!file) {
+      return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+    }
     if (!fs.existsSync(file)) {
       return NextResponse.json({ runs: [] });
     }

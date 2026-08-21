@@ -39,6 +39,26 @@ export function getJobsPath(cronDir: string): string {
   return path.join(cronDir, 'jobs.json');
 }
 
+export function getCronRunsDir(cronDir: string): string {
+  return path.join(path.resolve(cronDir), 'runs');
+}
+
+export function isPathInsideDir(rootDir: string, candidate: string): boolean {
+  const rootResolved = path.resolve(rootDir);
+  const candidateResolved = path.resolve(candidate);
+  if (candidateResolved === rootResolved) return false;
+  return candidateResolved.startsWith(rootResolved + path.sep);
+}
+
+export function resolveCronRunFilePath(cronDir: string, rawId: unknown): string | null {
+  const id = normalizeJobId(rawId);
+  if (!id) return null;
+  const runsDir = getCronRunsDir(cronDir);
+  const file = path.resolve(runsDir, `${id}.jsonl`);
+  if (!isPathInsideDir(runsDir, file)) return null;
+  return file;
+}
+
 function resolveCronJobId(job: CronJobConfig): string | null {
   return normalizeJobId(job.id ?? job.jobId);
 }
