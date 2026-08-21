@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireApiUser } from '@/lib/api-auth';
+import { requireApiEditor, requireApiUser } from '@/lib/api-auth';
 import { getBrand, updateBrand } from '@/lib/brand-queries';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ bran
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
-  const auth = requireApiUser(req as Request);
+  const auth = requireApiEditor(req as Request);
   if (auth) return auth;
   const { brandId } = await params;
   const existing = getBrand(brandId);

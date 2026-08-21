@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { requireApiUser } from '@/lib/api-auth';
+import { requireApiCapability, requireApiUser } from '@/lib/api-auth';
 import { requireUser } from '@/lib/auth';
 import { allowPolicyWrite, getInstance, resolveOpenClawPaths } from '@/lib/instances';
 
@@ -106,7 +106,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = requireApiUser(request);
+  const auth = requireApiCapability(request, 'manage_system');
   if (auth) return auth;
   if (!allowPolicyWrite()) {
     return NextResponse.json(

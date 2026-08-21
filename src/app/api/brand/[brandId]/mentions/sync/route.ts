@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireApiUser } from '@/lib/api-auth';
+import { requireApiEditor } from '@/lib/api-auth';
 import { getBrand, insertBrandMention } from '@/lib/brand-queries';
 import { searchXMentions } from '@/lib/x-api';
 import { searchInstagramMentions } from '@/lib/instagram-api';
@@ -8,7 +8,7 @@ import { searchRedditMentions } from '@/lib/reddit-api';
 import { classifyMention } from '@/lib/mention-classify';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
-  const auth = requireApiUser(req as Request);
+  const auth = requireApiEditor(req as Request);
   if (auth) return auth;
   const { brandId } = await params;
 

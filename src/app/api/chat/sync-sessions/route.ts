@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import fs from 'fs';
 import path from 'path';
-import { requireApiUser } from '@/lib/api-auth';
+import { requireApiCapability, requireApiUser } from '@/lib/api-auth';
 import { getAgentIds } from '@/lib/agent-config';
 import { getInstance, resolveOpenClawPaths } from '@/lib/instances';
 
@@ -33,7 +33,7 @@ interface SessionEntry {
  * into the messages table. Tracks progress via session_sync table.
  */
 export async function POST(request: Request) {
-  const auth = requireApiUser(request as Request);
+  const auth = requireApiCapability(request as Request, 'manage_system');
   if (auth) return auth;
 
   const instance = getInstance(getInstanceId(request));
