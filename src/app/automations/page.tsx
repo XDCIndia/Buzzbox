@@ -242,12 +242,12 @@ export default function AutomationsPage() {
               <p className="text-sm text-muted-foreground text-center py-8">No execution data yet</p>
             ) : (
               <div className="space-y-2">
-                {skill_executions.map(exec => {
+                {skill_executions.map((exec, execIndex) => {
                   const maxCount = Math.max(...skill_executions.map(e => e.count), 1);
                   const width = (exec.count / maxCount) * 100;
                   const style = agentStyles[exec.agent] ?? fallbackStyle;
                   return (
-                    <div key={`${exec.agent}-${exec.skill}`} className="space-y-1">
+                    <div key={`${exec.agent}-${exec.skill}-${execIndex}`} className="space-y-1">
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`} />
