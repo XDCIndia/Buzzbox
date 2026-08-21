@@ -8,6 +8,7 @@ import { allowWorkspaceWrite, getInstance, resolveOpenClawPaths } from '@/lib/in
 import {
   getAgentWorkspaceRoot,
   isAllowedWorkspaceWritePath,
+  normalizeWorkspaceRelativePath,
   resolveWorkspacePath,
   WORKSPACE_MAX_FILE_BYTES,
 } from '@/lib/agent-workspace';
@@ -40,17 +41,25 @@ function getInstanceIdFromRequest(req: NextRequest): string | null {
   }
 }
 
+const HIDDEN_DIR_NAMES = new Set([
+  'node_modules',
+  'credentials',
+  'state',
+  'logs',
+  'sessions',
+  'sandboxes',
+  'sandbox',
+]);
+
 function shouldHide(relPosix: string): boolean {
   const segments = relPosix.split('/').filter(Boolean);
-  if (segments.some((s) => s.startsWith('.'))) return true;
-  if (segments.some((s) => s.toLowerCase() === 'node_modules')) return true;
-  if (segments.some((s) => s.toLowerCase() === 'credentials')) return true;
-  if (segments.some((s) => s.toLowerCase() === 'state')) return true;
-  if (segments.some((s) => s.toLowerCase() === 'logs')) return true;
-  if (segments.some((s) => s.toLowerCase() === 'sessions')) return true;
-  if (segments.some((s) => s.toLowerCase() === 'sandboxes')) return true;
-  if (segments.some((s) => s.toLowerCase() === 'sandbox')) return true;
-  return false;
+  return segments.some((s) => {
+    if (s.startsWith('.')) return true;
+    // Windows strips trailing dots/spaces from path segments, so match
+    // sensitive names ignoring them (e.g. "credentials." === "credentials").
+    const name = s.replace(/[. ]+$/, '').toLowerCase();
+    return HIDDEN_DIR_NAMES.has(name);
+  });
 }
 
 async function listDir(root: string, relDir: string, depth: number, maxEntries: number): Promise<Entry[]> {
@@ -195,6 +204,12 @@ export async function GET(req: NextRequest) {
 
     const abs = resolveWorkspacePath(root.abs, rel);
     if (!abs) return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+
+    // Direct reads must obey the same sensitive-path policy as listings.
+    const relNormalized = normalizeWorkspaceRelativePath(rel);
+    if (relNormalized && shouldHide(relNormalized)) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
 
     const st = await fs.stat(abs).catch(() => null);
     if (!st) return NextResponse.json({ error: 'Not found' }, { status: 404 });
