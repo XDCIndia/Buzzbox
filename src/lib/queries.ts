@@ -113,6 +113,37 @@ export function getAlerts(filters?: { excludeSeed?: boolean }): Alert[] {
   return alerts;
 }
 
+// ─── Approvals ─────────────────────────────────────────
+export function getPendingApprovals() {
+  const db = getDb();
+
+  const content = db.prepare(
+    `SELECT id, platform, format, pillar, text_preview,
+            full_content, status, scheduled_for,
+            created_at, image_url
+     FROM content_posts
+     WHERE status = 'pending_approval'
+     ORDER BY created_at ASC`
+  ).all();
+
+  const sequences = db.prepare(
+    `SELECT s.id, s.lead_id, s.sequence_name, s.step,
+            s.subject, s.body, s.status, s.tier,
+            s.created_at, l.first_name, l.last_name,
+            l.company
+     FROM sequences s
+     LEFT JOIN leads l ON s.lead_id = l.id
+     WHERE s.status = 'pending_approval'
+     ORDER BY s.created_at ASC`
+  ).all();
+
+  return {
+    content,
+    sequences,
+    total: content.length + sequences.length,
+  };
+}
+
 // ─── Content ───────────────────────────────────────────
 export function getContentPosts(filters?: {
   status?: string;
@@ -408,4 +439,49 @@ export function getSeedCount(): number {
 /** Returns SQL fragment to exclude seeded records from a query */
 export function seedFilter(tableName: string, idColumn: string = 'id'): string {
   return `AND NOT EXISTS (SELECT 1 FROM seed_registry sr WHERE sr.table_name = '${tableName}' AND sr.record_id = CAST(${idColumn} AS TEXT))`;
+}
+
+export function createBuzzContentDraft({
+  platform,
+  content,
+}: {
+  platform: string;
+  content: string;
+}) {
+  const db = getDb();
+
+  const id = `buzz-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    INSERT INTO content_posts (
+      id,
+      platform,
+      format,
+      pillar,
+      text_preview,
+      full_content,
+      status,
+      created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    platform,
+    'post',
+    1,
+    content.slice(0, 160),
+    content,
+    'draft',
+    now,
+  );
+
+  return db.prepare(`
+    SELECT *
+    FROM content_posts
+    WHERE id = ?
+  `).get(id);
 }
