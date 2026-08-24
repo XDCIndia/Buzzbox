@@ -11,6 +11,7 @@ import { useDashboard } from '@/store';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { timeAgo } from '@/lib/utils';
 import type { Notification } from '@/types';
+import { BuzzAssistant } from '@/components/chat/buzz-assistant';
 
 interface HeaderStats {
   posts_today: number;
@@ -53,8 +54,9 @@ export function HeaderBar() {
       <div className="flex items-center gap-2 sm:gap-2.5">
         <SeedToggle active={realOnly} onToggle={toggleRealOnly} />
         <SearchTrigger />
-        <NotificationBell />
         <ThemeToggle />
+        <BuzzAssistant />
+        <NotificationBell />
         <FeedToggle open={feedOpen} onToggle={toggleFeed} />
         <SyncStatus />
         <LogoutButton />
