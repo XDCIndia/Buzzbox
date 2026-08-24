@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireApiUser } from '@/lib/api-auth';
 import { getBrand, insertBrandMention } from '@/lib/brand-queries';
 import { searchXMentions, type XMentionResult } from '@/lib/x-api';
+import { searchFacebookPageMentions, type FacebookMentionResult } from '@/lib/facebook-api';
 import { fetchThreadsMentions, type ThreadsMentionResult } from '@/lib/threads-api';
 import { searchYouTubeMentions, type YouTubeMentionResult } from '@/lib/youtube-api';
 import { searchInstagramMentions, type InstagramMentionResult } from '@/lib/instagram-api';
@@ -12,6 +13,7 @@ import type { MentionPlatform } from '@/types';
 
 type MentionSyncResult =
   | XMentionResult
+  | FacebookMentionResult
   | ThreadsMentionResult
   | YouTubeMentionResult
   | InstagramMentionResult
@@ -58,6 +60,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
   const { brandId } = await params;
 
   const bearerToken = process.env.X_BEARER_TOKEN;
+  const fbPageAccessToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  const fbPageId = process.env.FACEBOOK_PAGE_ID;
   const threadsAccessToken = process.env.THREADS_ACCESS_TOKEN;
   const threadsUserId = process.env.THREADS_USER_ID;
   const youtubeApiKey = process.env.YOUTUBE_API_KEY;
@@ -71,6 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
 
   if (
     !bearerToken &&
+    !(fbPageAccessToken && fbPageId) &&
     !(threadsAccessToken && threadsUserId) &&
     !youtubeApiKey &&
     !(igAccessToken && igBusinessAccountId) &&
@@ -78,7 +83,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
     !redditConfigured
   ) {
     return NextResponse.json(
-      { error: 'No social connector is configured. Add X_BEARER_TOKEN, THREADS_ACCESS_TOKEN/THREADS_USER_ID, YOUTUBE_API_KEY, INSTAGRAM_ACCESS_TOKEN/INSTAGRAM_BUSINESS_ACCOUNT_ID, TIKTOK_ACCESS_TOKEN, or REDDIT_CLIENT_ID/REDDIT_CLIENT_SECRET/REDDIT_USER_AGENT to .env.local to enable live mention syncing.' },
+      { error: 'No social connector is configured. Add X_BEARER_TOKEN, FACEBOOK_PAGE_ACCESS_TOKEN/FACEBOOK_PAGE_ID, THREADS_ACCESS_TOKEN/THREADS_USER_ID, YOUTUBE_API_KEY, INSTAGRAM_ACCESS_TOKEN/INSTAGRAM_BUSINESS_ACCOUNT_ID, TIKTOK_ACCESS_TOKEN, or REDDIT_CLIENT_ID/REDDIT_CLIENT_SECRET/REDDIT_USER_AGENT to .env.local to enable live mention syncing.' },
       { status: 412 },
     );
   }
@@ -103,6 +108,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
     }
   } else {
     skipped.push('x');
+  }
+
+  // Facebook's Graph API has no open keyword search across all of Facebook --
+  // a Page access token only grants visibility into that Page's own posts
+  // and comments, so this is scoped to searching the Page's recent posts.
+  if (fbPageAccessToken && fbPageId) {
+    try {
+      const results = await searchFacebookPageMentions({
+        pageAccessToken: fbPageAccessToken,
+        pageId: fbPageId,
+        query,
+        maxResults: 50,
+      });
+      inserted += insertResults(brandId, 'facebook', 'facebook', results);
+    } catch (err) {
+      errors.facebook = (err as Error).message;
+    }
+  } else {
+    skipped.push('facebook');
   }
 
   // Threads' public API only exposes mentions/replies on OUR OWN authorized
