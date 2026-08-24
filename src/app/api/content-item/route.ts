@@ -4,6 +4,7 @@ import path from 'node:path';
 import { getDb } from '@/lib/db';
 import { getHermesStateDir } from '@/lib/hermes-state';
 import { requireApiEditor, requireApiUser } from '@/lib/api-auth';
+import { maybePublishToX } from '@/lib/publish-to-x';
 
 export const dynamic = 'force-dynamic';
 
@@ -161,8 +162,25 @@ export async function PATCH(req: NextRequest) {
     const platform = (updated.platform as string | undefined) || 'x';
     const format = (updated.format as string | undefined) || 'short_post';
     const pillar = (updated.pillar as number | null | undefined) ?? null;
-    const status = (updated.status as string | undefined) || 'draft';
+    let status = (updated.status as string | undefined) || 'draft';
     const scheduledFor = (updated.scheduled_for as string | null | undefined) ?? null;
+
+    // Approving/publishing a queued X item is the moment it actually needs
+    // to go out -- wire the real post here rather than just flipping a status flag.
+    const publishResult = await maybePublishToX({
+      platform,
+      previousStatus: (current.status as string | undefined) ?? null,
+      nextStatus: status,
+      text: parsed.full || parsed.preview,
+    });
+    if (publishResult.attempted && !publishResult.ok) {
+      return NextResponse.json({ error: publishResult.error }, { status: publishResult.status });
+    }
+    if (publishResult.attempted && publishResult.ok) {
+      status = 'published';
+      updated.status = status;
+    }
+
     const queueJson = JSON.stringify(updated);
 
     db.transaction(() => {
