@@ -104,7 +104,7 @@ export function BuzzAssistant() {
     }
   }
 
-  function useSuggestion(text: string) {
+  function handleSuggestion(text: string) {
     setInput(text);
   }
 
@@ -212,19 +212,19 @@ export function BuzzAssistant() {
                 <button
                   type="button"
                   onClick={() =>
-                    useSuggestion(
+                    handleSuggestion(
                       "Give me today's marketing overview",
                     )
                   }
                   className="whitespace-nowrap px-2.5 py-1.5 rounded-lg bg-surface-1 border border-border text-[10px] text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors"
                 >
-                  Today's overview
+                  Today&apos;s overview
                 </button>
 
                 <button
                   type="button"
                   onClick={() =>
-                    useSuggestion(
+                    handleSuggestion(
                       'Show me the current pipeline',
                     )
                   }
@@ -236,7 +236,7 @@ export function BuzzAssistant() {
                 <button
                   type="button"
                   onClick={() =>
-                    useSuggestion(
+                    handleSuggestion(
                       'Show me pending approvals',
                     )
                   }
@@ -282,3 +282,4 @@ export function BuzzAssistant() {
     </div>
   );
 }
+
