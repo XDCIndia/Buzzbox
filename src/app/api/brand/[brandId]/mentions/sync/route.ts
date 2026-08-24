@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireApiUser } from '@/lib/api-auth';
+import { requireApiEditor } from '@/lib/api-auth';
 import { getBrand, insertBrandMention } from '@/lib/brand-queries';
 import { searchXMentions, type XMentionResult } from '@/lib/x-api';
 import { searchFacebookPageMentions, type FacebookMentionResult } from '@/lib/facebook-api';
@@ -55,7 +55,7 @@ function insertResults(
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
-  const auth = requireApiUser(req as Request);
+  const auth = requireApiEditor(req as Request);
   if (auth) return auth;
   const { brandId } = await params;
 
