@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireApiUser } from '@/lib/api-auth';
 import { getBrand, insertBrandMention } from '@/lib/brand-queries';
 import { searchXMentions } from '@/lib/x-api';
+import { searchYouTubeMentions } from '@/lib/youtube-api';
 import { searchInstagramMentions } from '@/lib/instagram-api';
 import { searchTikTokMentions } from '@/lib/tiktok-api';
 import { searchRedditMentions } from '@/lib/reddit-api';
@@ -20,10 +21,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
   const redditClientSecret = process.env.REDDIT_CLIENT_SECRET;
   const redditUserAgent = process.env.REDDIT_USER_AGENT;
   const redditConfigured = !!(redditClientId && redditClientSecret && redditUserAgent);
+  const youtubeApiKey = process.env.YOUTUBE_API_KEY;
 
-  if (!bearerToken && !tiktokAccessToken && !(igAccessToken && igBusinessAccountId) && !redditConfigured) {
+  if (
+    !bearerToken &&
+    !tiktokAccessToken &&
+    !(igAccessToken && igBusinessAccountId) &&
+    !redditConfigured &&
+    !youtubeApiKey
+  ) {
     return NextResponse.json(
-      { error: 'No social connector is configured. Add X_BEARER_TOKEN, TIKTOK_ACCESS_TOKEN, INSTAGRAM_ACCESS_TOKEN/INSTAGRAM_BUSINESS_ACCOUNT_ID, or REDDIT_CLIENT_ID/REDDIT_CLIENT_SECRET/REDDIT_USER_AGENT to .env.local to enable live mention syncing.' },
+      { error: 'No social connector is configured. Add X_BEARER_TOKEN, TIKTOK_ACCESS_TOKEN, INSTAGRAM_ACCESS_TOKEN/INSTAGRAM_BUSINESS_ACCOUNT_ID, REDDIT_CLIENT_ID/REDDIT_CLIENT_SECRET/REDDIT_USER_AGENT, or YOUTUBE_API_KEY to .env.local to enable live mention syncing.' },
       { status: 412 },
     );
   }
@@ -71,6 +79,40 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
     }
   } else {
     skipped.push('x');
+  }
+
+  if (!youtubeApiKey) {
+    skipped.push('youtube');
+  } else {
+    try {
+      const results = await searchYouTubeMentions({ apiKey: youtubeApiKey, query, maxResults: 25 });
+      for (const r of results) {
+        const { sentiment, emotion } = classifyMention(r.text);
+        insertBrandMention({
+          id: `youtube_${r.id}`,
+          brand_id: brandId,
+          source_type: 'social',
+          platform: 'youtube',
+          author_name: r.author_name,
+          author_handle: r.author_handle,
+          author_avatar_url: null,
+          author_reach: r.author_reach,
+          text: r.text,
+          url: r.url || null,
+          likes: r.likes,
+          comments: r.comments,
+          sentiment,
+          emotion,
+          intent: null,
+          is_crisis: false,
+          is_high_impact: r.author_reach > 100_000,
+          published_at: r.published_at,
+        });
+        inserted++;
+      }
+    } catch (err) {
+      errors.youtube = (err as Error).message;
+    }
   }
 
   if (!igAccessToken || !igBusinessAccountId) {
