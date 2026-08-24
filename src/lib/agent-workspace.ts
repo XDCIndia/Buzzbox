@@ -42,7 +42,7 @@ export function isAllowedWorkspaceWritePath(relPath: string): boolean {
   return ALLOWED_EXTS.has(ext);
 }
 
-export function resolveWorkspacePath(root: string, relPath: string): string | null {
+export function normalizeWorkspaceRelativePath(relPath: string): string | null {
   const p = String(relPath || '').trim();
   if (!p) return null;
   if (p.includes('\0')) return null;
@@ -50,6 +50,12 @@ export function resolveWorkspacePath(root: string, relPath: string): string | nu
 
   const normalized = path.posix.normalize(p.replaceAll('\\', '/'));
   if (normalized.startsWith('../') || normalized === '..') return null;
+  return normalized;
+}
+
+export function resolveWorkspacePath(root: string, relPath: string): string | null {
+  const normalized = normalizeWorkspaceRelativePath(relPath);
+  if (!normalized) return null;
 
   // Use platform path.resolve and then enforce root prefix.
   const resolved = path.resolve(root, normalized);
