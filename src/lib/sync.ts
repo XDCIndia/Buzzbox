@@ -211,7 +211,7 @@ interface LinkedInComment {
   timestamp?: string;
 }
 
-function syncLinkedInComments() {
+export function syncLinkedInComments() {
   const items = readJson<LinkedInComment[]>('linkedin-comments-queue.json');
   if (!items || !Array.isArray(items)) return;
   const db = getDb();
@@ -327,26 +327,43 @@ interface ExperimentItem {
   completed_at?: string;
 }
 
-function syncExperimentLog() {
+export function syncExperimentLog() {
   const items = readJson<ExperimentItem[]>('experiment-log.json');
   if (!items || !Array.isArray(items)) return;
   const db = getDb();
-  // Rewrite all experiments from source
-  db.prepare('DELETE FROM experiments').run();
+  // Reconcile by the source's natural key (hypothesis, week): update rows that
+  // already exist (preserving their id), insert genuinely new ones, and leave
+  // DB-only rows alone. Experiments have no created_at column and nothing
+  // references their id, so identity stability is the only invariant to keep.
+  const findId = db.prepare('SELECT id FROM experiments WHERE hypothesis IS ? AND week IS ?');
+  const update = db.prepare(`
+    UPDATE experiments SET week = ?, hypothesis = ?, action = ?, metric = ?, win_threshold = ?,
+      status = ?, results = ?, winner = ?, margin = ?, decision = ?, learning = ?,
+      next_action = ?, proposed_at = ?, completed_at = ?
+    WHERE id = ?
+  `);
   const insert = db.prepare(`
     INSERT INTO experiments (week, hypothesis, action, metric, win_threshold, status, results, winner, margin, decision, learning, next_action, proposed_at, completed_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
+  const toRow = (e: ExperimentItem) => [
+    e.week || null, e.hypothesis || null, e.action || null,
+    e.metric || null, e.win_threshold || null, e.status || 'proposed',
+    e.results ? JSON.stringify(e.results) : null,
+    e.winner || null, e.margin || null, e.decision || null,
+    e.learning || null, e.next_action || null,
+    e.proposed_at || null, e.completed_at || null,
+  ];
+  const matched = new Set<number>();
   db.transaction(() => {
     for (const e of items) {
-      insert.run(
-        e.week || null, e.hypothesis || null, e.action || null,
-        e.metric || null, e.win_threshold || null, e.status || 'proposed',
-        e.results ? JSON.stringify(e.results) : null,
-        e.winner || null, e.margin || null, e.decision || null,
-        e.learning || null, e.next_action || null,
-        e.proposed_at || null, e.completed_at || null,
-      );
+      const row = findId.get(e.hypothesis || null, e.week || null) as { id: number } | undefined;
+      if (row && !matched.has(row.id)) {
+        matched.add(row.id);
+        update.run(...toRow(e), row.id);
+      } else {
+        insert.run(...toRow(e));
+      }
     }
   })();
 }
@@ -359,23 +376,30 @@ interface LearningItem {
   applied_to?: string[];
 }
 
-function syncExperimentLearnings() {
+export function syncExperimentLearnings() {
   const items = readJson<LearningItem[]>('experiment-learnings.json');
   if (!items || !Array.isArray(items)) return;
   const db = getDb();
-  db.prepare('DELETE FROM learnings').run();
+  // Reconcile by the source's natural key (learning, validated_week): refresh
+  // confidence/applied_to on existing rows (id and DB-generated created_at
+  // stay untouched), insert new ones, and keep DB-only rows.
+  const findId = db.prepare('SELECT id FROM learnings WHERE learning IS ? AND validated_week IS ?');
+  const update = db.prepare('UPDATE learnings SET confidence = ?, applied_to = ? WHERE id = ?');
   const insert = db.prepare(`
     INSERT INTO learnings (learning, validated_week, confidence, applied_to)
     VALUES (?, ?, ?, ?)
   `);
+  const matched = new Set<number>();
   db.transaction(() => {
     for (const l of items) {
-      insert.run(
-        l.learning || null,
-        l.validated_week || null,
-        l.confidence || null,
-        l.applied_to ? JSON.stringify(l.applied_to) : null,
-      );
+      const row = findId.get(l.learning || null, l.validated_week || null) as { id: number } | undefined;
+      const appliedTo = l.applied_to ? JSON.stringify(l.applied_to) : null;
+      if (row && !matched.has(row.id)) {
+        matched.add(row.id);
+        update.run(l.confidence || null, appliedTo, row.id);
+      } else {
+        insert.run(l.learning || null, l.validated_week || null, l.confidence || null, appliedTo);
+      }
     }
   })();
 }
