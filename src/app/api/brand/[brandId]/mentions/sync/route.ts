@@ -1,12 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiUser } from '@/lib/api-auth';
 import { getBrand, insertBrandMention } from '@/lib/brand-queries';
-import { searchXMentions } from '@/lib/x-api';
-import { searchYouTubeMentions } from '@/lib/youtube-api';
-import { searchInstagramMentions } from '@/lib/instagram-api';
-import { searchTikTokMentions } from '@/lib/tiktok-api';
-import { searchRedditMentions } from '@/lib/reddit-api';
+import { searchXMentions, type XMentionResult } from '@/lib/x-api';
+import { fetchThreadsMentions, type ThreadsMentionResult } from '@/lib/threads-api';
+import { searchYouTubeMentions, type YouTubeMentionResult } from '@/lib/youtube-api';
+import { searchInstagramMentions, type InstagramMentionResult } from '@/lib/instagram-api';
+import { searchTikTokMentions, type TikTokMentionResult } from '@/lib/tiktok-api';
+import { searchRedditMentions, type RedditMentionResult } from '@/lib/reddit-api';
 import { classifyMention } from '@/lib/mention-classify';
+import type { MentionPlatform } from '@/types';
+
+type MentionSyncResult =
+  | XMentionResult
+  | ThreadsMentionResult
+  | YouTubeMentionResult
+  | InstagramMentionResult
+  | TikTokMentionResult
+  | RedditMentionResult;
+
+function insertResults(
+  brandId: string,
+  platform: MentionPlatform,
+  idPrefix: string,
+  results: MentionSyncResult[],
+): number {
+  let inserted = 0;
+  for (const r of results) {
+    const { sentiment, emotion } = classifyMention(r.text);
+    insertBrandMention({
+      id: `${idPrefix}_${r.id}`,
+      brand_id: brandId,
+      source_type: 'social',
+      platform,
+      author_name: r.author_name,
+      author_handle: r.author_handle,
+      author_avatar_url: null,
+      author_reach: r.author_reach,
+      text: r.text,
+      url: r.url || null,
+      likes: r.likes,
+      comments: r.comments,
+      sentiment,
+      emotion,
+      intent: null,
+      is_crisis: false,
+      is_high_impact: r.author_reach > 100_000,
+      published_at: r.published_at,
+    });
+    inserted++;
+  }
+  return inserted;
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
   const auth = requireApiUser(req as Request);
@@ -14,24 +58,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
   const { brandId } = await params;
 
   const bearerToken = process.env.X_BEARER_TOKEN;
-  const tiktokAccessToken = process.env.TIKTOK_ACCESS_TOKEN;
+  const threadsAccessToken = process.env.THREADS_ACCESS_TOKEN;
+  const threadsUserId = process.env.THREADS_USER_ID;
+  const youtubeApiKey = process.env.YOUTUBE_API_KEY;
   const igAccessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
   const igBusinessAccountId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
+  const tiktokAccessToken = process.env.TIKTOK_ACCESS_TOKEN;
   const redditClientId = process.env.REDDIT_CLIENT_ID;
   const redditClientSecret = process.env.REDDIT_CLIENT_SECRET;
   const redditUserAgent = process.env.REDDIT_USER_AGENT;
   const redditConfigured = !!(redditClientId && redditClientSecret && redditUserAgent);
-  const youtubeApiKey = process.env.YOUTUBE_API_KEY;
 
   if (
     !bearerToken &&
-    !tiktokAccessToken &&
+    !(threadsAccessToken && threadsUserId) &&
+    !youtubeApiKey &&
     !(igAccessToken && igBusinessAccountId) &&
-    !redditConfigured &&
-    !youtubeApiKey
+    !tiktokAccessToken &&
+    !redditConfigured
   ) {
     return NextResponse.json(
-      { error: 'No social connector is configured. Add X_BEARER_TOKEN, TIKTOK_ACCESS_TOKEN, INSTAGRAM_ACCESS_TOKEN/INSTAGRAM_BUSINESS_ACCOUNT_ID, REDDIT_CLIENT_ID/REDDIT_CLIENT_SECRET/REDDIT_USER_AGENT, or YOUTUBE_API_KEY to .env.local to enable live mention syncing.' },
+      { error: 'No social connector is configured. Add X_BEARER_TOKEN, THREADS_ACCESS_TOKEN/THREADS_USER_ID, YOUTUBE_API_KEY, INSTAGRAM_ACCESS_TOKEN/INSTAGRAM_BUSINESS_ACCOUNT_ID, TIKTOK_ACCESS_TOKEN, or REDDIT_CLIENT_ID/REDDIT_CLIENT_SECRET/REDDIT_USER_AGENT to .env.local to enable live mention syncing.' },
       { status: 412 },
     );
   }
@@ -50,30 +97,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
   if (bearerToken) {
     try {
       const results = await searchXMentions({ bearerToken, query, maxResults: 50 });
-      for (const r of results) {
-        const { sentiment, emotion } = classifyMention(r.text);
-        insertBrandMention({
-          id: `x_${r.id}`,
-          brand_id: brandId,
-          source_type: 'social',
-          platform: 'x',
-          author_name: r.author_name,
-          author_handle: r.author_handle,
-          author_avatar_url: null,
-          author_reach: r.author_reach,
-          text: r.text,
-          url: r.url || null,
-          likes: r.likes,
-          comments: r.comments,
-          sentiment,
-          emotion,
-          intent: null,
-          is_crisis: false,
-          is_high_impact: r.author_reach > 100_000,
-          published_at: r.published_at,
-        });
-        inserted++;
-      }
+      inserted += insertResults(brandId, 'x', 'x', results);
     } catch (err) {
       errors.x = (err as Error).message;
     }
@@ -81,43 +105,36 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
     skipped.push('x');
   }
 
-  if (!youtubeApiKey) {
-    skipped.push('youtube');
+  // Threads' public API only exposes mentions/replies on OUR OWN authorized
+  // account -- it has no open, cross-platform keyword search like X's
+  // search/recent endpoint, so `query`/brand.keywords are not used here.
+  if (threadsAccessToken && threadsUserId) {
+    try {
+      const results = await fetchThreadsMentions({
+        accessToken: threadsAccessToken,
+        threadsUserId,
+        limit: 50,
+      });
+      inserted += insertResults(brandId, 'threads', 'threads', results);
+    } catch (err) {
+      errors.threads = (err as Error).message;
+    }
   } else {
+    skipped.push('threads');
+  }
+
+  if (youtubeApiKey) {
     try {
       const results = await searchYouTubeMentions({ apiKey: youtubeApiKey, query, maxResults: 25 });
-      for (const r of results) {
-        const { sentiment, emotion } = classifyMention(r.text);
-        insertBrandMention({
-          id: `youtube_${r.id}`,
-          brand_id: brandId,
-          source_type: 'social',
-          platform: 'youtube',
-          author_name: r.author_name,
-          author_handle: r.author_handle,
-          author_avatar_url: null,
-          author_reach: r.author_reach,
-          text: r.text,
-          url: r.url || null,
-          likes: r.likes,
-          comments: r.comments,
-          sentiment,
-          emotion,
-          intent: null,
-          is_crisis: false,
-          is_high_impact: r.author_reach > 100_000,
-          published_at: r.published_at,
-        });
-        inserted++;
-      }
+      inserted += insertResults(brandId, 'youtube', 'youtube', results);
     } catch (err) {
       errors.youtube = (err as Error).message;
     }
+  } else {
+    skipped.push('youtube');
   }
 
-  if (!igAccessToken || !igBusinessAccountId) {
-    skipped.push('instagram');
-  } else {
+  if (igAccessToken && igBusinessAccountId) {
     try {
       const results = await searchInstagramMentions({
         accessToken: igAccessToken,
@@ -125,62 +142,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
         query,
         maxResults: 50,
       });
-      for (const r of results) {
-        const { sentiment, emotion } = classifyMention(r.text);
-        insertBrandMention({
-          id: `instagram_${r.id}`,
-          brand_id: brandId,
-          source_type: 'social',
-          platform: 'instagram',
-          author_name: r.author_name,
-          author_handle: r.author_handle,
-          author_avatar_url: null,
-          author_reach: r.author_reach,
-          text: r.text,
-          url: r.url || null,
-          likes: r.likes,
-          comments: r.comments,
-          sentiment,
-          emotion,
-          intent: null,
-          is_crisis: false,
-          is_high_impact: r.author_reach > 100_000,
-          published_at: r.published_at,
-        });
-        inserted++;
-      }
+      inserted += insertResults(brandId, 'instagram', 'instagram', results);
     } catch (err) {
       errors.instagram = (err as Error).message;
     }
+  } else {
+    skipped.push('instagram');
   }
 
   if (tiktokAccessToken) {
     try {
       const results = await searchTikTokMentions({ accessToken: tiktokAccessToken, query, maxResults: 50 });
-      for (const r of results) {
-        const { sentiment, emotion } = classifyMention(r.text);
-        insertBrandMention({
-          id: `tiktok_${r.id}`,
-          brand_id: brandId,
-          source_type: 'social',
-          platform: 'tiktok',
-          author_name: r.author_name,
-          author_handle: r.author_handle,
-          author_avatar_url: null,
-          author_reach: r.author_reach,
-          text: r.text,
-          url: r.url || null,
-          likes: r.likes,
-          comments: r.comments,
-          sentiment,
-          emotion,
-          intent: null,
-          is_crisis: false,
-          is_high_impact: r.author_reach > 100_000,
-          published_at: r.published_at,
-        });
-        inserted++;
-      }
+      inserted += insertResults(brandId, 'tiktok', 'tiktok', results);
     } catch (err) {
       errors.tiktok = (err as Error).message;
     }
@@ -197,30 +170,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
         query,
         maxResults: 50,
       });
-      for (const r of results) {
-        const { sentiment, emotion } = classifyMention(r.text);
-        insertBrandMention({
-          id: `reddit_${r.id}`,
-          brand_id: brandId,
-          source_type: 'social',
-          platform: 'reddit',
-          author_name: r.author_name,
-          author_handle: r.author_handle,
-          author_avatar_url: null,
-          author_reach: r.author_reach,
-          text: r.text,
-          url: r.url || null,
-          likes: r.likes,
-          comments: r.comments,
-          sentiment,
-          emotion,
-          intent: null,
-          is_crisis: false,
-          is_high_impact: r.author_reach > 100_000,
-          published_at: r.published_at,
-        });
-        inserted++;
-      }
+      inserted += insertResults(brandId, 'reddit', 'reddit', results);
     } catch (err) {
       errors.reddit = (err as Error).message;
     }
@@ -228,5 +178,5 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
     skipped.push('reddit');
   }
 
-  return NextResponse.json({ synced: inserted, inserted, skipped, errors });
+  return NextResponse.json({ synced: inserted, skipped, ...(Object.keys(errors).length ? { errors } : {}) });
 }
