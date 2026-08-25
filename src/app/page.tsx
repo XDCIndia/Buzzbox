@@ -383,7 +383,7 @@ export default function OverviewPage() {
                   <SnapshotRow label="Engagement" value={metricsReversed[metricsReversed.length - 1]?.total_engagement ?? 0} color="bg-success" />
                   <SnapshotRow label="Sends" value={metricsReversed[metricsReversed.length - 1]?.sends ?? 0} color="bg-warning" />
                   <p className="text-xs text-muted-foreground pt-2">
-                    Trends update as campaigns and agents record activity. Switch to "Real" data in the header to exclude seeded samples.
+                    Trends update as campaigns and agents record activity. Switch to &quot;Real&quot; data in the header to exclude seeded samples.
                   </p>
                 </div>
               ) : (

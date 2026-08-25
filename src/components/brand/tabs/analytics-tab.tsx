@@ -28,8 +28,6 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
   }, [brandId]);
 
   const loadAll = useCallback(() => {
-    setLoading(true);
-    setError(null);
     const real = realOnly ? '?real=true' : '';
     Promise.all([
       fetch(`/api/brand/${brandId}/stats${real}`).then(r => {
@@ -49,8 +47,8 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
   }, [brandId, realOnly]);
 
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  loadAll();
+}, [loadAll]);
 
   async function addCompetitor(e: React.FormEvent) {
     e.preventDefault();
