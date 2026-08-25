@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
+import { getHermesStateDir } from './hermes-state';
 
 // NOTE: src/lib/db.ts and src/lib/sync.ts capture their paths at module load,
 // so both modules must be dynamically imported inside before() AFTER the env
@@ -11,6 +12,8 @@ import Database from 'better-sqlite3';
 const tempDir = mkdtempSync(path.join(tmpdir(), 'hermes-sync-reconcile-test-'));
 const dbPath = path.join(tempDir, 'hermes-test.db');
 const stateDir = path.join(tempDir, 'state');
+
+const realDbPath = path.join(getHermesStateDir(), 'hermes.db');
 
 process.env.HERMES_DB_PATH = dbPath;
 process.env.HERMES_STATE_DIR = stateDir;
@@ -44,7 +47,7 @@ after(() => {
   rmSync(tempDir, { recursive: true, force: true });
 
   // Leak check: none of the fixture content may exist in the real dev DB.
-  const real = new Database('D:/Buzzbox/state/hermes.db', { readonly: true });
+  const real = new Database(realDbPath, { readonly: true });
   const leaks = real.prepare(
     "SELECT (SELECT COUNT(*) FROM experiments WHERE hypothesis LIKE 'fixture%') e, " +
     "(SELECT COUNT(*) FROM learnings WHERE learning LIKE 'fixture%') l, " +
