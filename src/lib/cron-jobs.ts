@@ -92,10 +92,51 @@ export async function readCronJobsFile(cronDir: string): Promise<CronJobsFile> {
   return { version: 1, jobs: [] };
 }
 
+type CronMutation = (jobsFile: CronJobsFile) => CronJobsFile | null;
+
+const cronMutationLocks = new Map<string, Promise<void>>();
+
+export async function mutateCronJobsFile(
+  cronDir: string,
+  mutation: CronMutation,
+): Promise<CronJobsFile | null> {
+  const previous = cronMutationLocks.get(cronDir) ?? Promise.resolve();
+
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  const queued = previous.then(() => current);
+  cronMutationLocks.set(cronDir, queued);
+
+  await previous;
+
+  try {
+    const jobsFile = await readCronJobsFile(cronDir);
+    const next = mutation(jobsFile);
+
+    if (next) {
+      await writeCronJobsFile(cronDir, next);
+    }
+
+    return next;
+  } finally {
+    release();
+
+    if (cronMutationLocks.get(cronDir) === queued) {
+      cronMutationLocks.delete(cronDir);
+    }
+  }
+}
+
 async function writeJsonAtomic(filePath: string, data: unknown): Promise<void> {
   const dir = path.dirname(filePath);
   const base = path.basename(filePath);
-  const tmp = path.join(dir, `.${base}.tmp.${Date.now()}`);
+  const tmp = path.join(
+  dir,
+  `.${base}.tmp.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}`,
+);
   await fs.writeFile(tmp, JSON.stringify(data, null, 2) + '\n', 'utf-8');
   await fs.rename(tmp, filePath);
 }

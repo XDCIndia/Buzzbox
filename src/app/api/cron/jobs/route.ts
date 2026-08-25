@@ -5,10 +5,10 @@ import { logAudit } from '@/lib/audit';
 import { allowCronWrite, getInstance, resolveOpenClawPaths } from '@/lib/instances';
 import {
   deleteCronJob,
+  mutateCronJobsFile,
   normalizeJobId,
   readCronJobsFile,
   upsertCronJob,
-  writeCronJobsFile,
   type CronJobConfig,
 } from '@/lib/cron-jobs';
 
@@ -61,12 +61,17 @@ export async function POST(req: NextRequest) {
   try {
     const instance = getInstance(getInstanceId(req));
     const { cronDir } = resolveOpenClawPaths(instance);
-    const jobsFile = await readCronJobsFile(cronDir);
-    if (jobsFile.jobs.some((j) => normalizeJobId(j.id ?? j.jobId) === id)) {
-      return NextResponse.json({ error: 'Job already exists' }, { status: 409 });
-    }
-    const next = upsertCronJob(jobsFile, { ...(job || {}), id, jobId: id });
-    await writeCronJobsFile(cronDir, next);
+    const next = await mutateCronJobsFile(cronDir, (jobsFile) => {
+  if (jobsFile.jobs.some((j) => normalizeJobId(j.id ?? j.jobId) === id)) {
+    return null;
+  }
+
+    return upsertCronJob(jobsFile, { ...(job || {}), id, jobId: id });
+});
+
+  if (!next) {
+    return NextResponse.json({ error: 'Job already exists' }, { status: 409 });
+  }
 
     logAudit({
       actor,
@@ -98,12 +103,17 @@ export async function PATCH(req: NextRequest) {
   try {
     const instance = getInstance(getInstanceId(req));
     const { cronDir } = resolveOpenClawPaths(instance);
-    const jobsFile = await readCronJobsFile(cronDir);
-    if (!jobsFile.jobs.some((j) => normalizeJobId(j.id ?? j.jobId) === id)) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
-    const next = upsertCronJob(jobsFile, { ...(job || {}), id, jobId: id });
-    await writeCronJobsFile(cronDir, next);
+    const next = await mutateCronJobsFile(cronDir, (jobsFile) => {
+  if (!jobsFile.jobs.some((j) => normalizeJobId(j.id ?? j.jobId) === id)) {
+    return null;
+  }
+
+    return upsertCronJob(jobsFile, { ...(job || {}), id, jobId: id });
+});
+
+  if (!next) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
 
     logAudit({
       actor,
@@ -132,12 +142,17 @@ export async function DELETE(req: NextRequest) {
   try {
     const instance = getInstance(getInstanceId(req));
     const { cronDir } = resolveOpenClawPaths(instance);
-    const jobsFile = await readCronJobsFile(cronDir);
-    if (!jobsFile.jobs.some((j) => normalizeJobId(j.id ?? j.jobId) === id)) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
-    const next = deleteCronJob(jobsFile, id);
-    await writeCronJobsFile(cronDir, next);
+    const next = await mutateCronJobsFile(cronDir, (jobsFile) => {
+  if (!jobsFile.jobs.some((j) => normalizeJobId(j.id ?? j.jobId) === id)) {
+    return null;
+  }
+
+    return deleteCronJob(jobsFile, id);
+});
+
+  if (!next) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
 
     logAudit({
       actor,
