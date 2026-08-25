@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { FlaskConical, Lightbulb } from 'lucide-react';
 import { useDashboard } from '@/store';
 import type { Experiment, Learning } from '@/types';
+import { parseAppliedTo } from '@/lib/experiments';
 
 type Tab = 'current' | 'history' | 'learnings';
 
@@ -94,7 +95,7 @@ export default function ExperimentsPage() {
                     {l.validated_week && <span>Week {l.validated_week}</span>}
                     {l.confidence && <Badge status={l.confidence} />}
                     {l.applied_to && (
-                      <span>Applied to: {JSON.parse(l.applied_to).join(', ')}</span>
+                      <span>Applied to: {parseAppliedTo(l.applied_to).join(', ')}</span>
                     )}
                   </div>
                 </div>
