@@ -18,8 +18,6 @@ export function OverviewTab({ brandId, realOnly }: { brandId: string; realOnly: 
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(() => {
-    setLoading(true);
-    setError(null);
     const real = realOnly ? '?real=true' : '';
     Promise.all([
       fetch(`/api/brand/${brandId}/stats${real}`).then(r => {

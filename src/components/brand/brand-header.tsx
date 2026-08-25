@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Tag, Radio, AlertCircle, RefreshCw, Settings, Compass } from 'lucide-react';
 import type { Brand } from '@/types';
@@ -12,9 +12,7 @@ export function BrandHeader({ brandId, title }: { brandId: string; title: string
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  function loadBrand() {
-    setLoading(true);
-    setError(null);
+  const loadBrand = useCallback(() => {
     fetch(`/api/brand/${brandId}`)
       .then(async res => {
         const data = await res.json();
@@ -28,11 +26,11 @@ export function BrandHeader({ brandId, title }: { brandId: string; title: string
         setError((err as Error).message || 'Brand not found');
       })
       .finally(() => setLoading(false));
-  }
+  }, [brandId]);
 
   useEffect(() => {
     loadBrand();
-  }, [brandId]);
+  }, [loadBrand]);
 
   if (loading) {
     return (
