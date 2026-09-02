@@ -28,29 +28,62 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
   }, [brandId]);
 
   const loadAll = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    const real = realOnly ? '?real=true' : '';
-    Promise.all([
-      fetch(`/api/brand/${brandId}/stats${real}`).then(r => {
-        if (!r.ok) throw new Error('Failed to load brand statistics');
-        return r.json();
-      }),
-      fetch(`/api/brand/${brandId}/creators${real}`).then(r => r.json()).catch(() => []),
-      fetch(`/api/brand/${brandId}/competitors`).then(r => r.json()).catch(() => []),
-    ])
-      .then(([statsData, creatorsData, competitorsData]) => {
-        setStats(statsData);
-        setCreators(Array.isArray(creatorsData) ? creatorsData : []);
-        setCompetitors(Array.isArray(competitorsData) ? competitorsData : []);
-      })
-      .catch(err => setError((err as Error).message || 'Failed to load brand analytics'))
-      .finally(() => setLoading(false));
-  }, [brandId, realOnly]);
+  setLoading(true);
+  setError(null);
+  const real = realOnly ? '?real=true' : '';
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  Promise.all([
+    fetch(`/api/brand/${brandId}/stats${real}`).then(r => {
+      if (!r.ok) throw new Error('Failed to load brand statistics');
+      return r.json();
+    }),
+    fetch(`/api/brand/${brandId}/creators${real}`).then(r => r.json()).catch(() => []),
+    fetch(`/api/brand/${brandId}/competitors`).then(r => r.json()).catch(() => []),
+  ])
+    .then(([statsData, creatorsData, competitorsData]) => {
+      setStats(statsData);
+      setCreators(Array.isArray(creatorsData) ? creatorsData : []);
+      setCompetitors(Array.isArray(competitorsData) ? competitorsData : []);
+    })
+    .catch(err => setError((err as Error).message || 'Failed to load brand analytics'))
+    .finally(() => setLoading(false));
+}, [brandId, realOnly]);
+
+useEffect(() => {
+  let cancelled = false;
+
+  const real = realOnly ? '?real=true' : '';
+
+  Promise.all([
+    fetch(`/api/brand/${brandId}/stats${real}`).then(r => {
+      if (!r.ok) throw new Error('Failed to load brand statistics');
+      return r.json();
+    }),
+    fetch(`/api/brand/${brandId}/creators${real}`).then(r => r.json()).catch(() => []),
+    fetch(`/api/brand/${brandId}/competitors`).then(r => r.json()).catch(() => []),
+  ])
+    .then(([statsData, creatorsData, competitorsData]) => {
+      if (cancelled) return;
+
+      setStats(statsData);
+      setCreators(Array.isArray(creatorsData) ? creatorsData : []);
+      setCompetitors(Array.isArray(competitorsData) ? competitorsData : []);
+    })
+    .catch(err => {
+      if (!cancelled) {
+        setError((err as Error).message || 'Failed to load brand analytics');
+      }
+    })
+    .finally(() => {
+      if (!cancelled) {
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId, realOnly]);
 
   async function addCompetitor(e: React.FormEvent) {
     e.preventDefault();

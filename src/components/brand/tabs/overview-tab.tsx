@@ -40,8 +40,41 @@ export function OverviewTab({ brandId, realOnly }: { brandId: string; realOnly: 
   }, [brandId, realOnly]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+  let cancelled = false;
+
+  const real = realOnly ? '?real=true' : '';
+
+  Promise.all([
+    fetch(`/api/brand/${brandId}/stats${real}`).then(r => {
+      if (!r.ok) throw new Error('Failed to load brand metrics');
+      return r.json();
+    }),
+    fetch(`/api/brand/${brandId}/mentions?sort=popular${real ? '&real=true' : ''}`).then(r => {
+      if (!r.ok) throw new Error('Failed to load brand mentions');
+      return r.json();
+    }),
+  ])
+    .then(([statsData, mentionsData]: [BrandMentionStats, BrandMention[]]) => {
+      if (cancelled) return;
+
+      setStats(statsData);
+      setMentions(Array.isArray(mentionsData) ? mentionsData.slice(0, 6) : []);
+    })
+    .catch(err => {
+      if (!cancelled) {
+        setError((err as Error).message || 'Failed to load brand overview.');
+      }
+    })
+    .finally(() => {
+      if (!cancelled) {
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId, realOnly]);
 
   function onPatch(id: string, patch: Record<string, string>) {
     setMentions(prev => prev.map(m => (m.id === id ? { ...m, ...patch } as BrandMention : m)));

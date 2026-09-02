@@ -31,7 +31,33 @@ export function BrandHeader({ brandId, title }: { brandId: string; title: string
   }
 
   useEffect(() => {
-    loadBrand();
+  let cancelled = false;
+
+  fetch(`/api/brand/${brandId}`)
+    .then(async res => {
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Brand not found');
+      }
+
+      if (!cancelled) {
+        setBrand(data);
+        setError(null);
+        setLoading(false);
+      }
+    })
+    .catch(err => {
+      if (!cancelled) {
+        setBrand(null);
+        setError((err as Error).message || 'Brand not found');
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [brandId]);
 
   if (loading) {
