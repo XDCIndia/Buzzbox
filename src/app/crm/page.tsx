@@ -183,7 +183,10 @@ export default function CrmPage() {
 
   const { data } = useSmartPoll<CrmData>(
     () => fetch(`/api/crm?${params}`).then(r => r.json()),
-    { interval: 30_000, key: `${realOnly}-${refreshKey}` },
+    {
+      interval: 30_000,
+      key: `${realOnly}-${stageFilter}-${tierFilter}-${search}-${refreshKey}`,
+    },
   );
 
   const leads = data?.leads || [];
