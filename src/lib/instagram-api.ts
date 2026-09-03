@@ -96,9 +96,21 @@ function isoDay(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function igGet<T>(accessToken: string, path: string, params: Record<string, string> = {}): Promise<T> {
-  const qs = new URLSearchParams({ access_token: accessToken, ...params });
-  const res = await fetch(`${GRAPH_BASE}${path}?${qs.toString()}`, { cache: "no-store" });
+async function igGet<T>(
+  accessToken: string,
+  path: string,
+  params: Record<string, string> = {}
+): Promise<T> {
+  const qs = new URLSearchParams(params);
+  const query = qs.toString();
+  const url = `${GRAPH_BASE}${path}${query ? `?${query}` : ''}`;
+
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Instagram API failed (${res.status}): ${text.slice(0, 300)}`);
