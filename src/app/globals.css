@@ -30,43 +30,48 @@
 
   --font-sans: var(--font-inter);
   --font-mono: var(--font-jetbrains);
+  --font-display: var(--font-space-grotesk);
 }
 
 /* ─── Design Tokens ─────────────────────────────────────── */
 :root {
   --nav-width: 220px;
   --header-height: 48px;
-  --radius: 0.625rem;
+  --radius: 0.5rem;
 
-  /* Light mode (default for :root, overridden by .dark) */
-  --background: #fafafa;
-  --foreground: #09090b;
+  /* Display face for editorial headings (dashboard + landing) */
+  --font-display: var(--font-space-grotesk), "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Light mode — warm cream/coral, matching the landing page.
+     Default for :root, overridden by .dark. */
+  --background: #fdfbfa;
+  --foreground: #1c1512;
   --card: #ffffff;
-  --card-foreground: #09090b;
-  --muted: #f4f4f5;
-  --muted-foreground: #71717a;
+  --card-foreground: #1c1512;
+  --muted: #f5efe9;
+  --muted-foreground: #6f6259;
   --primary: #ff6d4a;
   --primary-foreground: #ffffff;
-  --accent: #f4f4f5;
-  --accent-foreground: #18181b;
-  --border: #e4e4e7;
-  --border-subtle: #f4f4f5;
-  --border-strong: #d4d4d8;
+  --accent: #f6efe8;
+  --accent-foreground: #1c1512;
+  --border: #ece3dc;
+  --border-subtle: #f3ebe4;
+  --border-strong: #d9cbc1;
   --ring: #ff6d4a;
-  --success: #16a34a;
+  --success: #1e9e58;
   --success-foreground: #ffffff;
-  --warning: #d97706;
+  --warning: #b96c10;
   --warning-foreground: #422006;
-  --destructive: #dc2626;
+  --destructive: #d43c2e;
   --destructive-foreground: #ffffff;
-  --info: #2563eb;
+  --info: #2f6fed;
   --info-foreground: #ffffff;
 
-  /* Surface hierarchy */
+  /* Surface hierarchy — warm tints */
   --surface-0: #ffffff;
-  --surface-1: #f8fafc;
-  --surface-2: #f1f5f9;
-  --surface-3: #e2e8f0;
+  --surface-1: #faf6f1;
+  --surface-2: #f4ede6;
+  --surface-3: #eadfd6;
 
   /* Brand section scoped tokens */
   --brand-coral: #ff6d4a;
@@ -74,33 +79,34 @@
 }
 
 .dark {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #111113;
-  --card-foreground: #fafafa;
-  --muted: #161619;
-  --muted-foreground: #a1a1aa;
+  /* Warm espresso dark mode — the landing's dark sections as a workspace theme. */
+  --background: #1a1310;
+  --foreground: #f7f1ec;
+  --card: #221913;
+  --card-foreground: #f7f1ec;
+  --muted: #2a201a;
+  --muted-foreground: #b3a498;
   --primary: #ff6d4a;
   --primary-foreground: #ffffff;
-  --accent: #1c1c1f;
-  --accent-foreground: #f4f4f5;
-  --border: #27272a;
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-strong: rgba(255, 255, 255, 0.14);
+  --accent: #2c221b;
+  --accent-foreground: #f7f1ec;
+  --border: #382a21;
+  --border-subtle: #2f241c;
+  --border-strong: #4a382c;
   --ring: #ff6d4a;
-  --success: #22c55e;
+  --success: #4ade80;
   --success-foreground: #052e16;
-  --warning: #f59e0b;
+  --warning: #f5b04d;
   --warning-foreground: #422006;
-  --destructive: #ef4444;
+  --destructive: #f87171;
   --destructive-foreground: #ffffff;
-  --info: #3b82f6;
-  --info-foreground: #ffffff;
+  --info: #7fb0ff;
+  --info-foreground: #0c1a2e;
 
-  --surface-0: #09090b;
-  --surface-1: #0e0e10;
-  --surface-2: #141416;
-  --surface-3: #1c1c1f;
+  --surface-0: #1a1310;
+  --surface-1: #201813;
+  --surface-2: #281e17;
+  --surface-3: #33271e;
 
   --brand-coral: #ff7a5c;
   --brand-coral-foreground: #ffffff;
@@ -161,10 +167,30 @@ body {
 
 /* ─── Editorial typography helpers ──────────────────────── */
 .page-headline {
+  font-family: var(--font-display);
   font-size: clamp(1.875rem, 5vw, 2.25rem);
   line-height: 1.05;
   font-weight: 600;
   letter-spacing: -0.02em;
+}
+
+/* Small uppercase metadata label — "01 / OVERVIEW" style eyebrows */
+.console-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+.console-eyebrow::before {
+  content: "";
+  width: 14px;
+  height: 1px;
+  background: color-mix(in srgb, var(--primary) 55%, transparent);
 }
 
 .page-subheadline {

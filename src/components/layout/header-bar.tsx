@@ -2,7 +2,7 @@
 
 import {
   Activity, Search, Sun, Moon, Radio, PenLine, Mail, Users, LogOut,
-  Bell, Eye, EyeOff, Check, CheckCheck, Bot,
+  Bell, Eye, EyeOff, Check, CheckCheck, Boxes,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState, useRef } from 'react';
@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { useDashboard } from '@/store';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { timeAgo } from '@/lib/utils';
+import { DEFAULT_BRAND_ID } from '@/lib/brand-constants';
 import type { Notification } from '@/types';
 import { BuzzAssistant } from '@/components/chat/buzz-assistant';
 
@@ -28,12 +29,19 @@ export function HeaderBar() {
     { interval: 60_000, key: realOnly },
   );
 
+  // Workspace context — always show which brand/workspace is being viewed
+  const { data: brand } = useSmartPoll<{ name?: string }>(
+    () => fetch(`/api/brand/${DEFAULT_BRAND_ID}`).then(r => (r.ok ? r.json() : null)),
+    { interval: 120_000 },
+  );
+  const brandName = brand?.name || 'Workspace';
+
   return (
     <header className="fixed top-0 left-0 right-0 h-[var(--header-height)] bg-surface-0/90 backdrop-blur-md border-b border-border flex items-center justify-between px-3 sm:px-4 z-50">
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/25 flex items-center justify-center text-primary">
-            <Bot size={15} />
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center text-[var(--primary-foreground)]">
+            <Boxes size={15} />
           </div>
           <div className="flex flex-col">
             <span className="font-semibold text-sm tracking-tight text-foreground leading-none">Buzzbox</span>
@@ -41,9 +49,21 @@ export function HeaderBar() {
           </div>
         </div>
 
+        {/* Workspace context — which brand's data you are looking at */}
+        <div className="hidden md:flex items-center gap-2 ml-1 pl-3 border-l border-border/60 min-w-0">
+          <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">Workspace</span>
+          <span
+            className="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-border bg-surface-1 text-xs font-medium text-foreground max-w-[180px]"
+            title={`Viewing data for: ${brandName}`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-success pulse-dot shrink-0" />
+            <span className="truncate">{brandName}</span>
+          </span>
+        </div>
+
         {/* Quick stats — hidden on small screens */}
         {stats && (
-          <div className="hidden lg:flex items-center gap-3 ml-3 pl-3 border-l border-border/50">
+          <div className="hidden xl:flex items-center gap-3 ml-1 pl-3 border-l border-border/50">
             <QuickStat icon={PenLine} value={stats.posts_today} label="posts" />
             <QuickStat icon={Mail} value={stats.emails_sent} label="sent" />
             <QuickStat icon={Users} value={stats.pipeline_count} label="pipeline" />

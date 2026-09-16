@@ -151,7 +151,7 @@ export async function GET(request: Request) {
     if (existingToken) destroySession(existingToken);
 
     const token = createSession(user.id);
-    const response = NextResponse.redirect(new URL(stateCookie.from || '/', origin));
+    const response = NextResponse.redirect(new URL(stateCookie.from || '/dashboard', origin));
     response.cookies.set(SESSION_COOKIE, token, {
       httpOnly: true,
       secure: shouldUseSecureCookies(request),

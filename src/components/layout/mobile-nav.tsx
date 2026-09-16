@@ -41,7 +41,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Core',
     items: [
-      { href: '/', label: 'Overview', icon: Gauge, priority: true },
+      { href: '/dashboard', label: 'Overview', icon: Gauge, priority: true },
       { href: '/agents/squads', label: 'Squads', icon: Bot, priority: true },
       { href: '/outreach', label: 'Outreach', icon: Mail, countKey: 'outreach', priority: true },
       { href: '/crm', label: 'CRM', icon: Contact, countKey: 'new_leads', priority: true },
@@ -88,7 +88,7 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 function isActive(pathname: string, href: string) {
-  return href === '/' ? pathname === '/' : pathname.startsWith(href);
+  return href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href);
 }
 
 export function MobileNav() {
