@@ -311,7 +311,15 @@ function TopPagesSection({ pages }: { pages: Ga4TopPage[] }) {
         <FileText size={12} />
         Top Pages
       </h4>
-      <DataTable columns={columns} data={pages} keyField="pagePath" emptyMessage="No page data" />
+      <DataTable
+        columns={columns}
+        data={pages}
+        keyField="pagePath"
+        emptyIcon={Globe}
+        emptyTitle="No page data"
+        emptyDescription="Website analytics appear once GA4 is connected and traffic has been collected."
+        emptyMessage="No page data"
+      />
     </div>
   );
 }

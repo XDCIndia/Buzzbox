@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Search } from 'lucide-react';
 import { SignalCard } from '@/components/ui/signal-card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { useDashboard } from '@/store';
 import type { Signal } from '@/types';
@@ -84,8 +86,14 @@ export default function ResearchPage() {
         </div>
         <div className="panel-body space-y-3">
           {otherSignals.length === 0 && todaySignals.length === 0 ? (
-            <div className="panel p-8 text-center text-muted-foreground text-sm">
-              No research signals yet
+            <div className="p-6">
+              <EmptyState
+                icon={Search}
+                title="No research signals yet"
+                reason="Signals are collected from monitored sources when the research sync runs."
+                next="Check that monitoring keywords are configured and trigger a sync."
+                action={{ label: 'Run from Mission Control', href: '/dashboard' }}
+              />
             </div>
           ) : (
             otherSignals.map(s => <SignalCard key={s.id} signal={s} />)

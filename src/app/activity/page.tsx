@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PenLine, MessageCircle, Mail, Search, Info, Activity } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { timeAgo } from '@/lib/utils';
 import { useDashboard } from '@/store';
 import type { ActivityEntry } from '@/types';
@@ -66,8 +67,13 @@ export default function ActivityPage() {
       <div className="panel">
         <div className="panel-body space-y-0">
           {entries.length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-              No activity logged yet
+            <div className="p-6">
+              <EmptyState
+                icon={Activity}
+                title="No activity logged yet"
+                reason="Every publish, reply, approval, and agent action is recorded here as it happens."
+                next="Run an agent job or publish content to see the first entries."
+              />
             </div>
           ) : (
             groupByDay(entries).map(group => (

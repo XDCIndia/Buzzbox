@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { DataTable } from '@/components/ui/data-table';
+import { Contact, Mail, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { FunnelChart } from '@/components/ui/funnel-chart';
 import { ApprovalCard } from '@/components/ui/approval-card';
@@ -190,6 +191,11 @@ export default function OutreachPage() {
                 ]}
                 data={filteredLeads}
                 keyField="id"
+                emptyIcon={Contact}
+                emptyTitle={tierFilter || statusFilter ? 'No leads match these filters' : 'No leads yet'}
+                emptyDescription={tierFilter || statusFilter
+                  ? 'Try clearing the tier or status filters to see the full pipeline.'
+                  : 'Leads are captured automatically from outreach replies and CRM entries.'}
                 emptyMessage="No leads"
               />
             </div>
@@ -221,6 +227,9 @@ export default function OutreachPage() {
             ]}
             data={sequences}
             keyField="id"
+            emptyIcon={Mail}
+            emptyTitle="No sequences yet"
+            emptyDescription="Email sequences are generated for new leads and queued here for approval before sending."
             emptyMessage="No sequences"
           />
           </div>
@@ -267,6 +276,9 @@ export default function OutreachPage() {
             ]}
             data={suppression}
             keyField="email"
+            emptyIcon={Shield}
+            emptyTitle="Suppression list is empty"
+            emptyDescription="Emails marked as opt-outs, bounces, or do-not-contact are listed here to keep outreach compliant."
             emptyMessage="No suppressed emails"
           />
           </div>

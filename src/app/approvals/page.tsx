@@ -6,6 +6,7 @@ import { toast } from '@/components/ui/toast';
 import { useDashboard } from '@/store';
 import { CheckCircle2, XCircle, Mail, PenLine, ShieldCheck } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
 
 interface ContentApproval {
   id: string;
@@ -200,7 +201,13 @@ export default function ApprovalsPage() {
             </div>
           </div>
           {content.length === 0 ? (
-            <div className="text-xs text-muted-foreground">No pending content approvals.</div>
+            <EmptyState
+              icon={PenLine}
+              title="No content waiting"
+              reason="Drafts flagged for review appear here before anything is scheduled or published."
+              next="New drafts from the content pipeline will show up automatically."
+              variant="inline"
+            />
           ) : (
             <div className="space-y-3">
               {content.map(item => (
@@ -255,7 +262,13 @@ export default function ApprovalsPage() {
             </div>
           </div>
           {sequences.length === 0 ? (
-            <div className="text-xs text-muted-foreground">No pending outreach approvals.</div>
+            <EmptyState
+              icon={Mail}
+              title="No outreach waiting"
+              reason="Sequence steps generated for leads queue here for a quick approve/reject."
+              next="They arrive automatically as new leads enter the pipeline."
+              variant="inline"
+            />
           ) : (
             <div className="space-y-3">
               {sequences.map(item => (
@@ -301,7 +314,12 @@ export default function ApprovalsPage() {
           <span className="text-[10px] text-muted-foreground">{history.length} events</span>
         </div>
         {history.length === 0 ? (
-          <div className="text-xs text-muted-foreground">No recent approval activity.</div>
+          <EmptyState
+            icon={ShieldCheck}
+            title="No approvals yet"
+            reason="Approved and rejected items are logged here with who acted and when."
+            variant="inline"
+          />
         ) : (
           <div className="space-y-2 text-xs">
             {history.map((item, idx) => (

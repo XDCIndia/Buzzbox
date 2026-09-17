@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { SignalCard } from '@/components/ui/signal-card';
-import { ExternalLink, Copy, Check } from 'lucide-react';
+import { ExternalLink, Copy, Check, MessageCircle, Radar } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { formatDateTime } from '@/lib/utils';
 import { useDashboard } from '@/store';
@@ -97,6 +98,9 @@ export default function EngagementPage() {
             ]}
             data={xEngagements}
             keyField="id"
+            emptyIcon={ExternalLink}
+            emptyTitle="No X activity yet"
+            emptyDescription="Replies, likes, and mentions collected from X will appear here once the engagement agent runs."
             emptyMessage="No X engagements yet"
           />
           </div>
@@ -106,8 +110,14 @@ export default function EngagementPage() {
       {tab === 'linkedin' && (
         <div className="space-y-3">
           {linkedInQueue.length === 0 ? (
-            <div className="panel p-8 text-center text-muted-foreground text-sm">
-              No LinkedIn comments queued
+            <div className="panel p-8">
+              <EmptyState
+                icon={MessageCircle}
+                title="No LinkedIn comments queued"
+                reason="Draft comments for LinkedIn posts appear here when the engagement agent finds relevant conversations."
+                next="Connect LinkedIn or run a sync to populate the queue."
+                variant="panel"
+              />
             </div>
           ) : (
             linkedInQueue.map(item => (
@@ -142,8 +152,14 @@ export default function EngagementPage() {
       {tab === 'signals' && (
         <div className="space-y-3">
           {signals.length === 0 ? (
-            <div className="panel p-8 text-center text-muted-foreground text-sm">
-              No signals detected yet
+            <div className="panel p-8">
+              <EmptyState
+                icon={Radar}
+                title="No signals detected yet"
+                reason="Listening signals are collected from monitored keywords and sources across social and news."
+                next="Add brand keywords in Settings or run a research sync to start collecting."
+                action={{ label: 'Open research', href: '/research' }}
+              />
             </div>
           ) : (
             signals.slice(0, 50).map(signal => (

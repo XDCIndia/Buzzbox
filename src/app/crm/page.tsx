@@ -11,6 +11,7 @@ import {
   Check, XCircle,
   LayoutList, Kanban, AlertCircle, BarChart3, ExternalLink,
 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { useDashboard } from '@/store';
 import { timeAgo } from '@/lib/utils';
@@ -622,7 +623,18 @@ export default function CrmPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-2">
             {sorted.length === 0 ? (
-              <div className="panel p-8 text-center text-sm text-muted-foreground">No leads found</div>
+              <div className="panel p-8">
+                <EmptyState
+                  icon={Contact}
+                  title={search || stageFilter || tierFilter ? 'No leads match' : 'No leads yet'}
+                  reason={search || stageFilter || tierFilter
+                    ? 'No pipeline entries match the current search, stage, or tier filters.'
+                    : 'Leads enter the pipeline from outreach replies, signups, or manual entry.'}
+                  next={search || stageFilter || tierFilter
+                    ? 'Try a different search term or clear the filters.'
+                    : 'Add your first lead or connect a lead source to get started.'}
+                />
+              </div>
             ) : (
               sorted.map(lead => (
                 <LeadRow
