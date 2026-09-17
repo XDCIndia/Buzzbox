@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/ui/page-header';
 import { FlaskConical, Lightbulb, CheckCircle2 } from 'lucide-react';
-import { EmptyState } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState } from '@/components/ui/empty-state';
 import { useDashboard } from '@/store';
 import type { Experiment, Learning } from '@/types';
 
@@ -16,13 +16,20 @@ export default function ExperimentsPage() {
   const [tab, setTab] = useState<Tab>('current');
   const { realOnly } = useDashboard();
 
+  const [loadError, setLoadError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
+
   useEffect(() => {
     const realParam = realOnly ? '?real=true' : '';
-    fetch(`/api/experiments${realParam}`).then(r => r.json()).then(data => {
-      setExperiments(data.experiments || []);
-      setLearnings(data.learnings || []);
-    }).catch(() => {});
-  }, [realOnly]);
+    fetch(`/api/experiments${realParam}`)
+      .then(r => { if (!r.ok) throw new Error('experiments'); return r.json(); })
+      .then(data => {
+        setLoadError(false);
+        setExperiments(data.experiments || []);
+        setLearnings(data.learnings || []);
+      })
+      .catch(() => setLoadError(true));
+  }, [realOnly, retryNonce]);
 
   const running = experiments.filter(e => e.status === 'running' || e.status === 'proposed');
   const completed = experiments.filter(e => e.status === 'completed');
@@ -35,6 +42,16 @@ export default function ExperimentsPage() {
         title="Experiments"
         description="Running experiments, history, and captured learnings."
       />
+
+      {loadError && (
+        <ErrorState
+          title="Couldn't load experiments"
+          detail="The experiments service did not respond. Running experiments are unaffected — retry to refresh."
+          onRetry={() => setRetryNonce(n => n + 1)}
+        />
+      )}
+
+      {!loadError && (
       <div className="panel">
         <div className="panel-body !p-0">
           <div className="flex gap-0 border-b border-border">
@@ -54,6 +71,7 @@ export default function ExperimentsPage() {
           </div>
         </div>
       </div>
+      )}
 
       {tab === 'current' && (
         <div className="space-y-4">

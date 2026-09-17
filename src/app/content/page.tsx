@@ -8,6 +8,7 @@ import { PILLAR_LABELS, formatDateTime } from '@/lib/utils';
 import { Check, X, PenLine, TrendingUp } from 'lucide-react';
 import { toast } from '@/components/ui/toast';
 import { PageHeader } from '@/components/ui/page-header';
+import { ErrorState } from '@/components/ui/empty-state';
 import { useDashboard } from '@/store';
 import type { ContentPost } from '@/types';
 
@@ -19,12 +20,16 @@ export default function ContentPage() {
   const [filter, setFilter] = useState<string>('');
   const { realOnly } = useDashboard();
 
+  const [loadError, setLoadError] = useState(false);
   const load = useCallback(() => {
     const params = new URLSearchParams();
     if (filter) params.set('status', filter);
     if (realOnly) params.set('real', 'true');
     const q = params.toString();
-    fetch(`/api/content${q ? '?' + q : ''}`).then(r => r.json()).then(setPosts).catch(() => {});
+    fetch(`/api/content${q ? '?' + q : ''}`)
+      .then(r => { if (!r.ok) throw new Error('content'); return r.json(); })
+      .then(posts => { setLoadError(false); setPosts(posts); })
+      .catch(() => setLoadError(true));
   }, [filter, realOnly]);
 
   useEffect(() => { load(); }, [load]);
@@ -68,7 +73,16 @@ export default function ContentPage() {
         </select>
       </PageHeader>
 
+      {loadError && (
+        <ErrorState
+          title="Couldn't load content"
+          detail="The content service did not respond. Your drafts are safe — retry when the service is back."
+          onRetry={load}
+        />
+      )}
+
       {/* Tabs */}
+      {!loadError && (
       <div className="panel">
         <div className="panel-body !p-0">
       <div className="flex gap-0 border-b border-border">
@@ -84,6 +98,7 @@ export default function ContentPage() {
       </div>
       </div>
       </div>
+      )}
 
       {tab === 'queue' && (
         <div className="panel">

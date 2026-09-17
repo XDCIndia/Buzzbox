@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import {
   Gauge, Bot, PenLine, MessageCircle, Mail, Contact, Zap,
   Search, BarChart3, LineChart, BrainCircuit, Rocket, Clock, List, Settings,
   FolderOpen, AtSign, Newspaper, PieChart, Megaphone, Sparkles, Bell,
-  CheckSquare, Plug,
+  CheckSquare, Plug, ChevronDown,
 } from 'lucide-react';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { useDashboard } from '@/store';
@@ -87,6 +88,8 @@ const NAV_GROUPS: NavGroup[] = [
 export function NavRail() {
   const pathname = usePathname();
   const realOnly = useDashboard(s => s.realOnly);
+  // Groups the user manually collapsed; groups with an active page always stay open.
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const { data: counts } = useSmartPoll<NavCounts>(
     () => fetch(`/api/counts${realOnly ? '?real=true' : ''}`).then(r => r.json()),
@@ -96,11 +99,27 @@ export function NavRail() {
   return (
     <nav className="nav-rail fixed left-0 top-[var(--header-height)] bottom-0 w-[var(--nav-width)] bg-surface-0/95 backdrop-blur-md border-r border-border z-40 hidden md:flex flex-col select-none">
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-        {NAV_GROUPS.map((group, idx) => (
+        {NAV_GROUPS.map((group, idx) => {
+          const hasActive = group.items.some(item =>
+            item.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.href)
+          );
+          const isCollapsed = (collapsed[group.label] ?? false) && !hasActive;
+          const total = group.items.reduce((sum, item) => sum + (item.countKey && counts ? (counts[item.countKey] || 0) : 0), 0);
+          return (
           <div key={group.label} className={idx > 0 ? 'pt-4 border-t border-border/40' : ''}>
-            <div className="px-2.5 pb-2 text-[9px] font-semibold tracking-[0.18em] text-muted-foreground/50 font-mono uppercase">
-              {group.label}
-            </div>
+            <button
+              className="w-full flex items-center gap-1 px-2.5 pb-2 text-[9px] font-semibold tracking-[0.18em] text-muted-foreground/50 font-mono uppercase hover:text-muted-foreground transition-colors focus:outline-none focus:ring-1 focus:ring-primary rounded"
+              onClick={() => setCollapsed(prev => ({ ...prev, [group.label]: !isCollapsed }))}
+              aria-expanded={!isCollapsed}
+              title={isCollapsed ? `Expand ${group.label}` : `Collapse ${group.label}`}
+            >
+              <span className="flex-1 text-left">{group.label}</span>
+              {total > 0 && !isCollapsed && (
+                <span className="text-[9px] font-mono bg-surface-2 px-1 rounded text-muted-foreground">{total > 99 ? '99+' : total}</span>
+              )}
+              <ChevronDown size={10} className={`transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+            </button>
+            {!isCollapsed && (
             <div className="space-y-0.5">
               {group.items.map((item, itemIdx) => {
                 const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.href);
@@ -143,8 +162,10 @@ export function NavRail() {
                 );
               })}
             </div>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="p-2.5 border-t border-border/60 bg-surface-1/40">

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PenLine, MessageCircle, Mail, Search, Info, Activity } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
-import { EmptyState } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState } from '@/components/ui/empty-state';
 import { timeAgo } from '@/lib/utils';
 import { useDashboard } from '@/store';
 import type { ActivityEntry } from '@/types';
@@ -21,6 +21,8 @@ const ACTION_FILTERS = [
 export default function ActivityPage() {
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [filter, setFilter] = useState('');
+  const [loadError, setLoadError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const { realOnly } = useDashboard();
 
   useEffect(() => {
@@ -28,8 +30,11 @@ export default function ActivityPage() {
     if (filter) params.set('action', filter);
     params.set('limit', '200');
     if (realOnly) params.set('real', 'true');
-    fetch(`/api/activity?${params}`).then(r => r.json()).then(setEntries).catch(() => {});
-  }, [filter, realOnly]);
+    fetch(`/api/activity?${params}`)
+      .then(r => { if (!r.ok) throw new Error('activity'); return r.json(); })
+      .then(entries => { setLoadError(false); setEntries(entries); })
+      .catch(() => setLoadError(true));
+  }, [filter, realOnly, retryNonce]);
 
   return (
     <div className="space-y-6 animate-in">
@@ -64,6 +69,13 @@ export default function ActivityPage() {
         </div>
       </PageHeader>
 
+      {loadError ? (
+        <ErrorState
+          title="Couldn't load activity"
+          detail="The activity service did not respond. Recent events may still be recorded — retry to refresh."
+          onRetry={() => setRetryNonce(n => n + 1)}
+        />
+      ) : (
       <div className="panel">
         <div className="panel-body space-y-0">
           {entries.length === 0 ? (
@@ -116,6 +128,7 @@ export default function ActivityPage() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { SignalCard } from '@/components/ui/signal-card';
 import { ExternalLink, Copy, Check, MessageCircle, Radar } from 'lucide-react';
-import { EmptyState } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { formatDateTime } from '@/lib/utils';
 import { useDashboard } from '@/store';
@@ -18,13 +18,20 @@ export default function EngagementPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [tab, setTab] = useState<Tab>('x');
   const [copied, setCopied] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const { realOnly } = useDashboard();
 
-  useEffect(() => {
+  const loadEngagement = useCallback(() => {
     const realParam = realOnly ? '?real=true' : '';
-    fetch(`/api/engagement${realParam}`).then(r => r.json()).then(setEngagements).catch(() => {});
-    fetch(`/api/signals${realParam}`).then(r => r.json()).then(setSignals).catch(() => {});
+    Promise.all([
+      fetch(`/api/engagement${realParam}`).then(r => { if (!r.ok) throw new Error('engagement'); return r.json(); }),
+      fetch(`/api/signals${realParam}`).then(r => { if (!r.ok) throw new Error('signals'); return r.json(); }),
+    ])
+      .then(([eng, sig]) => { setLoadError(false); setEngagements(eng); setSignals(sig); })
+      .catch(() => setLoadError(true));
   }, [realOnly]);
+
+  useEffect(() => { loadEngagement(); }, [loadEngagement]);
 
   const xEngagements = engagements.filter(e => e.platform === 'x');
   const linkedInQueue = engagements.filter(e => e.platform === 'linkedin' && e.action_type === 'comment');
@@ -52,6 +59,14 @@ export default function EngagementPage() {
         </div>
       </PageHeader>
 
+      {loadError ? (
+        <ErrorState
+          title="Couldn't load engagement data"
+          detail="The engagement or signals service did not respond. Check that the sync service is running."
+          onRetry={loadEngagement}
+        />
+      ) : (
+      <>
       <div className="panel">
         <div className="panel-body !p-0">
       <div className="flex gap-0 border-b border-border">
@@ -167,6 +182,8 @@ export default function EngagementPage() {
             ))
           )}
         </div>
+      )}
+      </>
       )}
     </div>
   );

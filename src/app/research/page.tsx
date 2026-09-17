@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { SignalCard } from '@/components/ui/signal-card';
-import { EmptyState } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { useDashboard } from '@/store';
 import type { Signal } from '@/types';
@@ -22,6 +22,8 @@ export default function ResearchPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [typeFilter, setTypeFilter] = useState('');
   const [relevanceFilter, setRelevanceFilter] = useState('');
+  const [loadError, setLoadError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const { realOnly } = useDashboard();
 
   useEffect(() => {
@@ -30,8 +32,11 @@ export default function ResearchPage() {
     if (relevanceFilter) params.set('relevance', relevanceFilter);
     if (realOnly) params.set('real', 'true');
     const q = params.toString();
-    fetch(`/api/signals${q ? '?' + q : ''}`).then(r => r.json()).then(setSignals).catch(() => {});
-  }, [typeFilter, relevanceFilter, realOnly]);
+    fetch(`/api/signals${q ? '?' + q : ''}`)
+      .then(r => { if (!r.ok) throw new Error('signals'); return r.json(); })
+      .then(signals => { setLoadError(false); setSignals(signals); })
+      .catch(() => setLoadError(true));
+  }, [typeFilter, relevanceFilter, realOnly, retryNonce]);
 
   const todaySignals = signals.filter(s => s.date === new Date().toISOString().slice(0, 10));
   const otherSignals = signals.filter(s => s.date !== new Date().toISOString().slice(0, 10));
@@ -65,6 +70,14 @@ export default function ResearchPage() {
         </div>
       </PageHeader>
 
+      {loadError ? (
+        <ErrorState
+          title="Couldn't load signals"
+          detail="The signals service did not respond. Monitoring may be offline — retry in a moment."
+          onRetry={() => setRetryNonce(n => n + 1)}
+        />
+      ) : (
+      <>
       {/* Today's signals */}
       {todaySignals.length > 0 && (
         <section className="panel">
@@ -100,6 +113,8 @@ export default function ResearchPage() {
           )}
         </div>
       </section>
+      </>
+      )}
     </div>
   );
 }
