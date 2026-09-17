@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PenLine, MessageCircle, Mail, Search, Info, Activity } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { timeAgo } from '@/lib/utils';
 import { useDashboard } from '@/store';
 import type { ActivityEntry } from '@/types';
@@ -31,34 +32,36 @@ export default function ActivityPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="panel">
-        <div className="panel-header flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-xl font-semibold">Activity Log</h1>
-          <div className="flex items-center gap-2">
-            <button
-              className="btn btn-ghost text-xs"
-              onClick={() => {
-                const params = new URLSearchParams();
-                if (filter) params.set('action', filter);
-                params.set('limit', '500');
-                if (realOnly) params.set('real', 'true');
-                params.set('format', 'csv');
-                window.open(`/api/activity?${params.toString()}`, '_blank', 'noopener,noreferrer');
-              }}
-            >
-              Export CSV
-            </button>
-            <select
-              value={filter}
-              onChange={e => setFilter(e.target.value)}
-            >
-              {ACTION_FILTERS.map(f => (
-                <option key={f.key} value={f.key}>{f.label}</option>
-              ))}
-            </select>
-          </div>
+      <PageHeader
+        index="16"
+        eyebrow="System"
+        title="Activity log"
+        description="Every action across agents, content, and outreach."
+      >
+        <div className="flex items-center gap-2">
+          <button
+            className="btn btn-ghost text-xs"
+            onClick={() => {
+              const params = new URLSearchParams();
+              if (filter) params.set('action', filter);
+              params.set('limit', '500');
+              if (realOnly) params.set('real', 'true');
+              params.set('format', 'csv');
+              window.open(`/api/activity?${params.toString()}`, '_blank', 'noopener,noreferrer');
+            }}
+          >
+            Export CSV
+          </button>
+          <select
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+          >
+            {ACTION_FILTERS.map(f => (
+              <option key={f.key} value={f.key}>{f.label}</option>
+            ))}
+          </select>
         </div>
-      </div>
+      </PageHeader>
 
       <div className="panel">
         <div className="panel-body space-y-0">

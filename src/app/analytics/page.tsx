@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { PageHeader } from '@/components/ui/page-header';
 import {
   Activity,
   Globe,
-  LineChart,
   MousePointerClick,
   Users,
   Send,
@@ -162,11 +162,12 @@ export default function AnalyticsPage() {
   if (!data || loading) {
     return (
       <div className="space-y-6 animate-in">
-        <div className="panel">
-          <div className="panel-header flex items-center justify-between">
-            <h1 className="text-xl font-semibold">Analytics</h1>
-          </div>
-        </div>
+        <PageHeader
+          index="11"
+          eyebrow="Observe"
+          title="Analytics"
+          description="Website, social, and platform performance."
+        />
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <ChartSkeleton height={240} />
           <ChartSkeleton height={240} />
@@ -178,19 +179,18 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="panel">
-        <div className="panel-header flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <LineChart size={18} className="text-primary" />
-            <h1 className="text-xl font-semibold">Analytics</h1>
-          </div>
-          <div className="flex items-center gap-1">
-            <RangeButton active={days === 7} onClick={() => setDays(7)} label="7d" />
-            <RangeButton active={days === 30} onClick={() => setDays(30)} label="30d" />
-            <RangeButton active={days === 90} onClick={() => setDays(90)} label="90d" />
-          </div>
+      <PageHeader
+        index="11"
+        eyebrow="Observe"
+        title="Analytics"
+        description="Website, social, and platform performance."
+      >
+        <div className="flex items-center gap-1">
+          <RangeButton active={days === 7} onClick={() => setDays(7)} label="7d" />
+          <RangeButton active={days === 30} onClick={() => setDays(30)} label="30d" />
+          <RangeButton active={days === 90} onClick={() => setDays(90)} label="90d" />
         </div>
-      </div>
+      </PageHeader>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <WebsitePanel website={data.website} />

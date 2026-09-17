@@ -18,7 +18,7 @@ interface SearchResult {
 }
 
 const NAV_ITEMS = [
-  { label: 'Overview', path: '/dashboard', icon: Gauge },
+  { label: 'Mission Control', path: '/dashboard', icon: Gauge },
   { label: 'Content', path: '/content', icon: PenLine },
   { label: 'Engagement', path: '/engagement', icon: MessageCircle },
   { label: 'Outreach', path: '/outreach', icon: Mail },

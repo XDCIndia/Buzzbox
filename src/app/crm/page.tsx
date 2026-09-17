@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, DragEvent } from 'react';
 import Link from 'next/link';
+import { PageHeader } from '@/components/ui/page-header';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Contact, Search, ChevronRight, Star,
@@ -343,17 +344,20 @@ export default function CrmPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold">CRM</h1>
-          {canEdit && (
-            <button className="btn btn-primary btn-sm" onClick={() => setCreateOpen(true)}>
-              Add Lead
-            </button>
-          )}
-        </div>
-        {data?.summary && (
-          <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+      <PageHeader
+        index="06"
+        eyebrow="Operate"
+        title="CRM"
+        description="Every lead, score, and next action in one pipeline."
+      >
+        {canEdit && (
+          <button className="btn btn-primary btn-lg" onClick={() => setCreateOpen(true)}>
+            Add Lead
+          </button>
+        )}
+      </PageHeader>
+      {data?.summary && (
+          <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap mb-6">
             <span><strong className="text-foreground">{data.summary.total}</strong> leads</span>
             <span>avg score <strong className="text-foreground">{data.summary.avg_score}</strong></span>
             {data.summary.tier_breakdown.map(t => (
@@ -373,7 +377,6 @@ export default function CrmPage() {
           )}
           </div>
         )}
-      </div>
 
       {/* Quick Stats */}
       {data?.summary && (

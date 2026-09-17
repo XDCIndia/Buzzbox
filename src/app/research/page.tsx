@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { SignalCard } from '@/components/ui/signal-card';
+import { PageHeader } from '@/components/ui/page-header';
 import { useDashboard } from '@/store';
 import type { Signal } from '@/types';
 
@@ -35,30 +36,32 @@ export default function ResearchPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="panel">
-        <div className="panel-header flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-xl font-semibold">Research</h1>
-          <div className="flex gap-3">
-            <select
-              value={typeFilter}
-              onChange={e => setTypeFilter(e.target.value)}
-            >
-              {SIGNAL_TYPES.map(t => (
-                <option key={t.key} value={t.key}>{t.label}</option>
-              ))}
-            </select>
-            <select
-              value={relevanceFilter}
-              onChange={e => setRelevanceFilter(e.target.value)}
-            >
-              <option value="">All Relevance</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-          </div>
+      <PageHeader
+        index="09"
+        eyebrow="Observe"
+        title="Research"
+        description="Collected signals from social and news monitoring."
+      >
+        <div className="flex gap-3">
+          <select
+            value={typeFilter}
+            onChange={e => setTypeFilter(e.target.value)}
+          >
+            {SIGNAL_TYPES.map(t => (
+              <option key={t.key} value={t.key}>{t.label}</option>
+            ))}
+          </select>
+          <select
+            value={relevanceFilter}
+            onChange={e => setRelevanceFilter(e.target.value)}
+          >
+            <option value="">All Relevance</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Today's signals */}
       {todaySignals.length > 0 && (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Circle } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { AgentChat } from '@/components/chat/agent-chat';
 import { MissionControlChat } from '@/components/chat/mission-control-chat';
 
@@ -17,16 +18,17 @@ export default function AgentCommsPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold">Agent Comms</h1>
-          <p className="text-xs text-muted-foreground">Operator, orchestrator, and agent-to-agent channels.</p>
-        </div>
+      <PageHeader
+        index="18"
+        eyebrow="Agents"
+        title="Agent comms"
+        description="Operator, orchestrator, and agent-to-agent channels."
+      >
         <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap justify-end">
           <span className="badge border bg-muted/20 text-muted-foreground">Role: {role}</span>
           <span className="flex items-center gap-1.5"><Circle size={8} className="fill-primary text-primary" /> Live</span>
         </div>
-      </div>
+      </PageHeader>
 
       <section className="space-y-4">
         <div>

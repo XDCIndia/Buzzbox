@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   Cpu, Wrench, Zap, ChevronDown, ChevronUp,
   Circle, Activity,
@@ -71,7 +72,12 @@ export default function AgentsPage() {
   if (!agents || loading) {
     return (
       <div className="space-y-6 animate-in">
-        <h1 className="text-xl font-semibold">Agents</h1>
+        <PageHeader
+          index="17"
+          eyebrow="Agents"
+          title="Squads"
+          description="Squads, runtime health, and operator comms."
+        />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {[1, 2].map(i => (
             <div key={i} className="panel p-6 h-64 animate-pulse bg-muted/20" />
@@ -83,11 +89,12 @@ export default function AgentsPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold">Agents</h1>
-          <p className="text-xs text-muted-foreground">Squads, runtime health, and operator comms.</p>
-        </div>
+      <PageHeader
+        index="17"
+        eyebrow="Agents"
+        title="Squads"
+        description="Squads, runtime health, and operator comms."
+      >
         <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap justify-end">
           <span className="flex items-center gap-1.5"><Circle size={8} className="fill-success text-success" /> Active</span>
           <span className="flex items-center gap-1.5"><Circle size={8} className="fill-warning text-warning" /> Idle</span>
@@ -96,7 +103,7 @@ export default function AgentsPage() {
             Role: {role}
           </span>
         </div>
-      </div>
+      </PageHeader>
 
       <section className="space-y-4">
         <div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
 import { FlaskConical, Lightbulb } from 'lucide-react';
 import { useDashboard } from '@/store';
 import type { Experiment, Learning } from '@/types';
@@ -27,10 +28,13 @@ export default function ExperimentsPage() {
 
   return (
     <div className="space-y-6 animate-in">
+      <PageHeader
+        index="08"
+        eyebrow="Operate"
+        title="Experiments"
+        description="Running experiments, history, and captured learnings."
+      />
       <div className="panel">
-        <div className="panel-header">
-          <h1 className="text-xl font-semibold">Experiments</h1>
-        </div>
         <div className="panel-body !p-0">
           <div className="flex gap-0 border-b border-border">
             {([

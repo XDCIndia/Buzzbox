@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FileText, Folder, RefreshCw, Save, Trash2, Plus, ArrowUp } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { toast } from '@/components/ui/toast';
 
 type Entry = {
@@ -305,13 +306,12 @@ export default function AgentWorkspacePage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold">Workspace</h1>
-          <p className="text-xs text-muted-foreground">
-            Browse and edit workspace files. Hidden by default: dotfiles, credentials/state/logs, sessions, sandboxes.
-          </p>
-        </div>
+      <PageHeader
+        index="19"
+        eyebrow="Agents"
+        title="Workspace"
+        description="Browse and edit workspace files. Hidden by default: dotfiles, credentials/state/logs, sessions, sandboxes."
+      >
         <div className="flex items-center gap-2 flex-wrap">
           <button type="button" className="btn btn-ghost btn-sm" onClick={refresh} disabled={loadingList}>
             <RefreshCw size={14} /> Refresh
@@ -321,7 +321,7 @@ export default function AgentWorkspacePage() {
             {rootLabel}{rootWritable ? '' : ' (read-only)'}
           </span>
         </div>
-      </div>
+      </PageHeader>
 
       {writeBlocked && (
         <div className="panel border border-warning/40 bg-warning/5">

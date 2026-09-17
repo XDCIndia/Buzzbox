@@ -7,6 +7,7 @@ import { FunnelChart } from '@/components/ui/funnel-chart';
 import { ApprovalCard } from '@/components/ui/approval-card';
 import { formatDateTime } from '@/lib/utils';
 import { toast } from '@/components/ui/toast';
+import { PageHeader } from '@/components/ui/page-header';
 import { useDashboard } from '@/store';
 import type { Lead, Sequence, FunnelStep, Suppression } from '@/types';
 
@@ -73,8 +74,12 @@ export default function OutreachPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-semibold">Outreach</h1>
+      <PageHeader
+        index="05"
+        eyebrow="Operate"
+        title="Outreach"
+        description="Leads, sequences, and approvals for every outbound motion."
+      >
         <div className="text-xs text-muted-foreground">
           Leads <span className="font-mono text-foreground">{leads.length}</span>
           {' · '}
@@ -82,7 +87,7 @@ export default function OutreachPage() {
           {' · '}
           Suppression <span className="font-mono text-foreground">{suppression.length}</span>
         </div>
-      </div>
+      </PageHeader>
 
       <div className="panel">
         <div className="panel-body !p-0">

@@ -1,6 +1,7 @@
 'use client';
 
 import { useSmartPoll } from '@/hooks/use-smart-poll';
+import { PageHeader } from '@/components/ui/page-header';
 
 interface DeployStatusPayload {
   service: { name: string; state: string };
@@ -26,7 +27,12 @@ export default function DeployPage() {
   if (loading || !data) {
     return (
       <div className="space-y-6 animate-in">
-        <h1 className="text-xl font-semibold">Deploy</h1>
+        <PageHeader
+          index="14"
+          eyebrow="System"
+          title="Deploy"
+          description="Service health, deploy state, and operations."
+        />
         <div className="panel p-6 h-48 animate-pulse bg-muted/20" />
       </div>
     );
@@ -37,7 +43,12 @@ export default function DeployPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <h1 className="text-xl font-semibold">Deploy</h1>
+      <PageHeader
+        index="14"
+        eyebrow="System"
+        title="Deploy"
+        description="Service health, deploy state, and operations."
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <StatusCard label="Service" value={data.service.state} ok={serviceOk} />

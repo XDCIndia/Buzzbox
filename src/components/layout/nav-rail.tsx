@@ -40,7 +40,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'CORE',
     items: [
-      { href: '/dashboard', label: 'Overview', icon: Gauge },
+      { href: '/dashboard', label: 'Mission Control', icon: Gauge },
       { href: '/agents/squads', label: 'Squads', icon: Bot },
       { href: '/agents/comms', label: 'Comms', icon: MessageCircle },
       { href: '/agents/workspace', label: 'Workspace', icon: FolderOpen },

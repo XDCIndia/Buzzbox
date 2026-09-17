@@ -5,6 +5,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { SignalCard } from '@/components/ui/signal-card';
 import { ExternalLink, Copy, Check } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { formatDateTime } from '@/lib/utils';
 import { useDashboard } from '@/store';
 import type { Engagement, Signal } from '@/types';
@@ -35,8 +36,12 @@ export default function EngagementPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-semibold">Engagement</h1>
+      <PageHeader
+        index="04"
+        eyebrow="Operate"
+        title="Engagement"
+        description="Replies, comments, and listening signals across platforms."
+      >
         <div className="text-xs text-muted-foreground">
           X <span className="font-mono text-foreground">{xEngagements.length}</span>
           {' · '}
@@ -44,7 +49,7 @@ export default function EngagementPage() {
           {' · '}
           Signals <span className="font-mono text-foreground">{signals.length}</span>
         </div>
-      </div>
+      </PageHeader>
 
       <div className="panel">
         <div className="panel-body !p-0">

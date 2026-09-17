@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Settings, Database, Shield, Info, ExternalLink,
+  Database, Shield, Info, ExternalLink,
   RefreshCw, Trash2, Users, UserPlus, KeyRound, BrainCircuit, BellRing,
   AtSign, Plus, X,
 } from 'lucide-react';
 import { toast } from '@/components/ui/toast';
+import { PageHeader } from '@/components/ui/page-header';
 import { timeAgo } from '@/lib/utils';
 import { getRoleMatrix } from '@/lib/rbac';
 import { DEFAULT_BRAND_ID } from '@/lib/brand-constants';
@@ -461,15 +462,13 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 animate-in w-full">
+      <PageHeader
+        index="20"
+        eyebrow="System"
+        title="Settings"
+        description="Configure sync, memory policies, access controls, and workspace runtime details."
+      />
       <div className="panel">
-        <div className="panel-header">
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <Settings size={20} /> Settings
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Configure sync, memory policies, access controls, and workspace runtime details.
-          </p>
-        </div>
         <div className="panel-body">
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {[

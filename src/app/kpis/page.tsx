@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { TrendChart } from '@/components/ui/trend-chart';
+import { PageHeader } from '@/components/ui/page-header';
 import { useDashboard } from '@/store';
 import type { DailyMetrics, WeeklyKPI } from '@/types';
 
@@ -34,12 +35,16 @@ export default function KPIsPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-semibold">KPIs</h1>
+      <PageHeader
+        index="10"
+        eyebrow="Observe"
+        title="KPIs"
+        description="Weekly north-star metrics and trends."
+      >
         <div className="text-xs text-muted-foreground">
           Weeks tracked <span className="font-mono text-foreground">{weekly.length}</span>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Weekly metrics table */}
       <div className="panel">

@@ -1,6 +1,7 @@
 'use client';
 
 import { useSmartPoll } from '@/hooks/use-smart-poll';
+import { PageHeader } from '@/components/ui/page-header';
 import { formatDateTime } from '@/lib/utils';
 
 interface IntegrationCard {
@@ -52,12 +53,12 @@ export default function IntegrationsPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="panel">
-        <div className="panel-header">
-          <h1 className="text-xl font-semibold">Integrations</h1>
-          <p className="text-sm text-muted-foreground">Live status for Hermes data sources</p>
-        </div>
-      </div>
+      <PageHeader
+        index="12"
+        eyebrow="System"
+        title="Integrations"
+        description="Live status for Hermes data sources"
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="panel p-4 space-y-2">

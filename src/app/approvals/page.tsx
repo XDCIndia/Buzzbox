@@ -5,6 +5,7 @@ import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { toast } from '@/components/ui/toast';
 import { useDashboard } from '@/store';
 import { CheckCircle2, XCircle, Mail, PenLine, ShieldCheck } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 
 interface ContentApproval {
   id: string;
@@ -164,24 +165,21 @@ export default function ApprovalsPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="panel">
-        <div className="panel-header flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">Approvals</h1>
-            <p className="text-sm text-muted-foreground">Review pending content drafts and outreach sequences</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="status-pill status-neutral">Total: {data?.total ?? 0}</span>
-            <span className="status-pill status-info">Content: {content.length}</span>
-            <span className="status-pill status-warn">Outreach: {sequences.length}</span>
-            {canBulkApprove && (
-              <span className="status-pill status-ok flex items-center gap-1">
-                <ShieldCheck size={12} /> Admin
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        index="03"
+        eyebrow="Operate"
+        title="Approvals"
+        description="Review pending content drafts and outreach sequences"
+      >
+        <span className="status-pill status-neutral">Total: {data?.total ?? 0}</span>
+        <span className="status-pill status-info">Content: {content.length}</span>
+        <span className="status-pill status-warn">Outreach: {sequences.length}</span>
+        {canBulkApprove && (
+          <span className="status-pill status-ok flex items-center gap-1">
+            <ShieldCheck size={12} /> Admin
+          </span>
+        )}
+      </PageHeader>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="panel p-4 space-y-3">

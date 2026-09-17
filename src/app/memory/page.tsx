@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { PageHeader } from '@/components/ui/page-header';
 import { AlertTriangle, BrainCircuit, GitCompare, RefreshCcw, Users } from 'lucide-react';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { timeAgo } from '@/lib/utils';
@@ -145,17 +146,13 @@ export default function MemoryPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold">Memory</h1>
-          <p className="text-xs text-muted-foreground">
-            Drift, health, and recall risk signals.
-            <span className="ml-2">
-              <Link className="text-primary hover:underline" href="/settings">Tune policies</Link>
-            </span>
-          </p>
-        </div>
-
+      <PageHeader
+        index="13"
+        eyebrow="System"
+        title="Memory"
+        description="Drift, health, and recall risk signals."
+      >
+        <Link className="text-xs text-primary hover:underline" href="/settings">Tune policies</Link>
         <div className="flex items-center gap-2">
           <select
             className="px-2 py-1 rounded-md border border-border bg-background text-xs"
@@ -178,7 +175,7 @@ export default function MemoryPage() {
             Refresh
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {instancesError && (
         <div className="panel p-4 text-xs text-warning">

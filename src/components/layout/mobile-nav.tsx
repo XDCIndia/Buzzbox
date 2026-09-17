@@ -41,7 +41,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Core',
     items: [
-      { href: '/dashboard', label: 'Overview', icon: Gauge, priority: true },
+      { href: '/dashboard', label: 'Mission Control', icon: Gauge, priority: true },
       { href: '/agents/squads', label: 'Squads', icon: Bot, priority: true },
       { href: '/outreach', label: 'Outreach', icon: Mail, countKey: 'outreach', priority: true },
       { href: '/crm', label: 'CRM', icon: Contact, countKey: 'new_leads', priority: true },

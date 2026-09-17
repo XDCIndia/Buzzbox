@@ -7,6 +7,7 @@ import { TrendChart } from '@/components/ui/trend-chart';
 import { PILLAR_LABELS, formatDateTime } from '@/lib/utils';
 import { Check, X } from 'lucide-react';
 import { toast } from '@/components/ui/toast';
+import { PageHeader } from '@/components/ui/page-header';
 import { useDashboard } from '@/store';
 import type { ContentPost } from '@/types';
 
@@ -47,8 +48,12 @@ export default function ContentPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Content</h1>
+      <PageHeader
+        index="02"
+        eyebrow="Operate"
+        title="Content pipeline"
+        description="Draft, approve, and publish posts across platforms."
+      >
         <select
           className="px-3"
           value={filter}
@@ -61,7 +66,7 @@ export default function ContentPage() {
           <option value="published">Published</option>
           <option value="rejected">Rejected</option>
         </select>
-      </div>
+      </PageHeader>
 
       {/* Tabs */}
       <div className="panel">

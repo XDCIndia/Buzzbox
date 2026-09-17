@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   Zap, Clock, CheckCircle, AlertTriangle, Mail, PenLine,
   Calendar, Activity, Timer, ThumbsUp, ThumbsDown, Loader2,
@@ -79,10 +80,12 @@ export default function AutomationsPage() {
   if (!data || loading) {
     return (
       <div className="space-y-6 animate-in">
-        <h1 className="text-xl font-semibold">Automations</h1>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => <div key={i} className="panel h-32 animate-pulse bg-muted/20" />)}
-        </div>
+        <PageHeader
+          index="07"
+          eyebrow="Automate"
+          title="Automations"
+          description="Agents, scheduled jobs, and approval flows."
+        />
       </div>
     );
   }
@@ -108,7 +111,12 @@ export default function AutomationsPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <h1 className="text-xl font-semibold">Automations</h1>
+      <PageHeader
+        index="07"
+        eyebrow="Automate"
+        title="Automations"
+        description="Agents, scheduled jobs, and approval flows."
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
