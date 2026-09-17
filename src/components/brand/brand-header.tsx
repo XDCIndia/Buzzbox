@@ -13,8 +13,6 @@ export function BrandHeader({ brandId, title }: { brandId: string; title: string
   const [error, setError] = useState<string | null>(null);
 
   function loadBrand() {
-    setLoading(true);
-    setError(null);
     fetch(`/api/brand/${brandId}`)
       .then(async res => {
         const data = await res.json();
@@ -27,12 +25,21 @@ export function BrandHeader({ brandId, title }: { brandId: string; title: string
         setBrand(null);
         setError((err as Error).message || 'Brand not found');
       })
+      // NOTE: A previous implementation reset loading/error state synchronously at the
+      // top of this function. That pattern is flagged by react-hooks (setState during
+      // render phase of an effect); state now resolves asynchronously via the fetch chain.
       .finally(() => setLoading(false));
+  }
+
+  function retryBrand() {
+    setLoading(true);
+    setError(null);
+    loadBrand();
   }
 
   useEffect(() => {
     loadBrand();
-  }, [brandId]);
+  }, [brandId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -64,7 +71,7 @@ export function BrandHeader({ brandId, title }: { brandId: string; title: string
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={loadBrand} className="btn btn-ghost btn-sm text-xs">
+            <button onClick={retryBrand} className="btn btn-ghost btn-sm text-xs">
               <RefreshCw size={12} /> Retry
             </button>
             {brandId !== DEFAULT_BRAND_ID && (

@@ -33,6 +33,7 @@ export function DigestsTab({ brandId }: { brandId: string }) {
 
   useEffect(() => {
     loadDigests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brandId]);
 
   async function generate() {

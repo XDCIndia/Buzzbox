@@ -28,8 +28,6 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
   }, [brandId]);
 
   const loadAll = useCallback(() => {
-    setLoading(true);
-    setError(null);
     const real = realOnly ? '?real=true' : '';
     Promise.all([
       fetch(`/api/brand/${brandId}/stats${real}`).then(r => {
@@ -43,6 +41,7 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
         setStats(statsData);
         setCreators(Array.isArray(creatorsData) ? creatorsData : []);
         setCompetitors(Array.isArray(competitorsData) ? competitorsData : []);
+        setError(null);
       })
       .catch(err => setError((err as Error).message || 'Failed to load brand analytics'))
       .finally(() => setLoading(false));
@@ -51,6 +50,12 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  function retryAll() {
+    setLoading(true);
+    setError(null);
+    loadAll();
+  }
 
   async function addCompetitor(e: React.FormEvent) {
     e.preventDefault();
@@ -87,7 +92,7 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
       <ErrorBanner
         title="Unable to load analytics"
         message={error || 'Failed to fetch brand analytics data'}
-        onRetry={loadAll}
+        onRetry={retryAll}
       />
     );
   }

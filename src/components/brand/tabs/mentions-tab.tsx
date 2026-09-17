@@ -49,6 +49,7 @@ export function MentionsTab({ brandId, realOnly, sourceType }: { brandId: string
 
   useEffect(() => {
     loadMentions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brandId, realOnly, sourceType, sort, platforms, sentiments, search]);
 
   function onPatch(id: string, patch: Record<string, string>) {

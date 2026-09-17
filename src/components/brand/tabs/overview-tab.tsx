@@ -18,8 +18,6 @@ export function OverviewTab({ brandId, realOnly }: { brandId: string; realOnly: 
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(() => {
-    setLoading(true);
-    setError(null);
     const real = realOnly ? '?real=true' : '';
     Promise.all([
       fetch(`/api/brand/${brandId}/stats${real}`).then(r => {
@@ -34,6 +32,7 @@ export function OverviewTab({ brandId, realOnly }: { brandId: string; realOnly: 
       .then(([statsData, mentionsData]: [BrandMentionStats, BrandMention[]]) => {
         setStats(statsData);
         setMentions(Array.isArray(mentionsData) ? mentionsData.slice(0, 6) : []);
+        setError(null);
       })
       .catch(err => setError((err as Error).message || 'Failed to load brand overview.'))
       .finally(() => setLoading(false));
@@ -42,6 +41,12 @@ export function OverviewTab({ brandId, realOnly }: { brandId: string; realOnly: 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  function retryLoad() {
+    setLoading(true);
+    setError(null);
+    loadData();
+  }
 
   function onPatch(id: string, patch: Record<string, string>) {
     setMentions(prev => prev.map(m => (m.id === id ? { ...m, ...patch } as BrandMention : m)));
@@ -74,7 +79,7 @@ export function OverviewTab({ brandId, realOnly }: { brandId: string; realOnly: 
         title="Unable to load overview"
         message={error || 'Failed to fetch brand metrics'}
         explanation="Check network connection or try reloading."
-        onRetry={loadData}
+        onRetry={retryLoad}
       />
     );
   }
