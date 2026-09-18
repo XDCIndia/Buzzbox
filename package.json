@@ -3,6 +3,7 @@
   "version": "0.2.0",
   "description": "Local-first marketing operations control center for human and agent workflows",
   "private": false,
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
