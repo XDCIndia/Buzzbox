@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createNotification } from '@/lib/queries';
 import { getDb } from '@/lib/db';
 import { getConfiguredApiKey } from '@/lib/auth';
+import { secureCompare } from '@/lib/secure-compare';
 
 const VALID_TYPES = ['daily_report', 'alert', 'lead_reply', 'bounce_spike', 'experiment_result', 'custom'];
 const VALID_SEVERITIES = ['info', 'warning', 'error'];
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'API_KEY not configured' }, { status: 500 });
   }
   const apiKey = request.headers.get('x-api-key');
-  if (!apiKey || apiKey !== configuredApiKey) {
+  if (!secureCompare(apiKey, configuredApiKey)) {
     return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
   }
 

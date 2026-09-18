@@ -1,5 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import { getDb } from './db';
+import { secureCompare } from './secure-compare';
 
 const SALT_LENGTH = 16;
 const KEY_LENGTH = 32;
@@ -466,7 +467,7 @@ export function getUserFromRequest(request: Request): User | null {
 
   const apiKey = request.headers.get('x-api-key');
   const configuredApiKey = getConfiguredApiKey();
-  if (apiKey && configuredApiKey && apiKey === configuredApiKey) {
+  if (apiKey && configuredApiKey && secureCompare(apiKey, configuredApiKey)) {
     return { id: 0, username: 'api', role: 'admin', created_at: '' };
   }
 
