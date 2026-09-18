@@ -15,20 +15,42 @@ process.env.AUTH_PASS = 'super-secure-pass';
 process.env.API_KEY = 'test-api-key';
 process.env.HERMES_OPENCLAW_HOME = openclawHome;
 
-import { getDb, resetDbForTests } from './db';
-import {
-  createSession,
-  createUser,
-} from './auth';
-import {
-  getCronRunsDir,
-  isPathInsideDir,
-  resolveCronRunFilePath,
-} from './cron-jobs';
-import { GET } from '../app/api/cron/runs/route';
 import { NextRequest } from 'next/server';
 
-before(() => {
+// NOTE: src/lib/db.ts captures its database path at module load, so every
+// module that reads process.env at load time (db, auth, cron-jobs, route
+// handlers) must be dynamically imported inside before() AFTER the env vars
+// above are set. Static imports would evaluate db.ts first (ESM hoisting)
+// and silently point tests at the developer's real database. Same pattern as
+// rbac-system-mutations.test.ts and routes-api.test.ts.
+type DbModule = typeof import('./db');
+type AuthModule = typeof import('./auth');
+type CronJobsModule = typeof import('./cron-jobs');
+let getDb: DbModule['getDb'];
+let resetDbForTests: DbModule['resetDbForTests'];
+let createSession: AuthModule['createSession'];
+let createUser: AuthModule['createUser'];
+let ensureAuthTables: AuthModule['ensureAuthTables'];
+let getCronRunsDir: CronJobsModule['getCronRunsDir'];
+let isPathInsideDir: CronJobsModule['isPathInsideDir'];
+let resolveCronRunFilePath: CronJobsModule['resolveCronRunFilePath'];
+let GET: typeof import('../app/api/cron/runs/route')['GET'];
+
+before(async () => {
+  const dbm = await import('./db');
+  const authm = await import('./auth');
+  const cronJobs = await import('./cron-jobs');
+  const route = await import('../app/api/cron/runs/route');
+  getDb = dbm.getDb;
+  resetDbForTests = dbm.resetDbForTests;
+  createSession = authm.createSession;
+  createUser = authm.createUser;
+  ensureAuthTables = authm.ensureAuthTables;
+  getCronRunsDir = cronJobs.getCronRunsDir;
+  isPathInsideDir = cronJobs.isPathInsideDir;
+  resolveCronRunFilePath = cronJobs.resolveCronRunFilePath;
+  GET = route.GET;
+
   mkdirSync(runsDir, { recursive: true });
   writeFileSync(
     path.join(runsDir, 'testjob.jsonl'),
@@ -102,6 +124,9 @@ test('GET requires authentication', async () => {
 
 test('GET rejects authenticated viewers (manage_system is admin-only)', async () => {
   const db = getDb();
+  // Auth tables are created lazily by ensureAuthTables on first user/session
+  // call — ensure them before touching sessions on a fresh test DB.
+  ensureAuthTables();
   db.exec("DELETE FROM sessions; DELETE FROM users WHERE username = 'viewer_runs_test';");
   const viewer = createUser('viewer_runs_test', 'viewer-password-123', 'viewer');
   const token = createSession(viewer.id);
