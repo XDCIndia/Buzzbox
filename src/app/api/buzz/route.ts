@@ -4,6 +4,8 @@ import { sendOrchestratorMessage } from '@/lib/command';
 import { requireApiAdmin } from '@/lib/api-auth';
 import { getOverviewStats, getAlerts, getPendingApprovals, getLeadFunnel, getDailyMetrics, createBuzzContentDraft } from '@/lib/queries';
 import { computeSocialAnalytics } from '@/lib/analytics';
+import { parseAndValidate } from '@/lib/api-validate';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
@@ -269,9 +271,10 @@ export async function POST(request: NextRequest) {
   if (auth) return auth;
 
   try {
-    const body = await request.json();
+    const parsed = await parseAndValidate(request, z.object({ message: z.string() }));
+    if (!parsed.ok) return parsed.response;
 
-    const userMessage = String(body.message || '').trim();
+    const userMessage = parsed.data.message.trim();
 
     if (!userMessage) {
       return NextResponse.json(

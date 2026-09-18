@@ -5,6 +5,8 @@ import { getUserFromRequest } from '@/lib/auth';
 import { requireApiCapability } from '@/lib/api-auth';
 import { getDb } from '@/lib/db';
 import { getHermesStateDir } from '@/lib/hermes-state';
+import { parseAndValidate } from '@/lib/api-validate';
+import { z } from 'zod';
 
 const STATE_DIR = getHermesStateDir();
 const FLAG_PATH = path.join(STATE_DIR, 'sending-paused.flag');
@@ -19,10 +21,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const body = (await req.json().catch(() => ({}))) as { paused?: boolean; reason?: string };
-    if (typeof body.paused !== 'boolean') {
-      return NextResponse.json({ error: 'Missing paused flag' }, { status: 400 });
-    }
+    const parsed = await parseAndValidate(
+      req,
+      z.object({
+        paused: z.boolean(),
+        reason: z.string().optional(),
+      }),
+    );
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
 
     fs.mkdirSync(STATE_DIR, { recursive: true });
 

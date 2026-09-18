@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { authenticate, createSession, destroySession, seedAdmin } from '@/lib/auth';
 import { rateLimit } from '@/lib/rate-limit';
+import { parseAndValidate } from '@/lib/api-validate';
+import { z } from 'zod';
 
 const SESSION_COOKIE = 'hermes-session';
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
@@ -31,10 +33,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const { username, password } = await request.json();
-  if (!username || !password) {
-    return NextResponse.json({ error: 'Username and password required' }, { status: 400 });
-  }
+  const parsed = await parseAndValidate(
+    request,
+    z.object({
+      username: z.string().min(1),
+      password: z.string().min(1),
+    }),
+  );
+  if (!parsed.ok) return parsed.response;
+  const { username, password } = parsed.data;
 
   // Brute-force protection: cap attempts per client IP and per username.
   // IP is header-aware because the standalone deployment sits behind a proxy.

@@ -6,6 +6,8 @@ import path from 'node:path';
 import { requireApiEditor, requireApiUser } from '@/lib/api-auth';
 import { requireUser } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
+import { parseAndValidate } from '@/lib/api-validate';
+import { z } from 'zod';
 import { allowCronWrite, getInstance, resolveOpenClawPaths } from '@/lib/instances';
 import {
   normalizeJobId,
@@ -148,9 +150,18 @@ export async function PUT(request: Request) {
   }
 
   const actor = requireUser(request);
-  const body = await request.json().catch(() => ({}));
+  const parsed = await parseAndValidate(
+    request,
+    z.object({
+      id: z.string().optional(),
+      jobId: z.string().optional(),
+      action: z.enum(['toggle', 'trigger']),
+    }),
+  );
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const id = normalizeJobId(body?.id ?? body?.jobId);
-  const action = body?.action === 'toggle' || body?.action === 'trigger' ? body.action : null;
+  const action = body?.action ?? null;
 
   if (!id) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
   if (!action) return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

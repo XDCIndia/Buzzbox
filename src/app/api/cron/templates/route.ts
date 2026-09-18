@@ -2,12 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireApiEditor, requireApiUser } from '@/lib/api-auth';
 import { requireUser } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
-import {
-  createCronTemplate,
-  deleteCronTemplate,
-  listCronTemplates,
-  updateCronTemplate,
-} from '@/lib/cron-templates';
+import { updateCronTemplate, createCronTemplate, deleteCronTemplate, listCronTemplates } from '@/lib/cron-templates';
+import { parseAndValidate } from '@/lib/api-validate';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,11 +28,20 @@ export async function POST(req: NextRequest) {
   const actor = requireUser(req as unknown as Request);
 
   try {
-    const body = await req.json().catch(() => ({}));
+    const parsed = await parseAndValidate(
+      req,
+      z.object({
+        name: z.string().min(1),
+        description: z.string().optional(),
+        job: z.record(z.string(), z.unknown()).optional(),
+      }),
+    );
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data as Record<string, unknown>;
     const created = createCronTemplate({
-      name: body?.name,
-      description: body?.description,
-      job: body?.job,
+      name: body?.name as string,
+      description: body?.description as string | undefined,
+      job: body?.job as Record<string, unknown> | undefined,
     });
 
     logAudit({
@@ -59,12 +65,22 @@ export async function PATCH(req: NextRequest) {
   const actor = requireUser(req as unknown as Request);
 
   try {
-    const body = await req.json().catch(() => ({}));
+    const parsed = await parseAndValidate(
+      req,
+      z.object({
+        id: z.string().optional(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        job: z.record(z.string(), z.unknown()).optional(),
+      }),
+    );
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data as Record<string, unknown>;
     const updated = updateCronTemplate({
-      id: body?.id,
-      name: body?.name,
-      description: body?.description,
-      job: body?.job,
+      id: body?.id as string | undefined,
+      name: body?.name as string | undefined,
+      description: body?.description as string | undefined,
+      job: body?.job as Record<string, unknown> | undefined,
     });
 
     logAudit({

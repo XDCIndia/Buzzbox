@@ -6,6 +6,8 @@ import type { Lead, Sequence, FunnelStep } from '@/types';
 import { requireApiEditor, requireApiUser } from '@/lib/api-auth';
 import { requireUser } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
+import { parseAndValidate } from '@/lib/api-validate';
+import { z } from 'zod';
 
 export const dynamic = "force-dynamic";
 
@@ -185,8 +187,22 @@ export async function PATCH(request: Request) {
   if (auth) return auth;
   const actor = requireUser(request as Request);
   try {
-    const body = await request.json();
-    const { id, type, task_done, ...updates } = body as { id?: string; type?: string; task_done?: boolean } & Record<string, unknown>;
+    const parsed = await parseAndValidate(
+      request,
+      z.object({
+        id: z.string(),
+        type: z.enum(['sequence']).optional(),
+        task_done: z.boolean().optional(),
+        status: z.string().optional(),
+        tier: z.string().optional(),
+        notes: z.string().nullable().optional(),
+        pause_outreach: z.boolean().optional(),
+        next_action_at: z.string().nullable().optional(),
+      }),
+    );
+    if (!parsed.ok) return parsed.response;
+    const { id, type, task_done, ...rest } = parsed.data;
+    const updates = rest as unknown as Record<string, unknown>;
 
     if (!id) {
       return NextResponse.json({ error: 'id required' }, { status: 400 });
