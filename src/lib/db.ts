@@ -35,6 +35,11 @@ export function resetDbForTests(): void {
 }
 
 function migrate(db: Database.Database) {
+  const from = getSchemaVersion(db);
+
+  // v1: baseline schema (idempotent CREATE IF NOT EXISTS — no-ops on legacy DBs
+  // that predate version tracking)
+  if (from < 1) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS content_posts (
       id TEXT PRIMARY KEY,
@@ -334,16 +339,39 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_content_queue_items_status ON content_queue_items(status);
 
   `);
+  }
 
-  // Column migrations (safe to re-run)
-  try { db.exec("ALTER TABLE leads ADD COLUMN pause_outreach INTEGER DEFAULT 0"); } catch { /* column exists */ }
-  try { db.exec("ALTER TABLE content_posts ADD COLUMN image_url TEXT"); } catch { /* column exists */ }
+  // v2: checked column additions — table_info lookup instead of try/catch so
+  // real ALTER failures surface instead of being silently swallowed
+  if (from < 2) {
+    addColumnIfMissing(db, 'leads', 'pause_outreach', 'INTEGER DEFAULT 0');
+    addColumnIfMissing(db, 'content_posts', 'image_url', 'TEXT');
+  }
 
-  // Guarantee the default brand row exists even on a fresh/unseeded DB — brand-scoped
-  // API routes and FK-constrained inserts (brand_mentions, brand_digests, etc.) assume
-  // DEFAULT_BRAND_ID resolves to a real row instead of leaving the Brand module in a
-  // permanent "no brand exists" state.
+  // Data-level guarantee (runs every boot, deliberately NOT version-gated):
+  // the default brand row must exist because brand-scoped API routes and
+  // FK-constrained inserts (brand_mentions, brand_digests, etc.) assume
+  // DEFAULT_BRAND_ID resolves to a real row.
   db.prepare(
     `INSERT OR IGNORE INTO brands (id, name, keywords, sources) VALUES (?, ?, ?, ?)`
   ).run(DEFAULT_BRAND_ID, 'My Brand', '[]', '[]');
+
+  db.pragma(`user_version = ${CURRENT_SCHEMA_VERSION}`);
+}
+
+export const CURRENT_SCHEMA_VERSION = 2;
+
+export function getSchemaVersion(db: Database.Database): number {
+  return db.pragma('user_version', { simple: true }) as number;
+}
+
+function addColumnIfMissing(
+  db: Database.Database,
+  table: string,  column: string,
+  definition: string,
+): void {
+  const cols = (db.pragma(`table_info(${table})`) as { name: string }[]).map(c => c.name);
+  if (!cols.includes(column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
 }
