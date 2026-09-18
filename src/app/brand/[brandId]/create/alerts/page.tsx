@@ -9,7 +9,7 @@ export default function BrandAlertsPage() {
 
   return (
     <div className="space-y-4 animate-in">
-      <BrandHeader brandId={brandId} title="Alerts" />
+      <BrandHeader brandId={brandId} title="Alerts" index="B4" description="High-priority mentions flagged for immediate attention — spikes, sentiment shifts, and crisis signals." />
       <AlertsTab brandId={brandId} />
     </div>
   );

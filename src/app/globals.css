@@ -704,6 +704,18 @@ body {
   animation: count-up 0.4s ease-out;
 }
 
+/* ─── Reduced motion (accessibility) ───────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ─── Mobile Nav & Media Queries ───────────────────────── */
 @media (max-width: 768px) {
   .nav-rail { display: none !important; }

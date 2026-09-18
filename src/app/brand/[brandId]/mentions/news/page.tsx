@@ -11,7 +11,7 @@ export default function BrandNewsMentionsPage() {
 
   return (
     <div className="space-y-4 animate-in">
-      <BrandHeader brandId={brandId} title="News Mentions" />
+      <BrandHeader brandId={brandId} title="News Mentions" index="B2" description="Editorial and press coverage matching your brand's tracked keywords, synced from news sources." />
       <MentionsTab brandId={brandId} realOnly={realOnly} sourceType="news" />
     </div>
   );

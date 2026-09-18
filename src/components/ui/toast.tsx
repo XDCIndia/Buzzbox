@@ -79,7 +79,7 @@ function ToastItem({ toast: t, onDismiss }: { toast: Toast; onDismiss: () => voi
 
   return (
     <div
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-sm shadow-lg animate-in ${COLORS[t.type]}`}
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-sm shadow-lg animate-slide-in ${COLORS[t.type]}`}
       role="alert"
     >
       <Icon size={16} className="shrink-0" />

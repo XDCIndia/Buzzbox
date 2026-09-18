@@ -11,7 +11,7 @@ export default function BrandSocialMentionsPage() {
 
   return (
     <div className="space-y-4 animate-in">
-      <BrandHeader brandId={brandId} title="Social Mentions" />
+      <BrandHeader brandId={brandId} title="Social Mentions" index="B2" description="Real-time social conversations matching your brand's tracked keywords, triaged for engagement." />
       <MentionsTab brandId={brandId} realOnly={realOnly} sourceType="social" />
     </div>
   );
