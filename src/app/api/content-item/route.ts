@@ -121,7 +121,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ error: 'not found' }, { status: 404 });
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    console.error('content-item error:', e);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -234,6 +235,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ ok: true, item: updated });
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    console.error('content-item error:', e);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

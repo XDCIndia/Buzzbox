@@ -40,7 +40,8 @@ export async function GET(req: NextRequest) {
     const canWrite = allowCronWrite() && (actor.role === 'admin' || actor.role === 'editor');
     return NextResponse.json({ instance: instance.id, jobs: jobsFile.jobs, can_write: canWrite });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    console.error("API error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -77,7 +78,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, jobs: next.jobs });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    console.error("API error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -114,7 +116,8 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ ok: true, jobs: next.jobs });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    console.error("API error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -148,6 +151,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true, jobs: next.jobs });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    console.error("API error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

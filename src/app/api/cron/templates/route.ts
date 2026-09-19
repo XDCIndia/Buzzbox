@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
     const can_write = actor.role === 'admin' || actor.role === 'editor';
     return NextResponse.json({ templates, can_write });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    console.error("API error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -54,8 +55,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, template: created });
   } catch (error) {
     const msg = (error as Error)?.message || String(error);
-    const status = msg === 'Not found' ? 404 : msg.startsWith('Invalid') ? 400 : msg.includes('exists') ? 409 : 400;
-    return NextResponse.json({ error: msg }, { status });
+    if (/^(Invalid |Not found0Template job |Template name )/.test(msg)) {
+      const status = msg === 'Not found' ? 404 : msg.includes('exists') ? 409 : 400;
+      return NextResponse.json({ error: msg }, { status });
+    }
+    console.error('cron templates error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -93,8 +98,12 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true, template: updated });
   } catch (error) {
     const msg = (error as Error)?.message || String(error);
-    const status = msg === 'Not found' ? 404 : msg.startsWith('Invalid') ? 400 : msg.includes('exists') ? 409 : 400;
-    return NextResponse.json({ error: msg }, { status });
+    if (/^(Invalid |Not found0Template job |Template name )/.test(msg)) {
+      const status = msg === 'Not found' ? 404 : msg.includes('exists') ? 409 : 400;
+      return NextResponse.json({ error: msg }, { status });
+    }
+    console.error('cron templates error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -117,8 +126,12 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     const msg = (error as Error)?.message || String(error);
-    const status = msg === 'Not found' ? 404 : msg.startsWith('Invalid') ? 400 : 400;
-    return NextResponse.json({ error: msg }, { status });
+    if (/^(Invalid |Not found0Template job |Template name )/.test(msg)) {
+      const status = msg === 'Not found' ? 404 : msg.includes('exists') ? 409 : 400;
+      return NextResponse.json({ error: msg }, { status });
+    }
+    console.error('cron templates error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 

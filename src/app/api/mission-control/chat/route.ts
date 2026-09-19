@@ -96,7 +96,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ conversation_id: conversationId, messages, agents: agents });
   } catch (error) {
-    return NextResponse.json({ error: `Failed to fetch mission-control chat: ${String(error)}` }, { status: 500 });
+    console.error('mission-control chat fetch error:', error);
+    return NextResponse.json({ error: 'Failed to load mission-control chat' }, { status: 500 });
   }
 }
 
@@ -222,6 +223,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, conversation_id: conversationId });
   } catch (error) {
-    return NextResponse.json({ error: `Mission-control send failed: ${String(error)}` }, { status: 500 });
+    console.error('mission-control send error:', error);
+    return NextResponse.json({ error: 'Mission-control send failed' }, { status: 500 });
   }
 }
