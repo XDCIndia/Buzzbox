@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/data-table';
 import { TrendChart } from '@/components/ui/trend-chart';
@@ -21,15 +21,17 @@ export default function ContentPage() {
   const { realOnly } = useDashboard();
 
   const [loadError, setLoadError] = useState(false);
+  const loadGen = useRef(0);
   const load = useCallback(() => {
+    const gen = ++loadGen.current; // guard: only the newest load may paint
     const params = new URLSearchParams();
     if (filter) params.set('status', filter);
     if (realOnly) params.set('real', 'true');
     const q = params.toString();
     fetch(`/api/content${q ? '?' + q : ''}`)
       .then(r => { if (!r.ok) throw new Error('content'); return r.json(); })
-      .then(posts => { setLoadError(false); setPosts(posts); })
-      .catch(() => setLoadError(true));
+      .then(posts => { if (gen !== loadGen.current) return; setLoadError(false); setPosts(posts); })
+      .catch(() => { if (gen === loadGen.current) setLoadError(true); });
   }, [filter, realOnly]);
 
   useEffect(() => { load(); }, [load]);

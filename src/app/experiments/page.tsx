@@ -20,15 +20,18 @@ export default function ExperimentsPage() {
   const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
+    let cancelled = false; // guard: a newer run (or unmount) must win over this response
     const realParam = realOnly ? '?real=true' : '';
     fetch(`/api/experiments${realParam}`)
       .then(r => { if (!r.ok) throw new Error('experiments'); return r.json(); })
       .then(data => {
+        if (cancelled) return;
         setLoadError(false);
         setExperiments(data.experiments || []);
         setLearnings(data.learnings || []);
       })
-      .catch(() => setLoadError(true));
+      .catch(() => { if (!cancelled) setLoadError(true); });
+    return () => { cancelled = true; };
   }, [realOnly, retryNonce]);
 
   const running = experiments.filter(e => e.status === 'running' || e.status === 'proposed');

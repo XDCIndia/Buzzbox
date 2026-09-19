@@ -162,12 +162,16 @@ export function AgentChat() {
   const agents = discoveredAgents && discoveredAgents.length > 0 ? discoveredAgents : [];
 
   // Load messages when conversation changes
+  const convGen = useRef(0);
   const loadMessages = useCallback(async () => {
-    if (!activeConv) return;
+    const conv = activeConv;
+    if (!conv) return;
+    const gen = ++convGen.current; // guard: only the newest conversation may paint
     try {
-      const res = await fetch(`/api/chat/messages?conversation_id=${encodeURIComponent(activeConv)}&limit=100`);
+      const res = await fetch(`/api/chat/messages?conversation_id=${encodeURIComponent(conv)}&limit=100`);
       if (!res.ok) return;
       const data = await res.json();
+      if (gen !== convGen.current) return; // user switched conversations meanwhile
       if (data.messages) setMessages(data.messages);
     } catch (err) {
       console.error('Failed to load messages:', err);

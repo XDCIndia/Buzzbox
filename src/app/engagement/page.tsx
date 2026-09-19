@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { SignalCard } from '@/components/ui/signal-card';
@@ -21,14 +21,16 @@ export default function EngagementPage() {
   const [loadError, setLoadError] = useState(false);
   const { realOnly } = useDashboard();
 
+  const loadGen = useRef(0);
   const loadEngagement = useCallback(() => {
+    const gen = ++loadGen.current; // guard: only the newest load may paint
     const realParam = realOnly ? '?real=true' : '';
     Promise.all([
       fetch(`/api/engagement${realParam}`).then(r => { if (!r.ok) throw new Error('engagement'); return r.json(); }),
       fetch(`/api/signals${realParam}`).then(r => { if (!r.ok) throw new Error('signals'); return r.json(); }),
     ])
-      .then(([eng, sig]) => { setLoadError(false); setEngagements(eng); setSignals(sig); })
-      .catch(() => setLoadError(true));
+      .then(([eng, sig]) => { if (gen !== loadGen.current) return; setLoadError(false); setEngagements(eng); setSignals(sig); })
+      .catch(() => { if (gen === loadGen.current) setLoadError(true); });
   }, [realOnly]);
 
   useEffect(() => { loadEngagement(); }, [loadEngagement]);
