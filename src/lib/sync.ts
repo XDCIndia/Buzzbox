@@ -173,7 +173,17 @@ interface EngagementItem {
   created_at?: string;
 }
 
-function syncEngagementLog() {
+/**
+ * Sync the engagement log using stable record identity (#62).
+ *
+ * The old implementation skipped everything when `items.length <= row count`
+ * (LinkedIn rows inflated the count, hiding new records) and otherwise
+ * wiped + reinserted non-LinkedIn rows, discarding status changes. Now each
+ * item is matched by identity — known records are left untouched (statuses
+ * preserved), only genuinely new records are inserted, and repeated syncs
+ * are idempotent.
+ */
+export function syncEngagementLog() {
   const items = readJson<EngagementItem[]>('engagement-log.json');
   if (!items || !Array.isArray(items)) return;
   const db = getDb();
@@ -181,22 +191,37 @@ function syncEngagementLog() {
     INSERT INTO engagements (platform, action_type, target_url, target_username, our_text, status, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
-  const existing = (db.prepare('SELECT COUNT(*) as c FROM engagements').get() as { c: number })?.c ?? 0;
-  if (items.length <= existing) return; // crude dedup: only insert if new items appeared
+  const findRow = db.prepare(
+    'SELECT id FROM engagements WHERE platform = ? AND action_type = ? AND target_url IS ? AND our_text IS ?',
+  );
   db.transaction(() => {
-    db.prepare('DELETE FROM engagements WHERE platform != \'linkedin\' OR action_type != \'comment\'').run();
     for (const item of items) {
+      const platform = item.platform || 'x';
+      const actionType = item.action_type || item.action || 'reply';
+      const targetUrl = item.target_url || item.url || null;
+      const ourText = item.our_text || item.text || null;
+      if (findRow.get(platform, actionType, targetUrl, ourText)) continue;
       insert.run(
-        item.platform || 'x',
-        item.action_type || item.action || 'reply',
-        item.target_url || item.url || null,
+        platform,
+        actionType,
+        targetUrl,
         item.target_username || item.username || null,
-        item.our_text || item.text || null,
+        ourText,
         item.status || 'sent',
         item.created_at || item.timestamp || new Date().toISOString(),
       );
     }
   })();
+}
+
+/** NULL-safe stable identity for an engagement record (#62). */
+function engagementIdentity(
+  platform: string,
+  actionType: string,
+  targetUrl: string | null,
+  ourText: string | null,
+): string {
+  return JSON.stringify([platform, actionType, targetUrl ?? '', ourText ?? '']);
 }
 
 // ─── LinkedIn Comments Queue ───────────────────────────
@@ -211,25 +236,50 @@ interface LinkedInComment {
   timestamp?: string;
 }
 
-function syncLinkedInComments() {
+/**
+ * Sync the LinkedIn comments queue by identity diff (#62).
+ *
+ * The queue file is human-managed and authoritative for membership, but the
+ * old wipe-and-rewrite discarded status changes made in the DB. Now: rows
+ * removed from the file are deleted, rows still present keep their DB
+ * status, and only new rows are inserted.
+ */
+export function syncLinkedInComments() {
   const items = readJson<LinkedInComment[]>('linkedin-comments-queue.json');
   if (!items || !Array.isArray(items)) return;
   const db = getDb();
-  // Wipe and rewrite linkedin comments (small list, human-managed)
-  db.prepare("DELETE FROM engagements WHERE platform = 'linkedin' AND action_type = 'comment'").run();
   const insert = db.prepare(`
     INSERT INTO engagements (platform, action_type, target_url, target_username, our_text, status, created_at)
     VALUES ('linkedin', 'comment', ?, ?, ?, ?, ?)
   `);
+  const findRow = db.prepare(
+    "SELECT id FROM engagements WHERE platform = 'linkedin' AND action_type = 'comment' AND target_url IS ? AND our_text IS ?",
+  );
+  const deleteRow = db.prepare('DELETE FROM engagements WHERE id = ?');
+
+  const normalized = items.map(item => ({
+    targetUrl: item.target_url || item.url || null,
+    username: item.target_username || item.username || null,
+    ourText: item.our_text || item.text || null,
+    status: item.status || 'pending',
+    createdAt: item.timestamp || new Date().toISOString(),
+  }));
+  const fileKeys = new Set(
+    normalized.map(n => engagementIdentity('linkedin', 'comment', n.targetUrl, n.ourText)),
+  );
+
   db.transaction(() => {
-    for (const item of items) {
-      insert.run(
-        item.target_url || item.url || null,
-        item.target_username || item.username || null,
-        item.our_text || item.text || null,
-        item.status || 'pending',
-        item.timestamp || new Date().toISOString(),
-      );
+    const dbRows = db.prepare(
+      "SELECT id, target_url, our_text FROM engagements WHERE platform = 'linkedin' AND action_type = 'comment'",
+    ).all() as { id: number; target_url: string | null; our_text: string | null }[];
+    for (const row of dbRows) {
+      if (!fileKeys.has(engagementIdentity('linkedin', 'comment', row.target_url, row.our_text))) {
+        deleteRow.run(row.id);
+      }
+    }
+    for (const n of normalized) {
+      if (findRow.get(n.targetUrl, n.ourText)) continue; // preserve existing status
+      insert.run(n.targetUrl, n.username, n.ourText, n.status, n.createdAt);
     }
   })();
 }
