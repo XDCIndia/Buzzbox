@@ -19,6 +19,7 @@ const tempDir = mkdtempSync(path.join(tmpdir(), 'hermes-routes-api-test-'));
 const dbPath = path.join(tempDir, 'hermes-test.db');
 
 process.env.HERMES_DB_PATH = dbPath;
+process.env.HERMES_STATE_DIR = tempDir;
 process.env.AUTH_USER = 'admin_test';
 process.env.AUTH_PASS = 'super-secure-pass';
 process.env.API_KEY = 'test-api-key';
@@ -28,6 +29,8 @@ type Db = ReturnType<DbModule['getDb']>;
 let dbm: DbModule;
 let approvePost: typeof import('../app/api/automations/approve/route')['POST'];
 let contentPatch: typeof import('../app/api/content/route')['PATCH'];
+let leadsPost: typeof import('../app/api/leads/route')['POST'];
+let brandPatch: typeof import('../app/api/brand/[brandId]/route')['PATCH'];
 let db: Db;
 
 const ADMIN = { 'x-api-key': 'test-api-key' };
@@ -36,8 +39,12 @@ before(async () => {
   dbm = await import('./db');
   const approveRoute = await import('../app/api/automations/approve/route');
   const contentRoute = await import('../app/api/content/route');
+  const leadsRoute = await import('../app/api/leads/route');
+  const brandRoute = await import('../app/api/brand/[brandId]/route');
   approvePost = approveRoute.POST;
   contentPatch = contentRoute.PATCH;
+  leadsPost = leadsRoute.POST;
+  brandPatch = brandRoute.PATCH;
 
   // Fresh temp DB — migrate() runs the full v1 baseline + v2 columns and
   // stamps PRAGMA user_version = CURRENT_SCHEMA_VERSION.
@@ -211,6 +218,68 @@ test('content PATCH transitions draft to ready', async () => {
   const data = await res.json();
   assert.equal(data.ok, true);
   assert.equal(contentStatus('c_3'), 'ready');
+});
+
+/* ── leads POST: invalid status/date rejected, not silently defaulted (#57) ── */
+
+test('leads POST rejects invalid status instead of defaulting to new', async () => {
+  const res = await leadsPost(jsonRequest('http://localhost/api/leads', { status: 'bogus' }));
+  assert.equal(res.status, 400);
+});
+
+test('leads POST rejects invalid created_at instead of defaulting to now', async () => {
+  const res = await leadsPost(jsonRequest('http://localhost/api/leads', { first_name: 'A', created_at: 'not-a-date' }));
+  assert.equal(res.status, 400);
+});
+
+test('leads POST accepts a valid lead without status (defaults to new)', async () => {
+  const res = await leadsPost(jsonRequest('http://localhost/api/leads', { first_name: 'Valid' }));
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.ok, true);
+  assert.equal(data.lead.status, 'new');
+  assert.ok(String(data.lead.id).startsWith('lead_'));
+});
+
+/* ── brand PATCH: keyword/source normalization (#58) ─────────────────── */
+
+function patchRequest(brandId: string, body: unknown): Parameters<typeof brandPatch> {
+  const req = new NextRequest(`http://localhost/api/brand/${brandId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...ADMIN },
+    body: JSON.stringify(body),
+  });
+  return [req, { params: Promise.resolve({ brandId }) }];
+}
+
+function seedBrand(id: string): void {
+  db.prepare(
+    "INSERT OR IGNORE INTO brands (id, name, keywords, sources) VALUES (?, 'Test Brand', '[]', '[]')",
+  ).run(id);
+}
+
+test('brand PATCH trims keywords and drops empties', async () => {
+  seedBrand('b_test');
+  const res = await brandPatch(...patchRequest('b_test', {
+    keywords: ['  ai  ', '', '   ', 'agents'],
+  }));
+  assert.equal(res.status, 200);
+  const row = db.prepare("SELECT keywords FROM brands WHERE id = 'b_test'").get() as { keywords: string };
+  assert.deepEqual(JSON.parse(row.keywords), ['ai', 'agents']);
+});
+
+test('brand PATCH rejects oversized name with 400', async () => {
+  seedBrand('b_test');
+  const res = await brandPatch(...patchRequest('b_test', { name: 'x'.repeat(121) }));
+  assert.equal(res.status, 400);
+});
+
+test('brand PATCH rejects more than 100 keywords with 400', async () => {
+  seedBrand('b_test');
+  const res = await brandPatch(...patchRequest('b_test', {
+    keywords: Array.from({ length: 101 }, (_, i) => `k${i}`),
+  }));
+  assert.equal(res.status, 400);
 });
 
 test('content PATCH on X posts entering ready requires publish preflight (412 without token)', async () => {

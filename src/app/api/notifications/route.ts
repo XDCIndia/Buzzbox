@@ -5,6 +5,7 @@ import { requireApiEditor, requireApiUser } from '@/lib/api-auth';
 import { requireUser } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 import { parseAndValidate } from '@/lib/api-validate';
+import { clampParam } from '@/lib/query-params';
 import { z } from 'zod';
 
 interface Notification {
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
   }
 
   sql += ' ORDER BY created_at DESC LIMIT ?';
-  params.push(Number(searchParams.get('limit')) || 50);
+  params.push(clampParam(req, 'limit', 1, 200, 50));
 
   const rows = db.prepare(sql).all(...params) as (Omit<Notification, 'data' | 'read'> & { data: string | null; read: number })[];
   const notifications = rows.map(r => ({

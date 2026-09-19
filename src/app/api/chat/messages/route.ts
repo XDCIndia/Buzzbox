@@ -6,6 +6,7 @@ import { getAgentIds } from '@/lib/agent-config';
 import { requireUser } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 import { parseAndValidate } from '@/lib/api-validate';
+import { clampParam } from '@/lib/query-params';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
 
     const conversation_id = searchParams.get('conversation_id');
-    const limit = Number(searchParams.get('limit')) || 50;
+    const limit = clampParam(req, 'limit', 1, 200, 50);
     const since = searchParams.get('since');
 
     let sql = 'SELECT * FROM messages WHERE 1=1';
