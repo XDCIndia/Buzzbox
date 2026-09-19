@@ -323,12 +323,13 @@ export function getWeeklyKPIs(weeks: number = 12, filters?: { excludeSeed?: bool
     `SELECT * FROM daily_metrics WHERE 1=1 ${sf} ORDER BY date DESC LIMIT ?`
   ).all(weeks * 7) as DailyMetrics[];
 
-  // Group by ISO week
+  // Group by ISO week. Dates are plain 'YYYY-MM-DD' strings (UTC midnight);
+  // all bucketing below reads them back in UTC so results are identical
+  // regardless of the server's timezone (#61).
   const weekMap = new Map<string, DailyMetrics[]>();
   for (const m of metrics) {
-    const d = new Date(m.date);
-    const week = getISOWeek(d);
-    const key = `${d.getFullYear()}-W${String(week).padStart(2, '0')}`;
+    const { year, week } = getISOWeek(new Date(m.date));
+    const key = `${year}-W${String(week).padStart(2, '0')}`;
     if (!weekMap.has(key)) weekMap.set(key, []);
     weekMap.get(key)!.push(m);
   }
@@ -353,12 +354,25 @@ export function getWeeklyKPIs(weeks: number = 12, filters?: { excludeSeed?: bool
   }).slice(0, weeks);
 }
 
-function getISOWeek(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
+/**
+ * ISO-8601 week date parts for a calendar date, computed entirely in UTC
+ * (#61). The previous implementation mixed UTC-parsed dates with local
+ * getters, so on non-UTC servers boundary dates landed in the wrong week
+ * and the label year could be the calendar year instead of the ISO
+ * week-numbering year.
+ *
+ * Expects a Date whose UTC fields represent the calendar date (which is
+ * exactly what `new Date('YYYY-MM-DD')` produces).
+ */
+export function getISOWeek(date: Date): { year: number; week: number } {
+  // Thursday of the ISO week — the ISO week-numbering year is this
+  // Thursday's year.
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const dayNum = d.getUTCDay() || 7; // Mon=1..Sun=7
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return { year: d.getUTCFullYear(), week };
 }
 
 // ─── Activity Log ──────────────────────────────────────
