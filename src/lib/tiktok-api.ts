@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
+
 // TikTok integration.
 //
 // IMPORTANT ACCESS-TIER NOTE:
@@ -52,7 +54,7 @@ interface TikTokOAuthErrorBody {
 }
 
 async function postForm(url: string, body: Record<string, string>): Promise<TikTokTokenResponse> {
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -136,7 +138,7 @@ interface TikTokVideoListResponse {
 }
 
 async function tiktokGet<T>(url: string, accessToken: string): Promise<T> {
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     cache: 'no-store',
   });
@@ -262,7 +264,7 @@ export async function searchTikTokMentions(opts: {
   const startDate = oneWeekAgo.toISOString().slice(0, 10).replace(/-/g, '');
   const endDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `${TIKTOK_RESEARCH_VIDEO_QUERY_URL}?fields=id,video_description,username,create_time,like_count,comment_count,share_count,view_count`,
     {
       method: 'POST',

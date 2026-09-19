@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
+
 export interface LinkedInSummary {
   organizationUrn: string;
   followers?: number;
@@ -58,7 +60,7 @@ async function liGet<T>(opts: {
   };
   if (opts.version) headers["LinkedIn-Version"] = opts.version;
 
-  const res = await fetch(opts.url, { headers, cache: "no-store" });
+  const res = await fetchWithTimeout(opts.url, { headers, cache: "no-store" });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`LinkedIn API failed (${res.status}): ${text.slice(0, 300)}`);

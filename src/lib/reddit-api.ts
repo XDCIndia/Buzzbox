@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
+
 // Reddit mention search via Reddit's OAuth API.
 //
 // Reddit's "script" app type uses the OAuth2 client-credentials grant, which
@@ -68,7 +70,7 @@ async function getRedditAccessToken(opts: {
   }
 
   const basicAuth = Buffer.from(`${opts.clientId}:${opts.clientSecret}`).toString("base64");
-  const res = await fetch("https://www.reddit.com/api/v1/access_token", {
+  const res = await fetchWithTimeout("https://www.reddit.com/api/v1/access_token", {
     method: "POST",
     headers: {
       Authorization: `Basic ${basicAuth}`,
@@ -115,7 +117,7 @@ export async function searchRedditMentions(opts: {
     limit: String(Math.min(Math.max(opts.maxResults ?? 50, 1), 100)),
   });
 
-  const res = await fetch(`https://oauth.reddit.com/search?${params.toString()}`, {
+  const res = await fetchWithTimeout(`https://oauth.reddit.com/search?${params.toString()}`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "User-Agent": opts.userAgent,

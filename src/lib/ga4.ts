@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
 import { GoogleAuth, type JWTInput } from "google-auth-library";
 
 export interface Ga4Summary {
@@ -112,7 +113,7 @@ function parseServiceAccountJson(env: {
 }
 
 async function ga4Fetch<T>(accessToken: string, url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,

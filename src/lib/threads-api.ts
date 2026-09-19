@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
+
 // Meta's Threads API (graph.threads.net) is a *separate* API from the main
 // Meta Graph API, though it shares a similar OAuth/access-token model. Unlike
 // X's search/recent endpoint, it does NOT expose an open, cross-platform
@@ -21,7 +23,7 @@ function num(v: unknown): number {
 }
 
 async function threadsGet<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetchWithTimeout(url, { cache: "no-store" });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Threads API failed (${res.status}): ${text.slice(0, 300)}`);
