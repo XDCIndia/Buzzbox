@@ -115,19 +115,21 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
 
-  const status = asStatus(body?.status) ?? 'new';
-  if (!status) {
+  const statusInput = asStatus(body?.status);
+  if (body?.status !== undefined && statusInput === undefined) {
     return NextResponse.json({ error: 'Invalid lead status' }, { status: 400 });
   }
+  const status = statusInput ?? 'new';
   const tier = asNullableTier(body?.tier);
   if (body?.tier !== undefined && tier === undefined) {
     return NextResponse.json({ error: 'Invalid lead tier' }, { status: 400 });
   }
 
-  const createdAt = asNullableIsoDate(body?.created_at) ?? new Date().toISOString();
-  if (body?.created_at !== undefined && createdAt === undefined) {
+  const createdAtInput = asNullableIsoDate(body?.created_at);
+  if (body?.created_at !== undefined && createdAtInput === undefined) {
     return NextResponse.json({ error: 'Invalid created_at' }, { status: 400 });
   }
+  const createdAt = createdAtInput ?? new Date().toISOString();
 
   const nextActionAt = asNullableIsoDate(body?.next_action_at);
   if (body?.next_action_at !== undefined && nextActionAt === undefined) {
