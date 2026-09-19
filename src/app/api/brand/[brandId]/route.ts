@@ -19,12 +19,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ br
   const { brandId } = await params;
   const existing = getBrand(brandId);
   if (!existing) return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
+  // Trim, drop empties, and bound the list sizes before they reach the DB.
+  const tagList = z
+    .array(z.string().max(120))
+    .max(100, 'Too many items (max 100)')
+    .transform(arr => arr.map(s => s.trim()).filter(Boolean));
   const parsed = await parseAndValidate(
     req,
     z.object({
-      name: z.string().nullable().optional(),
-      keywords: z.array(z.string()).nullable().optional(),
-      sources: z.array(z.string()).nullable().optional(),
+      name: z.string().max(120).nullable().optional(),
+      keywords: tagList.nullable().optional(),
+      sources: tagList.nullable().optional(),
     }),
   );
   if (!parsed.ok) return parsed.response;
