@@ -12,6 +12,7 @@ import {
   triggerCronJobNow,
   upsertCronJob,
   writeCronJobsFile,
+  mutateCronJobsFile,
 } from './cron-jobs';
 
 const tempDir = mkdtempSync(path.join(tmpdir(), 'hermes-cron-jobs-test-'));
@@ -146,4 +147,38 @@ test('cron schedule and delivery fields are preserved for OpenClaw compatibility
   assert.ok(job);
   assert.equal((job.schedule as Record<string, unknown>)?.staggerMs, 15_000);
   assert.equal((job.delivery as Record<string, unknown>)?.mode, 'session_message');
+});
+
+test('mutateCronJobsFile serializes concurrent mutations', async () => {
+  const cronDir = path.join(tempDir, 'cron-concurrent');
+  await fs.mkdir(cronDir, { recursive: true });
+
+  await fs.writeFile(
+    path.join(cronDir, 'jobs.json'),
+    JSON.stringify({ version: 1, jobs: [] }, null, 2),
+    'utf-8',
+  );
+
+  const results = await Promise.all([
+    mutateCronJobsFile(cronDir, (jobsFile) =>
+      upsertCronJob(jobsFile, {
+        id: 'concurrent-a',
+        enabled: true,
+      }),
+    ),
+    mutateCronJobsFile(cronDir, (jobsFile) =>
+      upsertCronJob(jobsFile, {
+        id: 'concurrent-b',
+        enabled: true,
+      }),
+    ),
+  ]);
+
+  assert.ok(results[0]);
+  assert.ok(results[1]);
+
+  const final = await readCronJobsFile(cronDir);
+  const ids = final.jobs.map((job) => job.id);
+
+  assert.deepEqual(ids.sort(), ['concurrent-a', 'concurrent-b']);
 });

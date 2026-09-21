@@ -10,11 +10,11 @@ import { parseAndValidate } from '@/lib/api-validate';
 import { z } from 'zod';
 import { allowCronWrite, getInstance, resolveOpenClawPaths } from '@/lib/instances';
 import {
+  mutateCronJobsFile,
   normalizeJobId,
   readCronJobsFile,
   toggleCronJob,
   triggerCronJobNow,
-  writeCronJobsFile,
   type CronJobConfig,
 } from '@/lib/cron-jobs';
 
@@ -170,14 +170,15 @@ export async function PUT(request: Request) {
   try {
     const instance = getInstance(getInstanceId(request));
     const { cronDir } = resolveOpenClawPaths(instance);
-    const jobsFile = await readCronJobsFile(cronDir);
-    const next =
-      action === 'toggle'
-        ? toggleCronJob(jobsFile, id)
-        : triggerCronJobNow(jobsFile, id);
+    const next = await mutateCronJobsFile(cronDir, (jobsFile) =>
+    action === 'toggle'
+    ? toggleCronJob(jobsFile, id)
+    : triggerCronJobNow(jobsFile, id),
+    );
 
-    if (!next) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    await writeCronJobsFile(cronDir, next);
+  if (!next) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
 
     logAudit({
       actor,
