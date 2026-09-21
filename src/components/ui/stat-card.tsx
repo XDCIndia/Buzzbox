@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { formatNumber } from '@/lib/utils';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
@@ -14,6 +15,7 @@ interface StatCardProps {
 }
 
 export function StatCard({ label, value, icon: Icon, trend, sparkline, color = 'var(--primary)' }: StatCardProps) {
+  const gradientId = `gradient-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   return (
     <div className="card card-hover relative p-6 flex flex-col justify-between">
       <div className="flex items-start justify-between gap-4">
@@ -42,7 +44,7 @@ export function StatCard({ label, value, icon: Icon, trend, sparkline, color = '
           <ResponsiveContainer width="100%" height={56}>
             <AreaChart data={sparkline}>
               <defs>
-                <linearGradient id={`gradient-${label}`} x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={color} stopOpacity={0.22} />
                   <stop offset="95%" stopColor={color} stopOpacity={0} />
                 </linearGradient>
@@ -52,7 +54,7 @@ export function StatCard({ label, value, icon: Icon, trend, sparkline, color = '
                 dataKey="value"
                 stroke={color}
                 strokeWidth={1.5}
-                fill={`url(#gradient-${label})`}
+                fill={`url(#${gradientId})`}
                 dot={false}
               />
             </AreaChart>
