@@ -63,7 +63,7 @@ export default function ApprovalsPage() {
 
   const { data, refetch } = useSmartPoll<ApprovalData>(
     () => fetch(`/api/approvals${realParam}`).then(r => r.json()),
-    { interval: 30_000 },
+    { interval: 30_000, key: realOnly },
   );
 
   const { data: historyData } = useSmartPoll<{ history: ApprovalHistory[] }>(
