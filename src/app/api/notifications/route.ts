@@ -4,6 +4,8 @@ import { isRealMode } from '@/lib/seed-filter';
 import { requireApiEditor, requireApiUser } from '@/lib/api-auth';
 import { requireUser } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
+import { parseAndValidate } from '@/lib/api-validate';
+import { z } from 'zod';
 
 interface Notification {
   id: number;
@@ -49,7 +51,15 @@ export async function PATCH(req: NextRequest) {
   const auth = requireApiEditor(req as Request);
   if (auth) return auth;
   const actor = requireUser(req as Request);
-  const body = await req.json();
+  const parsed = await parseAndValidate(
+    req,
+    z.object({
+      mark_all_read: z.boolean().optional(),
+      id: z.number().int().optional(),
+    }),
+  );
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const db = getDb();
 
   if (body.mark_all_read) {

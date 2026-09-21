@@ -5,6 +5,8 @@ import { requireApiEditor, requireApiUser } from '@/lib/api-auth';
 import { getAgentIds } from '@/lib/agent-config';
 import { requireUser } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
+import { parseAndValidate } from '@/lib/api-validate';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,7 +61,18 @@ export async function POST(req: NextRequest) {
   try {
     const actor = requireUser(req as Request);
     const db = getDb();
-    const body = await req.json();
+    const parsed = await parseAndValidate(
+      req,
+      z.object({
+        content: z.string(),
+        to: z.string().optional(),
+        message_type: z.string().optional(),
+        conversation_id: z.string().optional(),
+        forward: z.boolean().optional(),
+      }),
+    );
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const from = (typeof actor?.username === 'string' && actor.username.trim()) ? actor.username.trim() : 'operator';
     const to = body.to ? (body.to as string).trim() : null;
     const content = (body.content || '').trim();

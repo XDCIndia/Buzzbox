@@ -4,6 +4,8 @@ import path from 'path';
 import { requireApiCapability, requireApiUser } from '@/lib/api-auth';
 import { requireUser } from '@/lib/auth';
 import { allowPolicyWrite, getInstance, resolveOpenClawPaths } from '@/lib/instances';
+import { parseAndValidate } from '@/lib/api-validate';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,7 +119,20 @@ export async function POST(request: Request) {
 
   try {
     const actor = requireUser(request);
-    const body = (await request.json()) as Partial<AlertPolicy> & { instance?: string; namespace?: string };
+    const parsed = await parseAndValidate(
+      request,
+      z.object({
+        window_days: z.number().optional(),
+        alert_contradictions_threshold: z.number().optional(),
+        alert_duplicates_threshold: z.number().optional(),
+        alert_weak_agents_threshold: z.number().optional(),
+        alert_never_ratio_threshold: z.number().optional(),
+        instance: z.string().optional(),
+        namespace: z.string().optional(),
+      }),
+    );
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data as Partial<AlertPolicy> & { instance?: string; namespace?: string };
     const instanceId = body.instance ?? body.namespace ?? getInstanceId(request) ?? undefined;
     const { instance, policyFile, auditFile } = policyPaths(instanceId ?? null);
     const before = readPolicy(policyFile);

@@ -3,6 +3,8 @@ import { getDb } from "@/lib/db";
 import { requireApiEditor } from "@/lib/api-auth";
 import { requireUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { z } from "zod";
+import { parseAndValidate } from "@/lib/api-validate";
 
 export const dynamic = "force-dynamic";
 
@@ -12,16 +14,16 @@ export async function POST(req: NextRequest) {
   const auth = requireApiEditor(req as Request);
   if (auth) return auth;
   const actor = requireUser(req as Request);
-  const body = await req.json();
-  const { id, type, action } = body as {
-    id: string;
-    type: "content" | "email";
-    action: "approve" | "reject";
-  };
-
-  if (!id || !type || !action) {
-    return NextResponse.json({ error: "Missing id, type, or action" }, { status: 400 });
-  }
+  const parsed = await parseAndValidate(
+    req,
+    z.object({
+      id: z.string().min(1),
+      type: z.enum(["content", "email"]),
+      action: z.enum(["approve", "reject"]),
+    }),
+  );
+  if (!parsed.ok) return parsed.response;
+  const { id, type, action } = parsed.data;
 
   const db = getDb();
 

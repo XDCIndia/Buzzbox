@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { listGoogleLoginRequests, requireAdmin, reviewGoogleLoginRequest } from '@/lib/auth';
+import { parseAndValidate } from '@/lib/api-validate';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
 type Role = 'admin' | 'editor' | 'viewer';
-type Action = 'approve' | 'deny';
 
 function normalizeRole(value: unknown): Role | null {
   if (value === 'operator') return 'editor';
@@ -27,12 +28,18 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     requireAdmin(request);
-    const body = (await request.json()) as { email?: string; action?: Action; role?: string };
-    const email = body.email?.trim().toLowerCase();
+    const parsed = await parseAndValidate(
+      request,
+      z.object({
+        email: z.string().min(1),
+        action: z.enum(['approve', 'deny']),
+        role: z.string().optional(),
+      }),
+    );
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
+    const email = body.email.trim().toLowerCase();
     if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
-    if (body.action !== 'approve' && body.action !== 'deny') {
-      return NextResponse.json({ error: 'action must be approve or deny' }, { status: 400 });
-    }
 
     const role = normalizeRole(body.role) ?? 'viewer';
     reviewGoogleLoginRequest(email, body.action, role);

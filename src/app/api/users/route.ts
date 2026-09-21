@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createUser, deleteUser, listUsers, requireAdmin, resetUserPassword, updateUserRole } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { parseAndValidate } from '@/lib/api-validate';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,10 +43,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     requireAdmin(request);
-    const body = (await request.json()) as { username?: string; password?: string; role?: string };
-    if (!body.username || !body.password) {
-      return NextResponse.json({ error: 'username and password required' }, { status: 400 });
-    }
+    const parsed = await parseAndValidate(
+      request,
+      z.object({
+        username: z.string().min(1),
+        password: z.string().min(1),
+        role: z.string().optional(),
+      }),
+    );
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const role: Role = normalizeRole(body.role) ?? 'editor';
     const user = createUser(body.username, body.password, role);
     return NextResponse.json({ user });
@@ -63,7 +71,16 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const admin = requireAdmin(request);
-    const body = (await request.json()) as { id?: number; role?: string; password?: string };
+    const parsed = await parseAndValidate(
+      request,
+      z.object({
+        id: z.number().int(),
+        role: z.string().optional(),
+        password: z.string().optional(),
+      }),
+    );
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     if (!body.id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
     if (body.role) {
@@ -93,7 +110,9 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const admin = requireAdmin(request);
-    const body = (await request.json()) as { id?: number };
+    const parsed = await parseAndValidate(request, z.object({ id: z.number().int() }));
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     if (!body.id) return NextResponse.json({ error: 'id required' }, { status: 400 });
     if (admin.id === body.id) {
       ensureAnotherAdminExists(admin.id);

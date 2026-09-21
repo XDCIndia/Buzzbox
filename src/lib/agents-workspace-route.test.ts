@@ -14,12 +14,34 @@ process.env.AUTH_PASS = 'super-secure-pass';
 process.env.API_KEY = 'test-api-key';
 process.env.HERMES_AGENT_WORKSPACE_DIR = wsRoot;
 
-import { getDb, resetDbForTests } from './db';
-import { createSession, createUser, ensureAuthTables } from './auth';
-import { GET } from '../app/api/agents/workspace/route';
 import { NextRequest } from 'next/server';
 
-before(() => {
+// NOTE: src/lib/db.ts captures its database path at module load, so every
+// module that reads process.env at load time (db, auth, route handlers) must
+// be dynamically imported inside before() AFTER the env vars above are set.
+// Static imports would evaluate db.ts first (ESM hoisting) and silently point
+// tests at the developer's real database. Same pattern as
+// rbac-system-mutations.test.ts and routes-api.test.ts.
+type DbModule = typeof import('./db');
+type AuthModule = typeof import('./auth');
+let getDb: DbModule['getDb'];
+let resetDbForTests: DbModule['resetDbForTests'];
+let createSession: AuthModule['createSession'];
+let createUser: AuthModule['createUser'];
+let ensureAuthTables: AuthModule['ensureAuthTables'];
+let GET: typeof import('../app/api/agents/workspace/route')['GET'];
+
+before(async () => {
+  const dbm = await import('./db');
+  const authm = await import('./auth');
+  const route = await import('../app/api/agents/workspace/route');
+  getDb = dbm.getDb;
+  resetDbForTests = dbm.resetDbForTests;
+  createSession = authm.createSession;
+  createUser = authm.createUser;
+  ensureAuthTables = authm.ensureAuthTables;
+  GET = route.GET;
+
   const files: Array<[string, string]> = [
     ['readme.md', '# hello'],
     ['notes/sub/page.md', 'page'],
@@ -46,6 +68,7 @@ after(() => {
   resetDbForTests();
   rmSync(tempDir, { recursive: true, force: true });
 });
+
 
 function makeRequest(pathValue: string | null, headers: Record<string, string> = {}): NextRequest {
   const url = new URL('http://localhost/api/agents/workspace');

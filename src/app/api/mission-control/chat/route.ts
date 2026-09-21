@@ -5,6 +5,8 @@ import { requireApiAdmin } from '@/lib/api-auth';
 import { requireAdmin } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 import { getAgentIds } from '@/lib/agent-config';
+import { parseAndValidate } from '@/lib/api-validate';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,13 +105,18 @@ export async function POST(request: NextRequest) {
   if (auth) return auth;
   try {
     const actor = requireAdmin(request as Request);
-    const body = (await request.json()) as {
-      mode?: Mode;
-      content?: string;
-      from_agent?: string;
-      to_agent?: string;
-      conversation_id?: string;
-    };
+    const parsed = await parseAndValidate(
+      request,
+      z.object({
+        mode: z.enum(['orchestrator', 'agent_bridge']).optional(),
+        content: z.string().optional(),
+        from_agent: z.string().optional(),
+        to_agent: z.string().optional(),
+        conversation_id: z.string().optional(),
+      }),
+    );
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
 
     const mode: Mode = body.mode === 'agent_bridge' ? 'agent_bridge' : 'orchestrator';
     const content = (body.content || '').trim();

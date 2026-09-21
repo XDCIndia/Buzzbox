@@ -5,9 +5,10 @@ import { requireApiEditor, requireApiUser } from "@/lib/api-auth";
 import { requireUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { getDb } from "@/lib/db";
+import { parseAndValidate } from "@/lib/api-validate";
+import { z } from "zod";
 
 const LEAD_APPROVED_STATUS = "approved";
-const ALLOWED_SEQUENCE_STATUSES = new Set(["approved", "cancelled", "queued", "sent", "pending_approval"]);
 
 export async function GET(req: NextRequest) {
   const auth = requireApiUser(req as Request);
@@ -26,13 +27,17 @@ export async function PATCH(req: NextRequest) {
   const auth = requireApiEditor(req as Request);
   if (auth) return auth;
   const actor = requireUser(req as Request);
-  const body = await req.json();
-  const { id, status } = body;
+  const parsed = await parseAndValidate(
+    req,
+    z.object({
+      id: z.union([z.string(), z.number()]).transform(String),
+      status: z.enum(["approved", "cancelled", "queued", "sent", "pending_approval"]),
+    }),
+  );
+  if (!parsed.ok) return parsed.response;
+  const { id, status } = parsed.data;
   if (!id || !status) {
     return NextResponse.json({ error: "id and status required" }, { status: 400 });
-  }
-  if (typeof status !== "string" || !ALLOWED_SEQUENCE_STATUSES.has(status)) {
-    return NextResponse.json({ error: "Invalid sequence status" }, { status: 400 });
   }
 
   if (status === "approved" || status === "queued" || status === "sent") {

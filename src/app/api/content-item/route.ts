@@ -5,6 +5,8 @@ import { getDb } from '@/lib/db';
 import { getHermesStateDir } from '@/lib/hermes-state';
 import { requireApiEditor, requireApiUser } from '@/lib/api-auth';
 import { maybePublishToX } from '@/lib/publish-to-x';
+import { parseAndValidate } from '@/lib/api-validate';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
@@ -127,11 +129,16 @@ export async function PATCH(req: NextRequest) {
   const auth = requireApiEditor(req as unknown as Request);
   if (auth) return auth;
   try {
-    const body = (await req.json()) as {
-      id?: string;
-      patch?: Record<string, unknown>;
-      item?: QueueItem;
-    };
+    const validated = await parseAndValidate(
+      req,
+      z.object({
+        id: z.string(),
+        item: z.record(z.string(), z.unknown()).optional(),
+        patch: z.record(z.string(), z.unknown()).optional(),
+      }),
+    );
+    if (!validated.ok) return validated.response;
+    const body = validated.data as { id?: string; patch?: Record<string, unknown>; item?: QueueItem };
 
     const id = body?.id;
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
