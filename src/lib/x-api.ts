@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
 import { recordXSearchCall } from '@/lib/x-budget';
 
 export interface XSummary {
@@ -57,7 +58,7 @@ function num(v: unknown): number {
 }
 
 async function xGet<T>(bearerToken: string, url: string): Promise<T> {
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     headers: { Authorization: `Bearer ${bearerToken}` },
     cache: "no-store",
   });
@@ -260,7 +261,7 @@ export async function postXTweet(opts: {
   accessToken: string;
   text: string;
 }): Promise<XPostResult> {
-  const res = await fetch("https://api.x.com/2/tweets", {
+  const res = await fetchWithTimeout("https://api.x.com/2/tweets", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${opts.accessToken}`,

@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
+
 export interface PlausibleWebsiteSummary {
   visitors: number;
   pageviews: number;
@@ -37,7 +39,7 @@ export async function fetchPlausibleWebsiteAnalytics(opts: {
   const aggregateParams = new URLSearchParams(commonParams);
   aggregateParams.set("metrics", "visitors,pageviews,bounce_rate,visit_duration");
 
-  const aggregateRes = await fetch(
+  const aggregateRes = await fetchWithTimeout(
     `${baseUrl}/api/v1/stats/aggregate?${aggregateParams.toString()}`,
     {
       headers: { Authorization: `Bearer ${opts.apiKey}` },
@@ -64,7 +66,7 @@ export async function fetchPlausibleWebsiteAnalytics(opts: {
   const timeseriesParams = new URLSearchParams(commonParams);
   timeseriesParams.set("metrics", "visitors,pageviews");
 
-  const seriesRes = await fetch(
+  const seriesRes = await fetchWithTimeout(
     `${baseUrl}/api/v1/stats/timeseries?${timeseriesParams.toString()}`,
     {
       headers: { Authorization: `Bearer ${opts.apiKey}` },

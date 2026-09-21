@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
+
 // Meta Graph API client for a single owned Facebook Page.
 //
 // IMPORTANT SCOPE NOTE: unlike X's `/2/tweets/search/recent`, Meta's Graph API does not
@@ -97,7 +99,7 @@ async function fbGet<T>(pageAccessToken: string, path: string, params: Record<st
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   url.searchParams.set("access_token", pageAccessToken);
 
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  const res = await fetchWithTimeout(url.toString(), { cache: "no-store" });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Facebook Graph API failed (${res.status}): ${text.slice(0, 300)}`);

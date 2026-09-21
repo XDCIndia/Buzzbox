@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
+
 // Instagram Graph API client.
 //
 // Requires a Business/Creator Instagram account linked to a Facebook Page,
@@ -98,7 +100,7 @@ function isoDay(d: Date): string {
 
 async function igGet<T>(accessToken: string, path: string, params: Record<string, string> = {}): Promise<T> {
   const qs = new URLSearchParams({ access_token: accessToken, ...params });
-  const res = await fetch(`${GRAPH_BASE}${path}?${qs.toString()}`, { cache: "no-store" });
+  const res = await fetchWithTimeout(`${GRAPH_BASE}${path}?${qs.toString()}`, { cache: "no-store" });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Instagram API failed (${res.status}): ${text.slice(0, 300)}`);

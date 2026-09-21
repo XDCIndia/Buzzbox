@@ -52,7 +52,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ paused: body.paused });
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    console.error("API error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 

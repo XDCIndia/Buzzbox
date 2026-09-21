@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
+
 // NOTE: comment-level mention search (matching the brand keyword inside video *comments*,
 // not just titles/descriptions) is intentionally deferred to a later version -- it needs a
 // commentThreads.list call per video, which is expensive on API quota.
@@ -11,7 +13,7 @@ async function ytGet<T>(url: string, opts?: { accessToken?: string }): Promise<T
   const headers: Record<string, string> = {};
   if (opts?.accessToken) headers.Authorization = `Bearer ${opts.accessToken}`;
 
-  const res = await fetch(url, { headers, cache: "no-store" });
+  const res = await fetchWithTimeout(url, { headers, cache: "no-store" });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`YouTube API failed (${res.status}): ${text.slice(0, 300)}`);

@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './fetch-with-timeout';
+
 const DICOMPUTE_BASE_URL =
   process.env.DICOMPUTE_BASE_URL || 'https://api.dicompute.ai/v1';
 
@@ -18,7 +20,7 @@ export async function askDicompute(
     throw new Error('DICOMPUTE_API_KEY is not configured');
   }
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `${DICOMPUTE_BASE_URL}/chat/completions`,
     {
       method: 'POST',
