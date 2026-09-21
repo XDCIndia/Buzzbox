@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getActivityLog } from '@/lib/queries';
 import { requireApiUser } from '@/lib/api-auth';
+import { clampParam } from '@/lib/query-params';
 
 export async function GET(req: NextRequest) {
   const auth = requireApiUser(req as Request);
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
   const real = searchParams.get('real') === 'true';
   const activity = getActivityLog({
     action: searchParams.get('action') || undefined,
-    limit: Number(searchParams.get('limit')) || 100,
+    limit: clampParam(req, 'limit', 1, 500, 100),
     excludeSeed: real,
   });
   return NextResponse.json(activity);
