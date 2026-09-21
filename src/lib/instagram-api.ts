@@ -98,9 +98,22 @@ function isoDay(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function igGet<T>(accessToken: string, path: string, params: Record<string, string> = {}): Promise<T> {
-  const qs = new URLSearchParams({ access_token: accessToken, ...params });
-  const res = await fetchWithTimeout(`${GRAPH_BASE}${path}?${qs.toString()}`, { cache: "no-store" });
+async function igGet<T>(
+  accessToken: string,
+  path: string,
+  params: Record<string, string> = {}
+): Promise<T> {
+  // The access token must never appear in the URL: Graph API URLs are logged by
+  // proxies, servers, and browser history. Send it via the Authorization header
+  // instead (issue #63).
+  const qs = new URLSearchParams(params);
+  const query = qs.toString();
+  const res = await fetchWithTimeout(`${GRAPH_BASE}${path}${query ? `?${query}` : ""}`, {
+    cache: "no-store",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Instagram API failed (${res.status}): ${text.slice(0, 300)}`);
