@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { DataTable } from '@/components/ui/data-table';
 import { Contact, Mail, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -27,17 +27,20 @@ export default function OutreachPage() {
   const { realOnly } = useDashboard();
 
   const [loadError, setLoadError] = useState(false);
+  const loadGen = useRef(0);
   const load = useCallback(() => {
+    const gen = ++loadGen.current; // guard: only the newest load may paint
     const realParam = realOnly ? '&real=true' : '';
     fetch(`/api/outreach?_=1${realParam}`).then(r => { if (!r.ok) throw new Error('outreach'); return r.json(); }).then(data => {
+      if (gen !== loadGen.current) return;
       setLoadError(false);
       setLeads(data.leads || []);
       setFunnel(data.funnel || []);
       setPendingApprovals(data.pendingApprovals || []);
-    }).catch(() => setLoadError(true));
+    }).catch(() => { if (gen === loadGen.current) setLoadError(true); });
     const realParam2 = realOnly ? '?real=true' : '';
-    fetch(`/api/sequences${realParam2}`).then(r => r.json()).then(setSequences).catch(() => setLoadError(true));
-    fetch(`/api/suppression${realParam2}`).then(r => r.json()).then(setSuppression).catch(() => setLoadError(true));
+    fetch(`/api/sequences${realParam2}`).then(r => r.json()).then(data => { if (gen === loadGen.current) setSequences(data); }).catch(() => { if (gen === loadGen.current) setLoadError(true); });
+    fetch(`/api/suppression${realParam2}`).then(r => r.json()).then(data => { if (gen === loadGen.current) setSuppression(data); }).catch(() => { if (gen === loadGen.current) setLoadError(true); });
   }, [realOnly]);
 
   useEffect(() => { load(); }, [load]);

@@ -25,15 +25,18 @@ export default function KPIsPage() {
   const { realOnly } = useDashboard();
 
   useEffect(() => {
+    let cancelled = false; // guard: a newer run (or unmount) must win over this response
     const realParam = realOnly ? '&real=true' : '';
     fetch(`/api/kpis?weeks=12${realParam}`)
       .then(r => { if (!r.ok) throw new Error('kpis'); return r.json(); })
       .then(data => {
+        if (cancelled) return;
         setLoadError(false);
         setDaily(data.daily || []);
         setWeekly(data.weekly || []);
       })
-      .catch(() => setLoadError(true));
+      .catch(() => { if (!cancelled) setLoadError(true); });
+    return () => { cancelled = true; };
   }, [realOnly, retryNonce]);
 
   const weeklyReversed = [...weekly].reverse();

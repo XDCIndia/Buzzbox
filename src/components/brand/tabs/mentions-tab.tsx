@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { RefreshCw, Download, ExternalLink, AtSign } from 'lucide-react';
 import { MentionCard } from '@/components/brand/mention-card';
 import { FilterPanel } from '@/components/brand/filter-panel';
@@ -28,7 +28,9 @@ export function MentionsTab({ brandId, realOnly, sourceType }: { brandId: string
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
+  const loadGen = useRef(0);
   function loadMentions() {
+    const gen = ++loadGen.current; // guard: only the newest load may paint
     const params = new URLSearchParams({ source_type: sourceType, sort });
     if (realOnly) params.set('real', 'true');
     platforms.forEach(p => params.append('platform', p));
@@ -42,9 +44,9 @@ export function MentionsTab({ brandId, realOnly, sourceType }: { brandId: string
         if (!r.ok) throw new Error('Failed to load mentions');
         return r.json();
       })
-      .then((data: BrandMention[]) => setMentions(Array.isArray(data) ? data : []))
-      .catch(err => setError((err as Error).message || 'Could not fetch mentions'))
-      .finally(() => setLoading(false));
+      .then((data: BrandMention[]) => { if (gen !== loadGen.current) return; setMentions(Array.isArray(data) ? data : []); })
+      .catch(err => { if (gen === loadGen.current) setError((err as Error).message || 'Could not fetch mentions'); })
+      .finally(() => { if (gen === loadGen.current) setLoading(false); });
   }
 
   useEffect(() => {

@@ -27,6 +27,7 @@ export default function ResearchPage() {
   const { realOnly } = useDashboard();
 
   useEffect(() => {
+    let cancelled = false; // guard: a newer run (or unmount) must win over this response
     const params = new URLSearchParams();
     if (typeFilter) params.set('type', typeFilter);
     if (relevanceFilter) params.set('relevance', relevanceFilter);
@@ -34,8 +35,9 @@ export default function ResearchPage() {
     const q = params.toString();
     fetch(`/api/signals${q ? '?' + q : ''}`)
       .then(r => { if (!r.ok) throw new Error('signals'); return r.json(); })
-      .then(signals => { setLoadError(false); setSignals(signals); })
-      .catch(() => setLoadError(true));
+      .then(signals => { if (!cancelled) { setLoadError(false); setSignals(signals); } })
+      .catch(() => { if (!cancelled) setLoadError(true); });
+    return () => { cancelled = true; };
   }, [typeFilter, relevanceFilter, realOnly, retryNonce]);
 
   const todaySignals = signals.filter(s => s.date === new Date().toISOString().slice(0, 10));

@@ -82,18 +82,20 @@ export function CommandPalette() {
     if (!query || query.length < 2) {
       return;
     }
+    let cancelled = false; // guard: only the newest query may paint results
     const timer = setTimeout(() => {
       setLoading(true);
       fetch(`/api/search?q=${encodeURIComponent(query)}${realOnly ? '&real=true' : ''}`)
         .then(r => r.json())
         .then(data => {
+          if (cancelled) return;
           setResults(data.results || []);
           setActiveIndex(0);
         })
-        .catch(() => setResults([]))
-        .finally(() => setLoading(false));
+        .catch(() => { if (!cancelled) setResults([]); })
+        .finally(() => { if (!cancelled) setLoading(false); });
     }, 200);
-    return () => clearTimeout(timer);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [query, realOnly]);
 
   // Filter nav items based on query

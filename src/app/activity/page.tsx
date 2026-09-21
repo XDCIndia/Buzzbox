@@ -26,14 +26,16 @@ export default function ActivityPage() {
   const { realOnly } = useDashboard();
 
   useEffect(() => {
+    let cancelled = false; // guard: a newer run (or unmount) must win over this response
     const params = new URLSearchParams();
     if (filter) params.set('action', filter);
     params.set('limit', '200');
     if (realOnly) params.set('real', 'true');
     fetch(`/api/activity?${params}`)
       .then(r => { if (!r.ok) throw new Error('activity'); return r.json(); })
-      .then(entries => { setLoadError(false); setEntries(entries); })
-      .catch(() => setLoadError(true));
+      .then(entries => { if (!cancelled) { setLoadError(false); setEntries(entries); } })
+      .catch(() => { if (!cancelled) setLoadError(true); });
+    return () => { cancelled = true; };
   }, [filter, realOnly, retryNonce]);
 
   return (
