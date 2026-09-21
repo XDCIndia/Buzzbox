@@ -135,8 +135,6 @@ export function ensureAuthTables(): void {
 export function seedAdmin(): void {
   const db = getDb();
   ensureAuthTables();
-  const count = (db.prepare('SELECT COUNT(*) as c FROM users').get() as { c: number }).c;
-  if (count > 0) return;
 
   const username = requireEnv('AUTH_USER').toLowerCase();
   const password = requireEnv('AUTH_PASS');
@@ -146,11 +144,21 @@ export function seedAdmin(): void {
   if (password.length < 10) {
     throw new Error('AUTH_PASS must be at least 10 characters');
   }
-  db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)').run(
-    username,
-    hashPassword(password),
-    'admin',
-  );
+
+  const existingAdmin = db.prepare('SELECT id FROM users WHERE username = ?').get(username) as { id: number } | undefined;
+  if (!existingAdmin) {
+    db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)').run(
+      username,
+      hashPassword(password),
+      'admin',
+    );
+  } else if (!verifyPassword(password, (db.prepare('SELECT password_hash FROM users WHERE username = ?').get(username) as { password_hash: string }).password_hash)) {
+    // Keep password in sync with .env.local if it has changed
+    db.prepare('UPDATE users SET password_hash = ? WHERE username = ?').run(
+      hashPassword(password),
+      username,
+    );
+  }
 }
 
 export function authenticate(username: string, password: string): User | null {

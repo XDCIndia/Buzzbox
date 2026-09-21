@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Zap, Clock, CheckCircle, AlertTriangle, Mail, PenLine,
   Calendar, Activity, Timer, ThumbsUp, ThumbsDown, Loader2,
@@ -79,10 +81,12 @@ export default function AutomationsPage() {
   if (!data || loading) {
     return (
       <div className="space-y-6 animate-in">
-        <h1 className="text-xl font-semibold">Automations</h1>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => <div key={i} className="panel h-32 animate-pulse bg-muted/20" />)}
-        </div>
+        <PageHeader
+          index="07"
+          eyebrow="Automate"
+          title="Automations"
+          description="Agents, scheduled jobs, and approval flows."
+        />
       </div>
     );
   }
@@ -108,7 +112,12 @@ export default function AutomationsPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <h1 className="text-xl font-semibold">Automations</h1>
+      <PageHeader
+        index="07"
+        eyebrow="Automate"
+        title="Automations"
+        description="Agents, scheduled jobs, and approval flows."
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -209,9 +218,13 @@ export default function AutomationsPage() {
           </div>
           <div className="panel-body">
             {approvals.length === 0 ? (
-              <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
-                <CheckCircle size={16} className="mr-2 text-success" /> All caught up
-              </div>
+              <EmptyState
+                icon={CheckCircle}
+                title="All caught up"
+                reason="No agent actions are waiting for review."
+                next="New agent requests will appear here as they come in."
+                variant="inline"
+              />
             ) : (
               <div className="space-y-2 max-h-80 overflow-y-auto">
                 {approvals.map(item => (
@@ -239,7 +252,13 @@ export default function AutomationsPage() {
           </div>
           <div className="panel-body">
             {skill_executions.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No execution data yet</p>
+              <EmptyState
+                icon={Zap}
+                title="No executions in the last 30 days"
+                reason="Skill runs are logged per agent with counts so you can see what automation is actually being used."
+                next="Trigger an agent job or wait for a scheduled run."
+                variant="inline"
+              />
             ) : (
               <div className="space-y-2">
                 {skill_executions.map((exec, execIndex) => {

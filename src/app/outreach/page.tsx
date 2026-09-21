@@ -2,11 +2,14 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { DataTable } from '@/components/ui/data-table';
+import { Contact, Mail, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { FunnelChart } from '@/components/ui/funnel-chart';
 import { ApprovalCard } from '@/components/ui/approval-card';
 import { formatDateTime } from '@/lib/utils';
 import { toast } from '@/components/ui/toast';
+import { PageHeader } from '@/components/ui/page-header';
+import { ErrorState } from '@/components/ui/empty-state';
 import { useDashboard } from '@/store';
 import type { Lead, Sequence, FunnelStep, Suppression } from '@/types';
 
@@ -23,16 +26,18 @@ export default function OutreachPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const { realOnly } = useDashboard();
 
+  const [loadError, setLoadError] = useState(false);
   const load = useCallback(() => {
     const realParam = realOnly ? '&real=true' : '';
-    fetch(`/api/outreach?_=1${realParam}`).then(r => r.json()).then(data => {
+    fetch(`/api/outreach?_=1${realParam}`).then(r => { if (!r.ok) throw new Error('outreach'); return r.json(); }).then(data => {
+      setLoadError(false);
       setLeads(data.leads || []);
       setFunnel(data.funnel || []);
       setPendingApprovals(data.pendingApprovals || []);
-    }).catch(() => {});
+    }).catch(() => setLoadError(true));
     const realParam2 = realOnly ? '?real=true' : '';
-    fetch(`/api/sequences${realParam2}`).then(r => r.json()).then(setSequences).catch(() => {});
-    fetch(`/api/suppression${realParam2}`).then(r => r.json()).then(setSuppression).catch(() => {});
+    fetch(`/api/sequences${realParam2}`).then(r => r.json()).then(setSequences).catch(() => setLoadError(true));
+    fetch(`/api/suppression${realParam2}`).then(r => r.json()).then(setSuppression).catch(() => setLoadError(true));
   }, [realOnly]);
 
   useEffect(() => { load(); }, [load]);
@@ -73,8 +78,12 @@ export default function OutreachPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-semibold">Outreach</h1>
+      <PageHeader
+        index="05"
+        eyebrow="Operate"
+        title="Outreach"
+        description="Leads, sequences, and approvals for every outbound motion."
+      >
         <div className="text-xs text-muted-foreground">
           Leads <span className="font-mono text-foreground">{leads.length}</span>
           {' · '}
@@ -82,8 +91,17 @@ export default function OutreachPage() {
           {' · '}
           Suppression <span className="font-mono text-foreground">{suppression.length}</span>
         </div>
-      </div>
+      </PageHeader>
 
+      {loadError && (
+        <ErrorState
+          title="Couldn't load outreach data"
+          detail="The outreach service did not respond. Leads, sequences, and the funnel are unavailable until it's back."
+          onRetry={load}
+        />
+      )}
+
+      {!loadError && (
       <div className="panel">
         <div className="panel-body !p-0">
       <div className="flex gap-0 border-b border-border overflow-x-auto">
@@ -105,6 +123,7 @@ export default function OutreachPage() {
       </div>
       </div>
       </div>
+      )}
 
       {tab === 'pipeline' && (
         <div className="panel">
@@ -185,6 +204,11 @@ export default function OutreachPage() {
                 ]}
                 data={filteredLeads}
                 keyField="id"
+                emptyIcon={Contact}
+                emptyTitle={tierFilter || statusFilter ? 'No leads match these filters' : 'No leads yet'}
+                emptyDescription={tierFilter || statusFilter
+                  ? 'Try clearing the tier or status filters to see the full pipeline.'
+                  : 'Leads are captured automatically from outreach replies and CRM entries.'}
                 emptyMessage="No leads"
               />
             </div>
@@ -216,6 +240,9 @@ export default function OutreachPage() {
             ]}
             data={sequences}
             keyField="id"
+            emptyIcon={Mail}
+            emptyTitle="No sequences yet"
+            emptyDescription="Email sequences are generated for new leads and queued here for approval before sending."
             emptyMessage="No sequences"
           />
           </div>
@@ -262,6 +289,9 @@ export default function OutreachPage() {
             ]}
             data={suppression}
             keyField="email"
+            emptyIcon={Shield}
+            emptyTitle="Suppression list is empty"
+            emptyDescription="Emails marked as opt-outs, bounces, or do-not-contact are listed here to keep outreach compliant."
             emptyMessage="No suppressed emails"
           />
           </div>

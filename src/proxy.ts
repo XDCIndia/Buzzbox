@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 const SESSION_COOKIE = 'hermes-session';
+const PUBLIC_PATHS = ['/login', '/'];
 
 function isHostAllowedByLock(hostName: string): boolean {
   const mode = (process.env.HERMES_HOST_LOCK || 'local').trim().toLowerCase();
@@ -33,7 +34,7 @@ export function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  if (pathname === '/login' || pathname.startsWith('/api/auth/')) {
+  if (PUBLIC_PATHS.some((p) => pathname === p) || pathname.startsWith('/api/auth/')) {
     return NextResponse.next();
   }
 

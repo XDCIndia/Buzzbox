@@ -18,7 +18,6 @@ interface ProviderConfigCardProps {
 export function ProviderConfigCard({
   title,
   description,
-  providerName,
   icon: Icon = Plug,
   configureHref = '/integrations',
   configureLabel = 'Configure Integration',

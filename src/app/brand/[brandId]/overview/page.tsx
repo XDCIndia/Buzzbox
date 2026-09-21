@@ -11,7 +11,7 @@ export default function BrandOverviewPage() {
 
   return (
     <div className="space-y-4 animate-in">
-      <BrandHeader brandId={brandId} title="Overview" />
+      <BrandHeader brandId={brandId} title="Brand Overview" index="B1" description="Live view of brand health — mentions, engagement, and share of voice across connected sources." />
       <OverviewTab brandId={brandId} realOnly={realOnly} />
     </div>
   );

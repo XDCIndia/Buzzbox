@@ -31,8 +31,23 @@ export function BuzzAssistant() {
     }
   }, [messages, loading, open]);
 
-  async function sendMessage() {
-    const message = input.trim();
+  // Listen for quick-action prompts dispatched from the dashboard
+  // (sendMessage is stable enough for this fire-and-forget path; eslint-disable
+  // avoids re-subscribing on every render.)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ prompt?: string }>).detail;
+      if (!detail?.prompt) return;
+      setOpen(true);
+      sendMessage(detail.prompt);
+    };
+    window.addEventListener('buzz:ask', handler);
+    return () => window.removeEventListener('buzz:ask', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function sendMessage(override?: string) {
+    const message = (override ?? input).trim();
 
     if (!message || loading) return;
 
@@ -264,7 +279,7 @@ export function BuzzAssistant() {
 
               <button
                 type="button"
-                onClick={sendMessage}
+                onClick={() => sendMessage()}
                 disabled={!input.trim() || loading}
                 className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label="Send message"

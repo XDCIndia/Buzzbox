@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { TrendChart } from '@/components/ui/trend-chart';
+import { PageHeader } from '@/components/ui/page-header';
+import { ErrorState } from '@/components/ui/empty-state';
 import { useDashboard } from '@/store';
 import type { DailyMetrics, WeeklyKPI } from '@/types';
 
@@ -18,15 +20,21 @@ const TARGETS = {
 export default function KPIsPage() {
   const [daily, setDaily] = useState<DailyMetrics[]>([]);
   const [weekly, setWeekly] = useState<WeeklyKPI[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const { realOnly } = useDashboard();
 
   useEffect(() => {
     const realParam = realOnly ? '&real=true' : '';
-    fetch(`/api/kpis?weeks=12${realParam}`).then(r => r.json()).then(data => {
-      setDaily(data.daily || []);
-      setWeekly(data.weekly || []);
-    }).catch(() => {});
-  }, [realOnly]);
+    fetch(`/api/kpis?weeks=12${realParam}`)
+      .then(r => { if (!r.ok) throw new Error('kpis'); return r.json(); })
+      .then(data => {
+        setLoadError(false);
+        setDaily(data.daily || []);
+        setWeekly(data.weekly || []);
+      })
+      .catch(() => setLoadError(true));
+  }, [realOnly, retryNonce]);
 
   const weeklyReversed = [...weekly].reverse();
   const thisWeek = weekly[0];
@@ -34,13 +42,25 @@ export default function KPIsPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-semibold">KPIs</h1>
+      <PageHeader
+        index="10"
+        eyebrow="Observe"
+        title="KPIs"
+        description="Weekly north-star metrics and trends."
+      >
         <div className="text-xs text-muted-foreground">
           Weeks tracked <span className="font-mono text-foreground">{weekly.length}</span>
         </div>
-      </div>
+      </PageHeader>
 
+      {loadError ? (
+        <ErrorState
+          title="Couldn't load KPI data"
+          detail="The metrics service did not respond. Weekly trends and targets are unavailable until it's back."
+          onRetry={() => setRetryNonce(n => n + 1)}
+        />
+      ) : (
+      <>
       {/* Weekly metrics table */}
       <div className="panel">
         <div className="panel-header">
@@ -132,6 +152,8 @@ export default function KPIsPage() {
         </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Inbox } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { EmptyState, type EmptyStateAction } from '@/components/brand/empty-state';
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
@@ -42,6 +43,8 @@ export function DataTable<T extends Record<string, any>>({
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  // Bare-fallback icon when the caller doesn't pass emptyIcon
+  const EmptyFallbackIcon = emptyIcon ?? Inbox;
 
   if (loading) {
     return <TableSkeleton rows={4} cols={columns.length} />;
@@ -89,9 +92,14 @@ export function DataTable<T extends Record<string, any>>({
     }
 
     return (
-      <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-        {emptyMessage}
-      </div>
+      <EmptyState
+        icon={EmptyFallbackIcon}
+        title={emptyTitle || 'Nothing here yet'}
+        description={emptyMessage}
+        primaryAction={emptyPrimaryAction}
+        secondaryAction={emptySecondaryAction}
+        variant="compact"
+      />
     );
   }
 

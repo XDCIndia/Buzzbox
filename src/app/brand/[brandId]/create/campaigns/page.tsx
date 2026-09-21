@@ -9,7 +9,7 @@ export default function BrandCampaignsPage() {
 
   return (
     <div className="space-y-4 animate-in">
-      <BrandHeader brandId={brandId} title="Campaigns" />
+      <BrandHeader brandId={brandId} title="Campaigns" index="B5" description="Organized engagement campaigns — group mentions into sequences and track outreach progress." />
       <CampaignsTab brandId={brandId} />
     </div>
   );

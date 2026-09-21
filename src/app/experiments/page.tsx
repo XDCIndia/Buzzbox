@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { FlaskConical, Lightbulb } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { FlaskConical, Lightbulb, CheckCircle2 } from 'lucide-react';
+import { EmptyState, ErrorState } from '@/components/ui/empty-state';
 import { useDashboard } from '@/store';
 import type { Experiment, Learning } from '@/types';
 
@@ -14,23 +16,43 @@ export default function ExperimentsPage() {
   const [tab, setTab] = useState<Tab>('current');
   const { realOnly } = useDashboard();
 
+  const [loadError, setLoadError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
+
   useEffect(() => {
     const realParam = realOnly ? '?real=true' : '';
-    fetch(`/api/experiments${realParam}`).then(r => r.json()).then(data => {
-      setExperiments(data.experiments || []);
-      setLearnings(data.learnings || []);
-    }).catch(() => {});
-  }, [realOnly]);
+    fetch(`/api/experiments${realParam}`)
+      .then(r => { if (!r.ok) throw new Error('experiments'); return r.json(); })
+      .then(data => {
+        setLoadError(false);
+        setExperiments(data.experiments || []);
+        setLearnings(data.learnings || []);
+      })
+      .catch(() => setLoadError(true));
+  }, [realOnly, retryNonce]);
 
   const running = experiments.filter(e => e.status === 'running' || e.status === 'proposed');
   const completed = experiments.filter(e => e.status === 'completed');
 
   return (
     <div className="space-y-6 animate-in">
+      <PageHeader
+        index="08"
+        eyebrow="Operate"
+        title="Experiments"
+        description="Running experiments, history, and captured learnings."
+      />
+
+      {loadError && (
+        <ErrorState
+          title="Couldn't load experiments"
+          detail="The experiments service did not respond. Running experiments are unaffected — retry to refresh."
+          onRetry={() => setRetryNonce(n => n + 1)}
+        />
+      )}
+
+      {!loadError && (
       <div className="panel">
-        <div className="panel-header">
-          <h1 className="text-xl font-semibold">Experiments</h1>
-        </div>
         <div className="panel-body !p-0">
           <div className="flex gap-0 border-b border-border">
             {([
@@ -49,12 +71,18 @@ export default function ExperimentsPage() {
           </div>
         </div>
       </div>
+      )}
 
       {tab === 'current' && (
         <div className="space-y-4">
           {running.length === 0 ? (
-            <div className="panel p-8 text-center text-muted-foreground text-sm">
-              No experiments running
+            <div className="panel p-8">
+              <EmptyState
+                icon={FlaskConical}
+                title="No experiments running"
+                reason="Experiments let you test content angles, send times, or outreach copy and measure what actually moves the numbers."
+                next="Log a new experiment to start tracking a hypothesis."
+              />
             </div>
           ) : (
             running.map(exp => (
@@ -67,8 +95,13 @@ export default function ExperimentsPage() {
       {tab === 'history' && (
         <div className="space-y-4">
           {completed.length === 0 ? (
-            <div className="panel p-8 text-center text-muted-foreground text-sm">
-              No completed experiments
+            <div className="panel p-8">
+              <EmptyState
+                icon={CheckCircle2}
+                title="No completed experiments"
+                reason="Experiments land here once they are marked done, with their outcome recorded."
+                next="Complete a running experiment to archive its results."
+              />
             </div>
           ) : (
             completed.map(exp => (
@@ -81,8 +114,13 @@ export default function ExperimentsPage() {
       {tab === 'learnings' && (
         <div className="space-y-3">
           {learnings.length === 0 ? (
-            <div className="panel p-8 text-center text-muted-foreground text-sm">
-              No validated learnings yet
+            <div className="panel p-8">
+              <EmptyState
+                icon={Lightbulb}
+                title="No validated learnings yet"
+                reason="Learnings are captured insights from finished experiments — what worked, what didn't, and with what confidence."
+                next="Capture a learning from a completed experiment."
+              />
             </div>
           ) : (
             learnings.map(l => (

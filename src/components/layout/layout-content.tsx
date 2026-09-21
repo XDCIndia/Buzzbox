@@ -9,6 +9,8 @@ import { AppShell } from './app-shell';
 import { CommandPalette } from '../command-palette';
 
 const AUTH_PATHS = ['/login'];
+// Public marketing pages — no auth check, no app shell.
+const PUBLIC_PATHS = ['/'];
 
 export function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -16,9 +18,10 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
   const [authChecked, setAuthChecked] = useState(false);
 
   const isAuthPath = AUTH_PATHS.some((p) => pathname.startsWith(p));
+  const isPublicPath = PUBLIC_PATHS.some((p) => pathname === p);
 
   useEffect(() => {
-    if (isAuthPath) return;
+    if (isAuthPath || isPublicPath) return;
     let cancelled = false;
     fetch('/api/auth/me', { cache: 'no-store' })
       .then((res) => {
@@ -35,9 +38,9 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isAuthPath, pathname, router]);
+  }, [isAuthPath, isPublicPath, pathname, router]);
 
-  if (isAuthPath) {
+  if (isAuthPath || isPublicPath) {
     return <>{children}</>;
   }
 

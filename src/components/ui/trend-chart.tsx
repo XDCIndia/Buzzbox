@@ -59,6 +59,7 @@ export function TrendChart({ data, xKey, lines, height = 260 }: TrendChartProps)
             stroke={line.color}
             strokeWidth={2}
             dot={false}
+            activeDot={{ r: 4, strokeWidth: 0 }}
             name={line.label}
           />
         ))}

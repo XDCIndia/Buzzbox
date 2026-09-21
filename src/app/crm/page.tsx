@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, DragEvent } from 'react';
 import Link from 'next/link';
+import { PageHeader } from '@/components/ui/page-header';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Contact, Search, ChevronRight, Star,
@@ -10,6 +11,7 @@ import {
   Check, XCircle,
   LayoutList, Kanban, AlertCircle, BarChart3, ExternalLink,
 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { useDashboard } from '@/store';
 import { timeAgo } from '@/lib/utils';
@@ -343,17 +345,20 @@ export default function CrmPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold">CRM</h1>
-          {canEdit && (
-            <button className="btn btn-primary btn-sm" onClick={() => setCreateOpen(true)}>
-              Add Lead
-            </button>
-          )}
-        </div>
-        {data?.summary && (
-          <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+      <PageHeader
+        index="06"
+        eyebrow="Operate"
+        title="CRM"
+        description="Every lead, score, and next action in one pipeline."
+      >
+        {canEdit && (
+          <button className="btn btn-primary btn-lg" onClick={() => setCreateOpen(true)}>
+            Add Lead
+          </button>
+        )}
+      </PageHeader>
+      {data?.summary && (
+          <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap mb-6">
             <span><strong className="text-foreground">{data.summary.total}</strong> leads</span>
             <span>avg score <strong className="text-foreground">{data.summary.avg_score}</strong></span>
             {data.summary.tier_breakdown.map(t => (
@@ -373,7 +378,6 @@ export default function CrmPage() {
           )}
           </div>
         )}
-      </div>
 
       {/* Quick Stats */}
       {data?.summary && (
@@ -619,7 +623,18 @@ export default function CrmPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-2">
             {sorted.length === 0 ? (
-              <div className="panel p-8 text-center text-sm text-muted-foreground">No leads found</div>
+              <div className="panel p-8">
+                <EmptyState
+                  icon={Contact}
+                  title={search || stageFilter || tierFilter ? 'No leads match' : 'No leads yet'}
+                  reason={search || stageFilter || tierFilter
+                    ? 'No pipeline entries match the current search, stage, or tier filters.'
+                    : 'Leads enter the pipeline from outreach replies, signups, or manual entry.'}
+                  next={search || stageFilter || tierFilter
+                    ? 'Try a different search term or clear the filters.'
+                    : 'Add your first lead or connect a lead source to get started.'}
+                />
+              </div>
             ) : (
               sorted.map(lead => (
                 <LeadRow

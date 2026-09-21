@@ -7,14 +7,12 @@ import type { Brand } from '@/types';
 import { DEFAULT_BRAND_ID } from '@/lib/brand-constants';
 import { BrandHeaderSkeleton } from '@/components/ui/loading-skeleton';
 
-export function BrandHeader({ brandId, title }: { brandId: string; title: string }) {
+export function BrandHeader({ brandId, title, index, description }: { brandId: string; title: string; index?: string; description?: string }) {
   const [brand, setBrand] = useState<Brand | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   function loadBrand() {
-    setLoading(true);
-    setError(null);
     fetch(`/api/brand/${brandId}`)
       .then(async res => {
         const data = await res.json();
@@ -27,12 +25,21 @@ export function BrandHeader({ brandId, title }: { brandId: string; title: string
         setBrand(null);
         setError((err as Error).message || 'Brand not found');
       })
+      // NOTE: A previous implementation reset loading/error state synchronously at the
+      // top of this function. That pattern is flagged by react-hooks (setState during
+      // render phase of an effect); state now resolves asynchronously via the fetch chain.
       .finally(() => setLoading(false));
+  }
+
+  function retryBrand() {
+    setLoading(true);
+    setError(null);
+    loadBrand();
   }
 
   useEffect(() => {
     loadBrand();
-  }, [brandId]);
+  }, [brandId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -64,7 +71,7 @@ export function BrandHeader({ brandId, title }: { brandId: string; title: string
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={loadBrand} className="btn btn-ghost btn-sm text-xs">
+            <button onClick={retryBrand} className="btn btn-ghost btn-sm text-xs">
               <RefreshCw size={12} /> Retry
             </button>
             {brandId !== DEFAULT_BRAND_ID && (
@@ -81,34 +88,36 @@ export function BrandHeader({ brandId, title }: { brandId: string; title: string
     );
   }
 
+  const hasKeywords = brand.keywords && brand.keywords.length > 0;
+  const hasSources = brand.sources && brand.sources.length > 0;
+
   return (
-    <div className="panel p-4 space-y-3">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold">{title}</h1>
-            <span className="text-muted-foreground font-light text-xl">—</span>
-            <span className="text-xl font-medium text-primary">{brand.name}</span>
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Active brand context for social listening, mentions triage, and reporting
+    <section className="mb-8 space-y-3">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
+        <div className="min-w-0">
+          <p className="console-eyebrow mb-3">
+            {index && <span className="opacity-80">{index} /</span>} Brand — {brand.name}
+          </p>
+          <h1 className="page-headline">{title}</h1>
+          <p className="page-subheadline mt-2 max-w-2xl">
+            {description ?? 'Active brand context for social listening, mentions triage, and reporting'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 shrink-0">
           <Link href="/settings?tab=brand" className="btn btn-ghost btn-sm text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground">
             <Settings size={12} /> Manage Brand
           </Link>
         </div>
       </div>
 
-      {((brand.keywords && brand.keywords.length > 0) || (brand.sources && brand.sources.length > 0)) && (
-        <div className="flex items-center gap-4 pt-1 flex-wrap border-t border-border/40 text-xs">
-          {brand.keywords && brand.keywords.length > 0 && (
+      {(hasKeywords || hasSources) && (
+        <div className="flex items-center gap-4 flex-wrap border-b border-border/40 pb-3 text-xs">
+          {hasKeywords && (
             <div className="flex items-center gap-1.5 flex-wrap">
               <Tag size={12} className="text-muted-foreground shrink-0" />
               <span className="text-muted-foreground font-medium text-[11px]">Tracking:</span>
-              {brand.keywords.map(kw => (
+              {brand.keywords!.map(kw => (
                 <span key={kw} className="badge badge-neutral text-[10px]">
                   {kw}
                 </span>
@@ -116,11 +125,11 @@ export function BrandHeader({ brandId, title }: { brandId: string; title: string
             </div>
           )}
 
-          {brand.sources && brand.sources.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap ml-auto">
+          {hasSources && (
+            <div className="flex items-center gap-1.5 flex-wrap lg:ml-auto">
               <Radio size={12} className="text-muted-foreground shrink-0" />
               <span className="text-muted-foreground font-medium text-[11px]">Sources:</span>
-              {brand.sources.map(src => (
+              {brand.sources!.map(src => (
                 <span key={src} className="badge badge-info text-[10px] uppercase">
                   {src}
                 </span>
@@ -129,6 +138,6 @@ export function BrandHeader({ brandId, title }: { brandId: string; title: string
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }

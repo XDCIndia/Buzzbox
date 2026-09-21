@@ -15,7 +15,7 @@ process.env.API_KEY = 'test-api-key';
 process.env.HERMES_AGENT_WORKSPACE_DIR = wsRoot;
 
 import { getDb, resetDbForTests } from './db';
-import { createSession, createUser } from './auth';
+import { createSession, createUser, ensureAuthTables } from './auth';
 import { GET } from '../app/api/agents/workspace/route';
 import { NextRequest } from 'next/server';
 
@@ -74,6 +74,9 @@ test('legitimate workspace files remain readable', async () => {
 
 test('authenticated viewer can still read legitimate files (auth unchanged)', async () => {
   const db = getDb();
+  // Auth tables may not exist yet in a fresh test DB (they are created lazily by
+  // ensureAuthTables on first user/session call), so ensure them before deleting.
+  ensureAuthTables();
   db.exec("DELETE FROM sessions; DELETE FROM users WHERE username = 'viewer_ws_test';");
   const viewer = createUser('viewer_ws_test', 'viewer-password-123', 'viewer');
   const token = createSession(viewer.id);

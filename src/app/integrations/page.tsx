@@ -1,6 +1,9 @@
 'use client';
 
+import { FileText, Mail } from 'lucide-react';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { formatDateTime } from '@/lib/utils';
 
 interface IntegrationCard {
@@ -52,12 +55,12 @@ export default function IntegrationsPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="panel">
-        <div className="panel-header">
-          <h1 className="text-xl font-semibold">Integrations</h1>
-          <p className="text-sm text-muted-foreground">Live status for Hermes data sources</p>
-        </div>
-      </div>
+      <PageHeader
+        index="12"
+        eyebrow="System"
+        title="Integrations"
+        description="Live status for Hermes data sources"
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="panel p-4 space-y-2">
@@ -145,7 +148,13 @@ export default function IntegrationsPage() {
               ))}
             </div>
           ) : (
-            <div className="text-xs text-muted-foreground">No Sanity items found.</div>
+            <EmptyState
+              icon={FileText}
+              title="No Sanity content yet"
+              reason="Published content synced from your Sanity CMS shows up here."
+              next="Check the Sanity project credentials in Settings if you expect items."
+              variant="inline"
+            />
           )}
         </div>
       </div>
@@ -165,7 +174,13 @@ export default function IntegrationsPage() {
               ))}
             </div>
           ) : (
-            <div className="text-xs text-muted-foreground">No Mailchimp lists found.</div>
+            <EmptyState
+              icon={Mail}
+              title="No Mailchimp lists yet"
+              reason="Audience lists synced from your Mailchimp account appear here."
+              next="Verify the Mailchimp API key in Settings and run a refresh."
+              variant="inline"
+            />
           )}
         </div>
       </div>

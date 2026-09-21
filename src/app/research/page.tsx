@@ -1,7 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Search } from 'lucide-react';
 import { SignalCard } from '@/components/ui/signal-card';
+import { EmptyState, ErrorState } from '@/components/ui/empty-state';
+import { PageHeader } from '@/components/ui/page-header';
 import { useDashboard } from '@/store';
 import type { Signal } from '@/types';
 
@@ -19,6 +22,8 @@ export default function ResearchPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [typeFilter, setTypeFilter] = useState('');
   const [relevanceFilter, setRelevanceFilter] = useState('');
+  const [loadError, setLoadError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const { realOnly } = useDashboard();
 
   useEffect(() => {
@@ -27,39 +32,52 @@ export default function ResearchPage() {
     if (relevanceFilter) params.set('relevance', relevanceFilter);
     if (realOnly) params.set('real', 'true');
     const q = params.toString();
-    fetch(`/api/signals${q ? '?' + q : ''}`).then(r => r.json()).then(setSignals).catch(() => {});
-  }, [typeFilter, relevanceFilter, realOnly]);
+    fetch(`/api/signals${q ? '?' + q : ''}`)
+      .then(r => { if (!r.ok) throw new Error('signals'); return r.json(); })
+      .then(signals => { setLoadError(false); setSignals(signals); })
+      .catch(() => setLoadError(true));
+  }, [typeFilter, relevanceFilter, realOnly, retryNonce]);
 
   const todaySignals = signals.filter(s => s.date === new Date().toISOString().slice(0, 10));
   const otherSignals = signals.filter(s => s.date !== new Date().toISOString().slice(0, 10));
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="panel">
-        <div className="panel-header flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-xl font-semibold">Research</h1>
-          <div className="flex gap-3">
-            <select
-              value={typeFilter}
-              onChange={e => setTypeFilter(e.target.value)}
-            >
-              {SIGNAL_TYPES.map(t => (
-                <option key={t.key} value={t.key}>{t.label}</option>
-              ))}
-            </select>
-            <select
-              value={relevanceFilter}
-              onChange={e => setRelevanceFilter(e.target.value)}
-            >
-              <option value="">All Relevance</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-          </div>
+      <PageHeader
+        index="09"
+        eyebrow="Observe"
+        title="Research"
+        description="Collected signals from social and news monitoring."
+      >
+        <div className="flex gap-3">
+          <select
+            value={typeFilter}
+            onChange={e => setTypeFilter(e.target.value)}
+          >
+            {SIGNAL_TYPES.map(t => (
+              <option key={t.key} value={t.key}>{t.label}</option>
+            ))}
+          </select>
+          <select
+            value={relevanceFilter}
+            onChange={e => setRelevanceFilter(e.target.value)}
+          >
+            <option value="">All Relevance</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
         </div>
-      </div>
+      </PageHeader>
 
+      {loadError ? (
+        <ErrorState
+          title="Couldn't load signals"
+          detail="The signals service did not respond. Monitoring may be offline — retry in a moment."
+          onRetry={() => setRetryNonce(n => n + 1)}
+        />
+      ) : (
+      <>
       {/* Today's signals */}
       {todaySignals.length > 0 && (
         <section className="panel">
@@ -81,14 +99,22 @@ export default function ResearchPage() {
         </div>
         <div className="panel-body space-y-3">
           {otherSignals.length === 0 && todaySignals.length === 0 ? (
-            <div className="panel p-8 text-center text-muted-foreground text-sm">
-              No research signals yet
+            <div className="p-6">
+              <EmptyState
+                icon={Search}
+                title="No research signals yet"
+                reason="Signals are collected from monitored sources when the research sync runs."
+                next="Check that monitoring keywords are configured and trigger a sync."
+                action={{ label: 'Run from Mission Control', href: '/dashboard' }}
+              />
             </div>
           ) : (
             otherSignals.map(s => <SignalCard key={s.id} signal={s} />)
           )}
         </div>
       </section>
+      </>
+      )}
     </div>
   );
 }

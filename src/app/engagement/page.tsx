@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { SignalCard } from '@/components/ui/signal-card';
-import { ExternalLink, Copy, Check } from 'lucide-react';
+import { ExternalLink, Copy, Check, MessageCircle, Radar } from 'lucide-react';
+import { EmptyState, ErrorState } from '@/components/ui/empty-state';
+import { PageHeader } from '@/components/ui/page-header';
 import { formatDateTime } from '@/lib/utils';
 import { useDashboard } from '@/store';
 import type { Engagement, Signal } from '@/types';
@@ -16,13 +18,20 @@ export default function EngagementPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [tab, setTab] = useState<Tab>('x');
   const [copied, setCopied] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const { realOnly } = useDashboard();
 
-  useEffect(() => {
+  const loadEngagement = useCallback(() => {
     const realParam = realOnly ? '?real=true' : '';
-    fetch(`/api/engagement${realParam}`).then(r => r.json()).then(setEngagements).catch(() => {});
-    fetch(`/api/signals${realParam}`).then(r => r.json()).then(setSignals).catch(() => {});
+    Promise.all([
+      fetch(`/api/engagement${realParam}`).then(r => { if (!r.ok) throw new Error('engagement'); return r.json(); }),
+      fetch(`/api/signals${realParam}`).then(r => { if (!r.ok) throw new Error('signals'); return r.json(); }),
+    ])
+      .then(([eng, sig]) => { setLoadError(false); setEngagements(eng); setSignals(sig); })
+      .catch(() => setLoadError(true));
   }, [realOnly]);
+
+  useEffect(() => { loadEngagement(); }, [loadEngagement]);
 
   const xEngagements = engagements.filter(e => e.platform === 'x');
   const linkedInQueue = engagements.filter(e => e.platform === 'linkedin' && e.action_type === 'comment');
@@ -35,8 +44,12 @@ export default function EngagementPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-semibold">Engagement</h1>
+      <PageHeader
+        index="04"
+        eyebrow="Operate"
+        title="Engagement"
+        description="Replies, comments, and listening signals across platforms."
+      >
         <div className="text-xs text-muted-foreground">
           X <span className="font-mono text-foreground">{xEngagements.length}</span>
           {' · '}
@@ -44,8 +57,16 @@ export default function EngagementPage() {
           {' · '}
           Signals <span className="font-mono text-foreground">{signals.length}</span>
         </div>
-      </div>
+      </PageHeader>
 
+      {loadError ? (
+        <ErrorState
+          title="Couldn't load engagement data"
+          detail="The engagement or signals service did not respond. Check that the sync service is running."
+          onRetry={loadEngagement}
+        />
+      ) : (
+      <>
       <div className="panel">
         <div className="panel-body !p-0">
       <div className="flex gap-0 border-b border-border">
@@ -92,6 +113,9 @@ export default function EngagementPage() {
             ]}
             data={xEngagements}
             keyField="id"
+            emptyIcon={ExternalLink}
+            emptyTitle="No X activity yet"
+            emptyDescription="Replies, likes, and mentions collected from X will appear here once the engagement agent runs."
             emptyMessage="No X engagements yet"
           />
           </div>
@@ -101,8 +125,14 @@ export default function EngagementPage() {
       {tab === 'linkedin' && (
         <div className="space-y-3">
           {linkedInQueue.length === 0 ? (
-            <div className="panel p-8 text-center text-muted-foreground text-sm">
-              No LinkedIn comments queued
+            <div className="panel p-8">
+              <EmptyState
+                icon={MessageCircle}
+                title="No LinkedIn comments queued"
+                reason="Draft comments for LinkedIn posts appear here when the engagement agent finds relevant conversations."
+                next="Connect LinkedIn or run a sync to populate the queue."
+                variant="panel"
+              />
             </div>
           ) : (
             linkedInQueue.map(item => (
@@ -137,8 +167,14 @@ export default function EngagementPage() {
       {tab === 'signals' && (
         <div className="space-y-3">
           {signals.length === 0 ? (
-            <div className="panel p-8 text-center text-muted-foreground text-sm">
-              No signals detected yet
+            <div className="panel p-8">
+              <EmptyState
+                icon={Radar}
+                title="No signals detected yet"
+                reason="Listening signals are collected from monitored keywords and sources across social and news."
+                next="Add brand keywords in Settings or run a research sync to start collecting."
+                action={{ label: 'Open research', href: '/research' }}
+              />
             </div>
           ) : (
             signals.slice(0, 50).map(signal => (
@@ -146,6 +182,8 @@ export default function EngagementPage() {
             ))
           )}
         </div>
+      )}
+      </>
       )}
     </div>
   );

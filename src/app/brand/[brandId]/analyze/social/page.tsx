@@ -11,7 +11,7 @@ export default function BrandAnalyticsPage() {
 
   return (
     <div className="space-y-4 animate-in">
-      <BrandHeader brandId={brandId} title="Social Analytics" />
+      <BrandHeader brandId={brandId} title="Brand Analytics" index="B3" description="Trends and engagement breakdowns for your brand's social presence over time." />
       <AnalyticsTab brandId={brandId} realOnly={realOnly} />
     </div>
   );

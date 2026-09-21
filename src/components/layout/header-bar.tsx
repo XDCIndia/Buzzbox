@@ -1,8 +1,9 @@
 'use client';
 
 import {
-  Activity, Search, Sun, Moon, Radio, PenLine, Mail, Users, LogOut,
-  Bell, Eye, EyeOff, Check, CheckCheck, Bot,
+  Search, Sun, Moon, Radio, PenLine, Mail, Users, LogOut,
+  Bell, Eye, EyeOff, Check, CheckCheck, Boxes, Plus, Contact, Sparkles,
+  ChevronDown,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState, useRef } from 'react';
@@ -10,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useDashboard } from '@/store';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { timeAgo } from '@/lib/utils';
+import { DEFAULT_BRAND_ID } from '@/lib/brand-constants';
 import type { Notification } from '@/types';
 import { BuzzAssistant } from '@/components/chat/buzz-assistant';
 
@@ -28,12 +30,19 @@ export function HeaderBar() {
     { interval: 60_000, key: realOnly },
   );
 
+  // Workspace context — always show which brand/workspace is being viewed
+  const { data: brand } = useSmartPoll<{ name?: string }>(
+    () => fetch(`/api/brand/${DEFAULT_BRAND_ID}`).then(r => (r.ok ? r.json() : null)),
+    { interval: 120_000 },
+  );
+  const brandName = brand?.name || 'Workspace';
+
   return (
     <header className="fixed top-0 left-0 right-0 h-[var(--header-height)] bg-surface-0/90 backdrop-blur-md border-b border-border flex items-center justify-between px-3 sm:px-4 z-50">
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/25 flex items-center justify-center text-primary">
-            <Bot size={15} />
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center text-[var(--primary-foreground)]">
+            <Boxes size={15} />
           </div>
           <div className="flex flex-col">
             <span className="font-semibold text-sm tracking-tight text-foreground leading-none">Buzzbox</span>
@@ -41,9 +50,21 @@ export function HeaderBar() {
           </div>
         </div>
 
+        {/* Workspace context — which brand's data you are looking at */}
+        <div className="hidden md:flex items-center gap-2 ml-1 pl-3 border-l border-border/60 min-w-0">
+          <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">Workspace</span>
+          <span
+            className="inline-flex items-center gap-1.5 h-6 px-2 rounded-md border border-border bg-surface-1 text-xs font-medium text-foreground max-w-[180px]"
+            title={`Viewing data for: ${brandName}`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-success pulse-dot shrink-0" />
+            <span className="truncate">{brandName}</span>
+          </span>
+        </div>
+
         {/* Quick stats — hidden on small screens */}
         {stats && (
-          <div className="hidden lg:flex items-center gap-3 ml-3 pl-3 border-l border-border/50">
+          <div className="hidden xl:flex items-center gap-3 ml-1 pl-3 border-l border-border/50">
             <QuickStat icon={PenLine} value={stats.posts_today} label="posts" />
             <QuickStat icon={Mail} value={stats.emails_sent} label="sent" />
             <QuickStat icon={Users} value={stats.pipeline_count} label="pipeline" />
@@ -52,16 +73,172 @@ export function HeaderBar() {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-2.5">
-        <SeedToggle active={realOnly} onToggle={toggleRealOnly} />
+        <QuickCreateMenu />
+        <DataStatusToggle active={realOnly} onToggle={toggleRealOnly} />
         <SearchTrigger />
         <ThemeToggle />
         <BuzzAssistant />
         <NotificationBell />
         <FeedToggle open={feedOpen} onToggle={toggleFeed} />
-        <SyncStatus />
         <LogoutButton />
       </div>
     </header>
+  );
+}
+
+const QUICK_CREATE_ITEMS = [
+  { label: 'New content draft', hint: 'Write a post for any platform', href: '/content', icon: PenLine },
+  { label: 'Add CRM lead', hint: 'Track a new contact', href: '/crm', icon: Contact },
+  { label: 'Ask Buzz', hint: 'Draft, summarize, or plan with AI', buzzPrompt: 'Help me draft a post for today.', icon: Sparkles },
+] as const;
+
+function QuickCreateMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        className="h-7 flex items-center gap-1 pl-2 pr-1.5 rounded-lg bg-primary text-[var(--primary-foreground)] hover:opacity-90 transition-all text-xs font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Quick create"
+        title="Quick create"
+      >
+        <Plus size={14} />
+        <span className="hidden lg:inline">New</span>
+        <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full mt-2 w-64 card border shadow-xl animate-in overflow-hidden z-50"
+        >
+          <div className="px-3 py-2 border-b border-border bg-surface-1">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground font-mono">Quick create</span>
+          </div>
+          <div className="p-1.5">
+            {QUICK_CREATE_ITEMS.map(item => {
+              const Icon = item.icon;
+              return (
+              <button
+                key={item.label}
+                role="menuitem"
+                className="w-full flex items-start gap-2.5 px-2.5 py-2 rounded-md text-left hover:bg-surface-2 transition-colors focus:outline-none focus:bg-surface-2"
+                onClick={() => {
+                  setOpen(false);
+                  if ('buzzPrompt' in item && item.buzzPrompt) {
+                    window.dispatchEvent(new CustomEvent('buzz:ask', { detail: { prompt: item.buzzPrompt } }));
+                  } else if ('href' in item && item.href) {
+                    window.location.href = item.href;
+                  }
+                }}
+              >
+                <span className="mt-0.5 w-6 h-6 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Icon size={13} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold text-foreground">{item.label}</span>
+                  <span className="block text-[11px] text-muted-foreground">{item.hint}</span>
+                </span>
+              </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Combined data-mode + sync clock popover (replaces SeedToggle + SyncStatus pair). */
+function DataStatusToggle({ active, onToggle }: { active: boolean; onToggle: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [lastSync, setLastSync] = useState<string | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const update = () => setLastSync(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    update();
+    const timer = setInterval(update, 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        className={`hidden md:flex h-7 items-center gap-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
+          active
+            ? 'bg-success/15 text-success border border-success/30'
+            : 'bg-surface-1 text-muted-foreground hover:text-foreground border border-border'
+        }`}
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Data mode and sync status"
+        title="Data mode & sync"
+      >
+        {active ? <Eye size={13} /> : <EyeOff size={13} />}
+        <span className="font-mono">{lastSync}</span>
+        <ChevronDown size={11} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-72 card border shadow-xl animate-in overflow-hidden z-50">
+          <div className="px-3 py-2 border-b border-border bg-surface-1">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground font-mono">Data status</span>
+          </div>
+          <div className="p-3 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold text-foreground">{active ? 'Real data only' : 'All data'}</div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {active ? 'Seeded/demo entries are hidden.' : 'Seeded demo entries are shown alongside real data.'}
+                </p>
+              </div>
+              <button
+                role="switch"
+                aria-checked={active}
+                aria-label="Toggle real data only"
+                onClick={onToggle}
+                className={`relative w-8 h-4.5 shrink-0 rounded-full transition-colors mt-0.5 ${active ? 'bg-success' : 'bg-muted-foreground/30'}`}
+                style={{ height: 18 }}
+              >
+                <span
+                  className="absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-all"
+                  style={{ left: active ? 16 : 2 }}
+                />
+              </button>
+            </div>
+            <div className="flex items-center gap-2 pt-2 border-t border-border/60 text-[11px] text-muted-foreground">
+              <span className="w-2 h-2 rounded-full bg-success pulse-dot shrink-0" />
+              Last sync <span className="font-mono text-foreground">{lastSync}</span>
+              <span className="ml-auto font-mono">30s interval</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -72,24 +249,6 @@ function QuickStat({ icon: Icon, value, label }: { icon: typeof PenLine; value: 
       <span className="font-mono font-medium text-foreground">{value}</span>
       <span>{label}</span>
     </div>
-  );
-}
-
-function SeedToggle({ active, onToggle }: { active: boolean; onToggle: () => void }) {
-  return (
-    <button
-      className={`h-7 flex items-center gap-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
-        active
-          ? 'bg-success/15 text-success border border-success/30'
-          : 'bg-surface-1 text-muted-foreground hover:text-foreground border border-border'
-      }`}
-      onClick={onToggle}
-      aria-label={active ? 'Showing real data only' : 'Showing all data including seeded'}
-      title={active ? 'Showing real data only' : 'Showing all data (including seeded)'}
-    >
-      {active ? <Eye size={13} /> : <EyeOff size={13} />}
-      <span className="hidden sm:inline">{active ? 'Real' : 'All Data'}</span>
-    </button>
   );
 }
 
@@ -260,25 +419,6 @@ function FeedToggle({ open, onToggle }: { open: boolean; onToggle: () => void })
     >
       <Radio size={14} />
     </button>
-  );
-}
-
-function SyncStatus() {
-  const [lastSync, setLastSync] = useState<string | null>(null);
-
-  useEffect(() => {
-    const update = () => setLastSync(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    update();
-    const timer = setInterval(update, 30_000);
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <div className="hidden md:flex items-center gap-1.5 text-[11px] text-muted-foreground bg-surface-1 px-2.5 py-1 rounded-lg border border-border">
-      <div className="w-2 h-2 rounded-full bg-success pulse-dot" />
-      <Activity size={12} className="text-muted-foreground" />
-      <span className="font-mono">{lastSync}</span>
-    </div>
   );
 }
 

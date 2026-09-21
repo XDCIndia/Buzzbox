@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { PenLine, MessageCircle, Mail, Search, Info, Activity } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState, ErrorState } from '@/components/ui/empty-state';
 import { timeAgo } from '@/lib/utils';
 import { useDashboard } from '@/store';
 import type { ActivityEntry } from '@/types';
@@ -19,6 +21,8 @@ const ACTION_FILTERS = [
 export default function ActivityPage() {
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [filter, setFilter] = useState('');
+  const [loadError, setLoadError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const { realOnly } = useDashboard();
 
   useEffect(() => {
@@ -26,45 +30,62 @@ export default function ActivityPage() {
     if (filter) params.set('action', filter);
     params.set('limit', '200');
     if (realOnly) params.set('real', 'true');
-    fetch(`/api/activity?${params}`).then(r => r.json()).then(setEntries).catch(() => {});
-  }, [filter, realOnly]);
+    fetch(`/api/activity?${params}`)
+      .then(r => { if (!r.ok) throw new Error('activity'); return r.json(); })
+      .then(entries => { setLoadError(false); setEntries(entries); })
+      .catch(() => setLoadError(true));
+  }, [filter, realOnly, retryNonce]);
 
   return (
     <div className="space-y-6 animate-in">
-      <div className="panel">
-        <div className="panel-header flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-xl font-semibold">Activity Log</h1>
-          <div className="flex items-center gap-2">
-            <button
-              className="btn btn-ghost text-xs"
-              onClick={() => {
-                const params = new URLSearchParams();
-                if (filter) params.set('action', filter);
-                params.set('limit', '500');
-                if (realOnly) params.set('real', 'true');
-                params.set('format', 'csv');
-                window.open(`/api/activity?${params.toString()}`, '_blank', 'noopener,noreferrer');
-              }}
-            >
-              Export CSV
-            </button>
-            <select
-              value={filter}
-              onChange={e => setFilter(e.target.value)}
-            >
-              {ACTION_FILTERS.map(f => (
-                <option key={f.key} value={f.key}>{f.label}</option>
-              ))}
-            </select>
-          </div>
+      <PageHeader
+        index="16"
+        eyebrow="System"
+        title="Activity log"
+        description="Every action across agents, content, and outreach."
+      >
+        <div className="flex items-center gap-2">
+          <button
+            className="btn btn-ghost text-xs"
+            onClick={() => {
+              const params = new URLSearchParams();
+              if (filter) params.set('action', filter);
+              params.set('limit', '500');
+              if (realOnly) params.set('real', 'true');
+              params.set('format', 'csv');
+              window.open(`/api/activity?${params.toString()}`, '_blank', 'noopener,noreferrer');
+            }}
+          >
+            Export CSV
+          </button>
+          <select
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+          >
+            {ACTION_FILTERS.map(f => (
+              <option key={f.key} value={f.key}>{f.label}</option>
+            ))}
+          </select>
         </div>
-      </div>
+      </PageHeader>
 
+      {loadError ? (
+        <ErrorState
+          title="Couldn't load activity"
+          detail="The activity service did not respond. Recent events may still be recorded — retry to refresh."
+          onRetry={() => setRetryNonce(n => n + 1)}
+        />
+      ) : (
       <div className="panel">
         <div className="panel-body space-y-0">
           {entries.length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-              No activity logged yet
+            <div className="p-6">
+              <EmptyState
+                icon={Activity}
+                title="No activity logged yet"
+                reason="Every publish, reply, approval, and agent action is recorded here as it happens."
+                next="Run an agent job or publish content to see the first entries."
+              />
             </div>
           ) : (
             groupByDay(entries).map(group => (
@@ -107,6 +128,7 @@ export default function ActivityPage() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
