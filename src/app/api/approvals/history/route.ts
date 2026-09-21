@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const rows = db.prepare(
       `SELECT id, ts, action, detail, result
        FROM activity_log
-       WHERE action IN ('content_approved', 'content_rejected', 'sequence_approved', 'sequence_rejected')
+       WHERE action IN ('approve', 'reject')
        ORDER BY ts DESC
        LIMIT 50`
     ).all();
