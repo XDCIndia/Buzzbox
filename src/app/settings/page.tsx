@@ -298,7 +298,8 @@ export default function SettingsPage() {
   async function triggerSync() {
     setSyncing(true);
     try {
-      await fetch('/api/sync');
+      const res = await fetch('/api/sync');
+      if (!res.ok) throw new Error(`Sync failed (${res.status})`);
       toast.success('Sync completed');
       // Refresh info
       const info = await fetch('/api/settings').then(r => r.json());
@@ -313,7 +314,8 @@ export default function SettingsPage() {
     if (!confirm('Remove all seed data? Real data will be preserved.')) return;
     setClearing(true);
     try {
-      await fetch('/api/seed', { method: 'DELETE' });
+      const res = await fetch('/api/seed', { method: 'DELETE' });
+      if (!res.ok) throw new Error(`Failed to clear seeds (${res.status})`);
       toast.success('Seed data cleared');
       const info = await fetch('/api/settings').then(r => r.json());
       setSyncInfo(info);

@@ -87,15 +87,19 @@ export default function ApprovalsPage() {
   async function updateContent(id: string, status: 'ready' | 'rejected') {
     setActing(id);
     try {
-      await fetch('/api/content', {
+      const res = await fetch('/api/content', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(String(data?.error || `Request failed (${res.status})`));
+      }
       toast.success(status === 'ready' ? 'Content approved' : 'Content rejected');
       refetch();
-    } catch {
-      toast.error('Failed to update content');
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Failed to update content');
     } finally {
       setActing(null);
     }
@@ -104,15 +108,19 @@ export default function ApprovalsPage() {
   async function updateSequence(id: string, status: 'approved' | 'cancelled') {
     setActing(id);
     try {
-      await fetch('/api/sequences', {
+      const res = await fetch('/api/sequences', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(String(data?.error || `Request failed (${res.status})`));
+      }
       toast.success(status === 'approved' ? 'Sequence approved' : 'Sequence rejected');
       refetch();
-    } catch {
-      toast.error('Failed to update sequence');
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Failed to update sequence');
     } finally {
       setActing(null);
     }
@@ -123,7 +131,7 @@ export default function ApprovalsPage() {
     if (!confirm(`Approve all ${content.length} content drafts?`)) return;
     setBulkWorking(true);
     try {
-      await Promise.all(
+      const results = await Promise.all(
         content.map(item =>
           fetch('/api/content', {
             method: 'PATCH',
@@ -132,10 +140,14 @@ export default function ApprovalsPage() {
           }),
         ),
       );
+      const failed = results.filter(r => !r.ok);
+      if (failed.length > 0) {
+        throw new Error(`${failed.length} of ${results.length} approvals failed`);
+      }
       toast.success('All content drafts approved');
       refetch();
-    } catch {
-      toast.error('Failed to approve all content');
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Failed to approve all content');
     } finally {
       setBulkWorking(false);
     }
@@ -146,7 +158,7 @@ export default function ApprovalsPage() {
     if (!confirm(`Approve all ${sequences.length} outreach drafts?`)) return;
     setBulkWorking(true);
     try {
-      await Promise.all(
+      const results = await Promise.all(
         sequences.map(item =>
           fetch('/api/sequences', {
             method: 'PATCH',
@@ -155,10 +167,14 @@ export default function ApprovalsPage() {
           }),
         ),
       );
+      const failed = results.filter(r => !r.ok);
+      if (failed.length > 0) {
+        throw new Error(`${failed.length} of ${results.length} approvals failed`);
+      }
       toast.success('All outreach drafts approved');
       refetch();
-    } catch {
-      toast.error('Failed to approve all outreach');
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Failed to approve all outreach');
     } finally {
       setBulkWorking(false);
     }

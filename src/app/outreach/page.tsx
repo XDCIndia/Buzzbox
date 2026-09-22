@@ -47,11 +47,15 @@ export default function OutreachPage() {
 
   const updateLeadStatus = async (id: string, status: string) => {
     try {
-      await fetch('/api/leads', {
+      const res = await fetch('/api/leads', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(String(data?.error || `Request failed (${res.status})`));
+      }
       toast.success(`Lead status updated to ${status}`);
       load();
     } catch {
@@ -61,11 +65,15 @@ export default function OutreachPage() {
 
   const updateSequenceStatus = async (id: string, status: string) => {
     try {
-      await fetch('/api/sequences', {
+      const res = await fetch('/api/sequences', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(String(data?.error || `Request failed (${res.status})`));
+      }
       toast.success(status === 'approved' ? 'Email draft approved' : 'Email draft rejected');
       load();
     } catch {

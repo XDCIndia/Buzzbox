@@ -342,6 +342,8 @@ export default function AutomationsPage() {
   );
 }
 
+import { toast } from '@/components/ui/toast';
+
 function ApprovalCardComponent({
   item,
   onAction,
@@ -358,13 +360,24 @@ function ApprovalCardComponent({
   async function handleAction(action: 'approve' | 'reject') {
     if (!canEdit) return;
     setActing(action);
-    await fetch('/api/automations/approve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: item.id, type: item.type, action }),
-    });
-    onAction();
-    setActing(null);
+    try {
+      const res = await fetch('/api/automations/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, type: item.type, action }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(String(data?.error || `Request failed (${res.status})`));
+      }
+      toast.success(action === 'approve' ? 'Approved' : 'Rejected');
+      onAction();
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Action failed');
+    } finally {
+      // Always restore the buttons, even on failure (#66).
+      setActing(null);
+    }
   }
 
   return (
