@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getDb } from '@/lib/db';
 import { getContentPostById, getContentPosts, markContentPublished, updateContentStatus } from '@/lib/queries';
 import { writebackContentStatus } from '@/lib/writeback';
 import { requireApiEditor, requireApiUser } from '@/lib/api-auth';
@@ -66,6 +67,19 @@ export async function PATCH(req: NextRequest) {
       ...(publishResult.attempted && publishResult.ok ? { x_post_id: publishResult.tweetId } : {}),
     },
   });
+
+  // #85: approvals taken anywhere must reach the approvals history panel,
+  // which reads activity_log ('approve'/'reject' rows) — audit_log alone
+  // never shows up there.
+  if (finalStatus === 'ready' || finalStatus === 'rejected') {
+    getDb()
+      .prepare("INSERT INTO activity_log (ts, action, detail, result) VALUES (datetime('now'), ?, ?, ?)")
+      .run(
+        finalStatus === 'ready' ? 'approve' : 'reject',
+        `${finalStatus === 'ready' ? 'Approved' : 'Rejected'} content: ${id}${publishResult.attempted && publishResult.ok ? ' (posted to X)' : ''}`,
+        finalStatus === 'ready' ? 'Moved to ready/approved' : 'Rejected/cancelled',
+      );
+  }
   return NextResponse.json({
     ok: true,
     status: finalStatus,

@@ -56,5 +56,18 @@ export async function PATCH(req: NextRequest) {
     target: "sequence:" + id,
     detail: { status },
   });
+
+  // #85: approvals taken anywhere must reach the approvals history panel,
+  // which reads activity_log ('approve'/'reject' rows) — audit_log alone
+  // never shows up there.
+  if (status === "approved" || status === "cancelled") {
+    getDb()
+      .prepare("INSERT INTO activity_log (ts, action, detail, result) VALUES (datetime('now'), ?, ?, ?)")
+      .run(
+        status === "approved" ? "approve" : "reject",
+        `${status === "approved" ? "Approved" : "Rejected"} email: ${id}`,
+        status === "approved" ? "Moved to ready/approved" : "Rejected/cancelled",
+      );
+  }
   return NextResponse.json({ ok: true });
 }
