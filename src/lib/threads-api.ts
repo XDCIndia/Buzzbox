@@ -22,8 +22,13 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-async function threadsGet<T>(url: string): Promise<T> {
-  const res = await fetchWithTimeout(url, { cache: "no-store" });
+async function threadsGet<T>(url: string, accessToken?: string): Promise<T> {
+  // Token rides in the Authorization header, never the query string (#84
+  // class of fix — URLs end up in proxy/access logs).
+  const res = await fetchWithTimeout(url, {
+    cache: "no-store",
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Threads API failed (${res.status}): ${text.slice(0, 300)}`);
@@ -73,12 +78,12 @@ export async function fetchThreadsMentions(opts: {
 }): Promise<ThreadsMentionResult[]> {
   const params = new URLSearchParams({
     fields: "id,text,permalink,username,timestamp",
-    access_token: opts.accessToken,
   });
   if (opts.limit) params.set("limit", String(Math.min(Math.max(opts.limit, 1), 100)));
 
   const res = await threadsGet<ThreadsMentionsResponse>(
-    `${THREADS_API_BASE}/${encodeURIComponent(opts.threadsUserId)}/mentions?${params.toString()}`
+    `${THREADS_API_BASE}/${encodeURIComponent(opts.threadsUserId)}/mentions?${params.toString()}`,
+    opts.accessToken
   );
 
   return (res.data ?? []).map((m): ThreadsMentionResult => ({
@@ -147,11 +152,11 @@ export async function fetchThreadsInsights(opts: {
     metric: "views,likes,replies,reposts,quotes,followers_count",
     since: String(since),
     until: String(until),
-    access_token: opts.accessToken,
   });
 
   const res = await threadsGet<ThreadsInsightsResponse>(
-    `${THREADS_API_BASE}/${encodeURIComponent(opts.threadsUserId)}/threads_insights?${params.toString()}`
+    `${THREADS_API_BASE}/${encodeURIComponent(opts.threadsUserId)}/threads_insights?${params.toString()}`,
+    opts.accessToken
   );
 
   const metrics = res.data ?? [];
