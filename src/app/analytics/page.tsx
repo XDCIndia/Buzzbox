@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { PageHeader } from '@/components/ui/page-header';
 import {
   Activity,
+  Eye,
   Globe,
   MousePointerClick,
   Users,
@@ -116,8 +117,9 @@ interface AnalyticsPayload {
       replies: number;
       reposts: number;
       quotes: number;
+      impressions?: number | null;
     };
-    series?: { date: string; posts: number; likes: number; replies: number; reposts: number; quotes: number }[];
+    series?: { date: string; posts: number; likes: number; replies: number; reposts: number; quotes: number; impressions?: number | null }[];
     error?: string;
     health?: ProviderHealth;
   };
@@ -629,6 +631,14 @@ function XPanel({ x, days }: { x: AnalyticsPayload["x"]; days: number }) {
                 sparkline={spark}
                 color="var(--success)"
               />
+              {x.summary.impressions != null && (
+                <StatCard
+                  label="Impressions"
+                  value={x.summary.impressions}
+                  icon={Eye}
+                  color="var(--warning, var(--primary))"
+                />
+              )}
             </div>
             <div className="card p-4">
               <div className="text-xs text-muted-foreground">@{x.summary.username}</div>
@@ -637,8 +647,18 @@ function XPanel({ x, days }: { x: AnalyticsPayload["x"]; days: number }) {
                 <span className="font-mono text-foreground">{x.summary.likes}</span>, replies{" "}
                 <span className="font-mono text-foreground">{x.summary.replies}</span>, reposts{" "}
                 <span className="font-mono text-foreground">{x.summary.reposts}</span>, quotes{" "}
-                <span className="font-mono text-foreground">{x.summary.quotes}</span>.
+                <span className="font-mono text-foreground">{x.summary.quotes}</span>
+                {x.summary.impressions != null && (
+                  <>, impressions <span className="font-mono text-foreground">{x.summary.impressions.toLocaleString()}</span></>
+                )}
+                .
               </div>
+              {x.summary.impressions == null && (
+                <div className="text-[11px] text-muted-foreground/70 mt-1">
+                  Impressions need an X user-context token (X_ACCESS_TOKEN) and a range of 7 days or less.
+                </div>
+              )
+              }
             </div>
             {series.length > 1 && (
               <div className="panel bg-transparent border border-border/30">

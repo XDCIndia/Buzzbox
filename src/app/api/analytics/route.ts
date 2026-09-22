@@ -213,7 +213,10 @@ export async function GET(req: NextRequest) {
   const xBearer = process.env.X_BEARER_TOKEN || process.env.X_API_BEARER_TOKEN || null;
   const xUsername = process.env.X_USERNAME || null;
   if (xBearer && xUsername) {
-    const xRun = await runProviderWithRetry(() => fetchXAccountAnalytics({ bearerToken: xBearer, username: xUsername, days }));
+    // Same user-context credential posting uses (maybePublishToX); when set,
+    // the X provider can also read non_public_metrics (impressions).
+    const xUserToken = process.env.X_ACCESS_TOKEN || null;
+    const xRun = await runProviderWithRetry(() => fetchXAccountAnalytics({ bearerToken: xBearer, username: xUsername, days, userAccessToken: xUserToken }));
     if (xRun.ok) {
       const out = xRun.data;
       x = {

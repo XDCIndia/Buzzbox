@@ -10,6 +10,9 @@ export interface XSummary {
   replies: number;
   reposts: number;
   quotes: number;
+  /** Impressions need non_public_metrics, which X only serves to user-context
+   * OAuth on recent posts — null when unavailable (app-only token or >7d range). */
+  impressions: number | null;
 }
 
 export interface XSeriesPoint {
@@ -19,6 +22,7 @@ export interface XSeriesPoint {
   replies: number;
   reposts: number;
   quotes: number;
+  impressions: number | null;
 }
 
 interface XUserLookupResponse {
@@ -31,18 +35,23 @@ interface XUserLookupResponse {
   };
 }
 
-interface XTweet {
-  created_at?: string;
-  public_metrics?: {
-    like_count?: number | string;
-    reply_count?: number | string;
-    retweet_count?: number | string;
-    quote_count?: number | string;
-  };
+interface XUserTweetMetrics {
+  like_count?: number | string;
+  reply_count?: number | string;
+  retweet_count?: number | string;
+  quote_count?: number | string;
 }
 
-interface XTweetsResponse {
-  data?: XTweet[];
+interface XUserTweet {
+  created_at?: string;
+  public_metrics?: XUserTweetMetrics;
+  /** Only returned when requested AND the call used user-context auth; X
+   * rejects the field on app-only tokens. Only populated for recent posts. */
+  non_public_metrics?: { impression_count?: number | string };
+}
+
+interface XUserTweetsResponse {
+  data?: XUserTweet[];
   meta?: {
     next_token?: string;
   };
@@ -57,9 +66,15 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-async function xGet<T>(bearerToken: string, url: string): Promise<T> {
+async function xGet<T>(
+  bearerToken: string,
+  url: string,
+  auth: "app" | "user" = "app",
+  userAccessToken?: string | null,
+): Promise<T> {
+  const token = auth === "user" && userAccessToken ? userAccessToken : bearerToken;
   const res = await fetchWithTimeout(url, {
-    headers: { Authorization: `Bearer ${bearerToken}` },
+    headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
   // Counts against the daily search-call budget regardless of outcome --
@@ -76,6 +91,10 @@ export async function fetchXAccountAnalytics(opts: {
   bearerToken: string;
   username: string;
   days: number;
+  /** Optional OAuth user-context token (tweet.write-capable, same credential
+   * posting uses). When present and the range is <= 7 days, impressions are
+   * requested via non_public_metrics; X silently omits them on app-only auth. */
+  userAccessToken?: string | null;
 }): Promise<{ summary: XSummary; series: XSeriesPoint[] }> {
   const user = await xGet<XUserLookupResponse>(
     opts.bearerToken,
@@ -93,12 +112,24 @@ export async function fetchXAccountAnalytics(opts: {
   const start = new Date(Date.now() - opts.days * 24 * 60 * 60 * 1000);
   const startTime = start.toISOString();
 
+  // Impressions (non_public_metrics) are user-context only and X only serves
+  // them for recent posts, so they are requested solely for short ranges.
+  const canRequestImpressions = Boolean(opts.userAccessToken) && opts.days <= 7;
+  const tweetFields = canRequestImpressions
+    ? "created_at,public_metrics,non_public_metrics"
+    : "created_at,public_metrics";
+  const authMode: "app" | "user" = canRequestImpressions ? "user" : "app";
+
   const buckets = new Map<string, XSeriesPoint>();
   for (let i = 0; i < opts.days; i++) {
     const d = new Date(Date.now() - (opts.days - 1 - i) * 24 * 60 * 60 * 1000);
     const key = isoDay(d);
-    buckets.set(key, { date: key, posts: 0, likes: 0, replies: 0, reposts: 0, quotes: 0 });
+    buckets.set(key, { date: key, posts: 0, likes: 0, replies: 0, reposts: 0, quotes: 0, impressions: null });
   }
+
+  // A post missing impression data while impressions were requested means the
+  // total would be silently partial — propagate null instead (#impressions).
+  let sawImpressionGap = false;
 
   let nextToken: string | undefined;
   const maxPages = 5;
@@ -106,15 +137,17 @@ export async function fetchXAccountAnalytics(opts: {
   for (let page = 0; page < maxPages; page++) {
     const params = new URLSearchParams({
       max_results: "100",
-      "tweet.fields": "created_at,public_metrics",
+      "tweet.fields": tweetFields,
       exclude: "retweets,replies",
       start_time: startTime,
     });
     if (nextToken) params.set("pagination_token", nextToken);
 
-    const tweets = await xGet<XTweetsResponse>(
+    const tweets = await xGet<XUserTweetsResponse>(
       opts.bearerToken,
-      `https://api.x.com/2/users/${encodeURIComponent(userId)}/tweets?${params.toString()}`
+      `https://api.x.com/2/users/${encodeURIComponent(userId)}/tweets?${params.toString()}`,
+      authMode,
+      opts.userAccessToken,
     );
 
     const data = Array.isArray(tweets?.data) ? tweets.data : [];
@@ -130,6 +163,16 @@ export async function fetchXAccountAnalytics(opts: {
       b.replies += num(t?.public_metrics?.reply_count);
       b.reposts += num(t?.public_metrics?.retweet_count);
       b.quotes += num(t?.public_metrics?.quote_count);
+      // Only trust impression data when we actually asked for it (user-context
+      // auth); app-only responses must never contribute impressions.
+      const impRaw = canRequestImpressions ? t?.non_public_metrics?.impression_count : undefined;
+      if (impRaw != null) {
+        // Impressions are per-post lifetime values; the series accumulates the
+        // posts published that day. Absent values leave the bucket at null.
+        b.impressions = (b.impressions ?? 0) + num(impRaw);
+      } else if (canRequestImpressions) {
+        sawImpressionGap = true;
+      }
     }
 
     nextToken = tweets?.meta?.next_token;
@@ -144,6 +187,9 @@ export async function fetchXAccountAnalytics(opts: {
       acc.replies += p.replies;
       acc.reposts += p.reposts;
       acc.quotes += p.quotes;
+      if (p.impressions != null) {
+        acc.impressions = (acc.impressions ?? 0) + p.impressions;
+      }
       return acc;
     },
     {
@@ -155,8 +201,12 @@ export async function fetchXAccountAnalytics(opts: {
       replies: 0,
       reposts: 0,
       quotes: 0,
+      impressions: null,
     } as XSummary
   );
+
+  // Partial impression data must never render as a complete total.
+  if (sawImpressionGap) summary.impressions = null;
 
   return { summary, series };
 }
