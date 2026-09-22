@@ -752,22 +752,30 @@ function ActionItemCard({ item, onAction, canEdit }: { item: ActionItem; onActio
     setActing(action);
     try {
       if (item.type === 'content') {
-        await fetch('/api/content', {
+        const res = await fetch('/api/content', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: item.id, status: action === 'approve' ? 'ready' : 'rejected' }),
         });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(String(data?.error || `Request failed (${res.status})`));
+        }
       } else {
-        await fetch('/api/sequences', {
+        const res = await fetch('/api/sequences', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: item.id, status: action === 'approve' ? 'approved' : 'cancelled' }),
         });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(String(data?.error || `Request failed (${res.status})`));
+        }
       }
       toast.success(action === 'approve' ? 'Approved' : 'Rejected');
       onAction();
-    } catch {
-      toast.error('Failed to update');
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Failed to update');
     }
     setActing(null);
   }

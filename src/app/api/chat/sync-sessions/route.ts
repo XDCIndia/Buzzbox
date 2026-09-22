@@ -64,27 +64,37 @@ export async function POST(request: Request) {
 
         const lastOffset = syncState?.last_offset || 0;
 
-        // Read file and get current size
         const stat = fs.statSync(filePath);
         if (stat.size <= lastOffset) {
           skipped++;
           continue; // No new data
         }
 
-        // Read new content from last offset (simple full read)
-        const content = fs.readFileSync(filePath, 'utf-8');
-        const lines = content.split('\n').filter((l) => l.trim());
+        // Walk the file as bytes so stored offsets stay byte-accurate (#60).
+        // A trailing line without a newline may still be being written, so it
+        // is left for the next sync instead of being consumed now.
+        const buf = fs.readFileSync(filePath);
+        const lineRanges: { text: string; start: number; end: number }[] = [];
+        let lineStart = 0;
+        while (lineStart < buf.length) {
+          const nl = buf.indexOf(0x0a, lineStart); // '\n'
+          if (nl === -1) break; // trailing partial line
+          lineRanges.push({ text: buf.subarray(lineStart, nl).toString('utf-8'), start: lineStart, end: nl + 1 });
+          lineStart = nl + 1;
+        }
 
-        const existingCount = db
-          .prepare('SELECT COUNT(*) as c FROM messages WHERE conversation_id = ?')
-          .get(conversationId) as { c: number };
+        const newLines = lineRanges.filter((r) => r.start >= lastOffset);
+        if (newLines.length === 0) {
+          skipped++; // only an incomplete trailing line was added
+          continue;
+        }
 
-        // Parse all message entries
-        const messageEntries: Array<{ role: string; text: string; timestamp: string }> = [];
+        // Parse all new message entries
+        const messageEntries: Array<{ role: string; text: string; timestamp: string; entryId?: string }> = [];
 
-        for (const line of lines) {
+        for (const { text } of newLines) {
           try {
-            const entry: SessionEntry = JSON.parse(line);
+            const entry: SessionEntry = JSON.parse(text);
             if (entry.type !== 'message' || !entry.message) continue;
 
             const { role, content: contentBlocks } = entry.message;
@@ -96,6 +106,7 @@ export async function POST(request: Request) {
                   role: 'user',
                   text: textBlock.text,
                   timestamp: entry.timestamp,
+                  entryId: entry.id,
                 });
               }
             } else if (role === 'assistant') {
@@ -109,6 +120,7 @@ export async function POST(request: Request) {
                   role: 'assistant',
                   text: combinedText,
                   timestamp: entry.timestamp,
+                  entryId: entry.id,
                 });
               }
             }
@@ -117,8 +129,15 @@ export async function POST(request: Request) {
           }
         }
 
-        // Only import entries beyond what we already have
-        const toImport = messageEntries.slice(existingCount.c);
+        // Idempotency guard (#60): skip entries already imported for this
+        // conversation even if the stored offset drifted (older syncs stored
+        // offsets computed differently).
+        const seenRows = db
+          .prepare("SELECT json_extract(metadata, '$.entry_id') AS eid FROM messages WHERE conversation_id = ? AND metadata IS NOT NULL")
+          .all(conversationId) as { eid: string | null }[];
+        const seenEntryIds = new Set(seenRows.map((r) => r.eid).filter((v): v is string => Boolean(v)));
+
+        const toImport = messageEntries.filter((e) => !e.entryId || !seenEntryIds.has(e.entryId));
 
         if (toImport.length > 0) {
           const insert = db.prepare(`
@@ -135,6 +154,7 @@ export async function POST(request: Request) {
                 source: 'session_sync',
                 session_id: sessionId,
                 instance: instance.id,
+                entry_id: entry.entryId ?? null,
               });
 
               insert.run(conversationId, fromAgent, toAgent, entry.text, metadata, ts);
@@ -150,7 +170,9 @@ export async function POST(request: Request) {
           let title = `${agentLabel} session activity`;
 
           if (firstUserMsg) {
-            const cronMatch = firstUserMsg.text.match(/\\[cron:[\\w-]+\\s+([^\\]]+)\\]/);
+            // [cron:<job-id> <description>] — the old pattern was double-escaped
+            // (\\[ instead of \[) and could never match a real title (#60).
+            const cronMatch = firstUserMsg.text.match(/\[cron:[\w-]+\s+([^\]]+)\]/);
             if (cronMatch) title = `${agentLabel}: ${cronMatch[1]}`;
             else if (firstUserMsg.text.startsWith('[Telegram')) title = `${agentLabel}: Telegram message`;
           }
@@ -168,14 +190,17 @@ export async function POST(request: Request) {
           );
         }
 
-        // Update sync state
+        // Resume from the end of the last complete line — never stat.size,
+        // which would consume a trailing partial line that is still being
+        // written (#60).
+        const newOffset = newLines[newLines.length - 1].end;
         db.prepare(`
           INSERT INTO session_sync (session_file, last_offset, last_synced_at)
           VALUES (?, ?, unixepoch())
           ON CONFLICT(session_file) DO UPDATE SET
             last_offset = excluded.last_offset,
             last_synced_at = excluded.last_synced_at
-        `).run(filePath, stat.size);
+        `).run(filePath, newOffset);
       } catch (err) {
         errors.push(`${instance.id}/${agentId}/${file}: ${err}`);
       }

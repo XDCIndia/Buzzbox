@@ -38,11 +38,15 @@ export default function ContentPage() {
 
   const updateStatus = async (id: string, status: string) => {
     try {
-      await fetch('/api/content', {
+      const res = await fetch('/api/content', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(String(data?.error || `Request failed (${res.status})`));
+      }
       toast.success(status === 'ready' ? 'Content approved' : 'Content rejected');
       load();
     } catch {

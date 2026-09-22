@@ -97,9 +97,14 @@ function num(v: unknown): number {
 async function fbGet<T>(pageAccessToken: string, path: string, params: Record<string, string> = {}): Promise<T> {
   const url = new URL(`${GRAPH_BASE}${path}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  url.searchParams.set("access_token", pageAccessToken);
 
-  const res = await fetchWithTimeout(url.toString(), { cache: "no-store" });
+  // Token goes in the Authorization header (Graph API supports Bearer auth),
+  // never the query string — URLs get logged by proxies/APMs (#84, mirrors
+  // the Instagram fix in #82).
+  const res = await fetchWithTimeout(url.toString(), {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${pageAccessToken}` },
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Facebook Graph API failed (${res.status}): ${text.slice(0, 300)}`);
