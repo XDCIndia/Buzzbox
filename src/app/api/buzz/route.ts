@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { askDicompute } from '@/lib/dicompute';
+import { askDicompute, MissingConfigError } from '@/lib/dicompute';
 import { sendOrchestratorMessage } from '@/lib/command';
 import { requireApiAdmin } from '@/lib/api-auth';
 import { getOverviewStats, getAlerts, getPendingApprovals, getLeadFunnel, getDailyMetrics, createBuzzContentDraft } from '@/lib/queries';
@@ -690,6 +690,15 @@ export async function POST(request: NextRequest) {
       orchestratorResponse: orchestratorResult.response,
     });
   } catch (error) {
+    // A missing connector credential is a configuration state, not a server
+    // error -- answer 412 like the X posting path does for missing tokens (#88).
+    if (error instanceof MissingConfigError) {
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 412 },
+      );
+    }
+
     console.error('Buzz API error:', error);
 
     return NextResponse.json(

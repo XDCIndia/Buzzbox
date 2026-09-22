@@ -11,7 +11,9 @@ export async function POST(request: Request) {
   // Auth: require API key
   const configuredApiKey = getConfiguredApiKey();
   if (!configuredApiKey) {
-    return NextResponse.json({ error: 'API_KEY not configured' }, { status: 500 });
+    // Configuration state, not a server fault -- 503 tells senders the
+    // receiver is (currently) unavailable instead of implying a bug (#88).
+    return NextResponse.json({ error: 'API_KEY not configured' }, { status: 503 });
   }
   const apiKey = request.headers.get('x-api-key');
   if (!secureCompare(apiKey, configuredApiKey)) {

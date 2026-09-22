@@ -8,6 +8,16 @@ const DICOMPUTE_MODEL =
 
 const DICOMPUTE_API_KEY = process.env.DICOMPUTE_API_KEY;
 
+/** Thrown when the Dicompute connector lacks configuration (e.g. no API key).
+ * Route handlers catch this to answer 4xx "precondition failed" instead of
+ * masking a configuration state as a 500 server error (#88). */
+export class MissingConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MissingConfigError';
+  }
+}
+
 export interface DicomputeMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -17,7 +27,9 @@ export async function askDicompute(
   messages: DicomputeMessage[],
 ) {
   if (!DICOMPUTE_API_KEY) {
-    throw new Error('DICOMPUTE_API_KEY is not configured');
+    throw new MissingConfigError(
+      'DICOMPUTE_API_KEY is not configured. Buzz requires the Dicompute LLM connector -- set DICOMPUTE_API_KEY in the environment to enable it.',
+    );
   }
 
   const response = await fetchWithTimeout(

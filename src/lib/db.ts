@@ -348,18 +348,29 @@ function migrate(db: Database.Database) {
     addColumnIfMissing(db, 'content_posts', 'image_url', 'TEXT');
   }
 
+  // v3: is_demo flags the placeholder/demo brand row so the UI can label
+  // seeded demo data clearly instead of presenting it as the user's own
+  // brand (#89).
+  if (from < 3) {
+    addColumnIfMissing(db, 'brands', 'is_demo', 'INTEGER DEFAULT 0');
+    // Backfill existing deployments: flag the seeded demo brand ('Hermes'
+    // from scripts/seed.ts) and the migration fallback ('My Brand') unless
+    // the operator already renamed them to something real.
+    db.prepare(`UPDATE brands SET is_demo = 1 WHERE id = ? AND name IN ('Hermes', 'My Brand')`).run(DEFAULT_BRAND_ID);
+  }
+
   // Data-level guarantee (runs every boot, deliberately NOT version-gated):
   // the default brand row must exist because brand-scoped API routes and
   // FK-constrained inserts (brand_mentions, brand_digests, etc.) assume
   // DEFAULT_BRAND_ID resolves to a real row.
   db.prepare(
-    `INSERT OR IGNORE INTO brands (id, name, keywords, sources) VALUES (?, ?, ?, ?)`
+    `INSERT OR IGNORE INTO brands (id, name, keywords, sources, is_demo) VALUES (?, ?, ?, ?, 1)`
   ).run(DEFAULT_BRAND_ID, 'My Brand', '[]', '[]');
 
   db.pragma(`user_version = ${CURRENT_SCHEMA_VERSION}`);
 }
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 export function getSchemaVersion(db: Database.Database): number {
   return db.pragma('user_version', { simple: true }) as number;

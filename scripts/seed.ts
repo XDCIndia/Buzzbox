@@ -610,9 +610,11 @@ console.log(`✓ Inserted ${activityEntries.length} activity log entries`);
 // Same UUID as DEFAULT_BRAND_ID in src/lib/brand-constants.ts.
 const BRAND_ID = '97cdb115-2c90-42a8-b904-d14abce1d682';
 
-db.prepare(`INSERT INTO brands (id, name, keywords, sources) VALUES (?, ?, ?, ?)`).run(
+// is_demo=1 flags this row so the UI labels it as demo placeholder data (#89);
+// renaming the brand via /settings clears the flag (operator adoption).
+db.prepare(`INSERT INTO brands (id, name, keywords, sources, is_demo) VALUES (?, ?, ?, ?, 1)`).run(
   BRAND_ID,
-  'Hermes',
+  'Demo Brand (Hermes)',
   JSON.stringify(['hermes', 'hermes ai', 'hermes dashboard', '#hermes']),
   JSON.stringify(['x', 'linkedin', 'reddit', 'threads', 'news']),
 );

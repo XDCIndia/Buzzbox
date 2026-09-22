@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Tag, Radio, AlertCircle, RefreshCw, Settings, Compass } from 'lucide-react';
+import { Tag, Radio, AlertCircle, RefreshCw, Settings, Compass, Info } from 'lucide-react';
 import type { Brand } from '@/types';
 import { DEFAULT_BRAND_ID } from '@/lib/brand-constants';
 import { BrandHeaderSkeleton } from '@/components/ui/loading-skeleton';
@@ -93,6 +93,22 @@ export function BrandHeader({ brandId, title, index, description }: { brandId: s
 
   return (
     <section className="mb-8 space-y-3">
+      {Boolean(brand.is_demo) && (
+        <div className="flex items-start justify-between gap-3 flex-wrap rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <Info size={16} className="mt-0.5 shrink-0 text-amber-400" />
+            <div>
+              <p className="text-sm font-medium text-foreground">This is demo data</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                &quot;{brand.name}&quot; was seeded by the Buzzbox demo script — the mentions, campaigns and metrics on this page are placeholder content, not your accounts. Rename the brand to yours to start tracking it.
+              </p>
+            </div>
+          </div>
+          <Link href="/settings?tab=brand" className="btn btn-primary btn-sm text-xs shrink-0 flex items-center gap-1">
+            <Settings size={12} /> Rename brand
+          </Link>
+        </div>
+      )}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
         <div className="min-w-0">
           <p className="console-eyebrow mb-3">
