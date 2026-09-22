@@ -417,6 +417,8 @@ export interface Brand {
   name: string;
   keywords: string[];
   sources: string[];
+  /** 1 when this row is the seeded demo placeholder (db.ts v3); cleared when the brand is renamed. */
+  is_demo?: number;
   created_at: string;
 }
 

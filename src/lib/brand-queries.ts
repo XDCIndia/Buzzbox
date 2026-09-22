@@ -26,7 +26,12 @@ export function updateBrand(id: string, data: { name?: string; keywords?: string
   const db = getDb();
   const current = getBrand(id);
   if (!current) return;
-  db.prepare('UPDATE brands SET name = ?, keywords = ?, sources = ? WHERE id = ?').run(
+  // Renaming the placeholder/demo brand is how an operator adopts it as their
+  // real brand -- clear the demo flag so the banner stops showing (#89).
+  const renamed = typeof data.name === 'string' && data.name.trim() !== '' && data.name !== current.name;
+  db.prepare(
+    `UPDATE brands SET name = ?, keywords = ?, sources = ?${renamed ? ', is_demo = 0' : ''} WHERE id = ?`
+  ).run(
     data.name ?? current.name,
     JSON.stringify(data.keywords ?? current.keywords),
     JSON.stringify(data.sources ?? current.sources),

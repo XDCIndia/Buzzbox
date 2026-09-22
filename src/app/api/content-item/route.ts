@@ -115,6 +115,12 @@ export async function GET(req: NextRequest) {
     const row = db.prepare('SELECT * FROM content_queue_items WHERE id = ?').get(id) as Record<string, unknown> | undefined;
     if (row) return NextResponse.json({ item: rowToQueueItem(row) });
 
+    // Primary content store: everything created via the dashboard/agents lives
+    // in content_posts (content_queue_items is only populated by this route's
+    // PATCH upsert), so fall back to it before declaring the item missing.
+    const post = db.prepare('SELECT * FROM content_posts WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    if (post) return NextResponse.json({ item: rowToQueueItem(post) });
+
     // Fallback for legacy deployments not yet synced to DB queue
     const fileItem = readQueueFile().find((x) => x?.id === id);
     if (fileItem) return NextResponse.json({ item: fileItem });
@@ -146,7 +152,10 @@ export async function PATCH(req: NextRequest) {
 
     const db = getDb();
     const row = db.prepare('SELECT * FROM content_queue_items WHERE id = ?').get(id) as Record<string, unknown> | undefined;
-    const current = row ? rowToQueueItem(row) : readQueueFile().find((x) => x?.id === id);
+    const post = row
+      ? undefined
+      : (db.prepare('SELECT * FROM content_posts WHERE id = ?').get(id) as Record<string, unknown> | undefined);
+    const current = row ? rowToQueueItem(row) : post ? rowToQueueItem(post) : readQueueFile().find((x) => x?.id === id);
     if (!current) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
     let updated: QueueItem;
