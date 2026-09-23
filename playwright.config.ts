@@ -10,7 +10,8 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'PORT=3010 HOSTNAME=127.0.0.1 node .next/standalone/server.js',
+    // Cross-platform launcher (POSIX `VAR=x` prefixes break on Windows shells).
+    command: 'node scripts/e2e-server.mjs',
     port: 3010,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

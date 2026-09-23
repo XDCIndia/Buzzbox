@@ -82,8 +82,11 @@ export function patchMention(id: string, data: { sentiment?: string; emotion?: s
   db.prepare(`UPDATE brand_mentions SET ${fields.join(', ')} WHERE id = ?`).run(...params);
 }
 
-export function insertBrandMention(m: Omit<BrandMention, 'created_at'>): void {
-  getDb().prepare(`
+// Returns true when the row was newly inserted, false when an identical id
+// already existed (INSERT OR IGNORE) — the mention-sync route relies on this
+// to only alert on fresh mentions, never on re-synced duplicates.
+export function insertBrandMention(m: Omit<BrandMention, 'created_at'>): boolean {
+  const info = getDb().prepare(`
     INSERT OR IGNORE INTO brand_mentions
       (id, brand_id, source_type, platform, author_name, author_handle, author_avatar_url, author_reach,
        text, url, likes, comments, sentiment, emotion, intent, is_crisis, is_high_impact, published_at)
@@ -92,6 +95,7 @@ export function insertBrandMention(m: Omit<BrandMention, 'created_at'>): void {
     m.id, m.brand_id, m.source_type, m.platform, m.author_name, m.author_handle, m.author_avatar_url, m.author_reach,
     m.text, m.url, m.likes, m.comments, m.sentiment, m.emotion, m.intent, m.is_crisis ? 1 : 0, m.is_high_impact ? 1 : 0, m.published_at,
   );
+  return info.changes > 0;
 }
 
 // ─── Stats ──────────────────────────────────────────────

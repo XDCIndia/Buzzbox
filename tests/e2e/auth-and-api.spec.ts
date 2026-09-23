@@ -6,13 +6,20 @@ test.describe('auth and api gate', () => {
     password: 'super-secure-pass',
   };
 
+  // Reuse one session across all tests: each Playwright test gets a fresh
+  // request context, and logging in per test would exhaust the login rate
+  // limiter (10 attempts/min/IP) now that the suite has 17+ tests.
+  let cachedCookie: string | null = null;
+
   async function getAuthHeaders(request: APIRequestContext) {
+    if (cachedCookie) return { cookie: cachedCookie };
     const login = await request.post('/api/auth/login', {
       data: loginPayload,
     });
     expect(login.status()).toBe(200);
     const sessionCookie = login.headers()['set-cookie'];
     expect(sessionCookie).toContain('hermes-session=');
+    cachedCookie = sessionCookie;
     return { cookie: sessionCookie };
   }
 
