@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/readme/marketing-dashboard-hero.jpeg" alt="Marketing Dashboard connects CRM, outreach, content, analytics, approvals, and automations" width="960">
+  <img src="public/readme/marketing-dashboard-hero.jpeg" alt="Buzzbox connects CRM, outreach, brand monitoring, content, analytics, approvals, and automations" width="960">
 </p>
 
 <p align="center">
@@ -8,14 +8,14 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-6B5CFF.svg" alt="MIT license"></a>
-  <a href="https://github.com/builderz-labs/marketing-dashboard/actions/workflows/ci.yml"><img src="https://github.com/builderz-labs/marketing-dashboard/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/XDCIndia/Buzzbox/actions/workflows/ci.yml"><img src="https://github.com/XDCIndia/Buzzbox/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16-17191F.svg" alt="Next.js 16"></a>
-  <a href="https://github.com/builderz-labs/marketing-dashboard"><img src="https://img.shields.io/github/stars/builderz-labs/marketing-dashboard" alt="GitHub stars"></a>
+  <a href="https://github.com/XDCIndia/Buzzbox"><img src="https://img.shields.io/github/stars/XDCIndia/Buzzbox" alt="GitHub stars"></a>
 </p>
 
 ---
 
-Marketing Dashboard brings CRM, outreach, content planning, analytics, approvals, automation schedules, and agent activity into one self-hosted interface. It runs on Next.js and SQLite, works without required hosted infrastructure, and can connect to OpenClaw and external marketing services when you choose.
+Buzzbox brings CRM, outreach, brand monitoring, content planning, analytics, approvals, automation schedules, and agent activity into one self-hosted interface. It runs on Next.js and SQLite, works without required hosted infrastructure, and can connect to OpenClaw and external marketing services when you choose.
 
 > **Project status:** alpha. The working surface is broad, but APIs, schemas, and configuration may change between releases.
 
@@ -26,7 +26,9 @@ Marketing Dashboard brings CRM, outreach, content planning, analytics, approvals
 | CRM | Leads, sources, pipeline stages, lead quality, and record details |
 | Outreach | Sequences, suppression, pausing, audits, and engagement |
 | Content | Calendar, content items, performance, and approval queues |
-| Analytics | KPI views plus optional Plausible, GA4, X, and LinkedIn connectors |
+| Analytics | KPI views plus optional Plausible, GA4, X (followers, engagement, impressions), and LinkedIn connectors |
+| Brand monitoring | Brand profiles, keyword-driven mention sync, sentiment, crisis and high-impact signals |
+| Buzz assistant | Conversational assistant over your marketing data (Dicompute-backed) |
 | Agents | OpenClaw instance discovery, squads, workspaces, sessions, and communications |
 | Automations | Cron jobs, templates, approvals, activity, and deployment status |
 
@@ -38,15 +40,15 @@ The dashboard is operator-led. Approval, pause, writeback, and host-access contr
 
 ### Requirements
 
-- Node.js 20
+- Node.js 22
 - pnpm 10
 - A local machine or private host that can persist SQLite state
 
 ### Run locally
 
 ```bash
-git clone https://github.com/builderz-labs/marketing-dashboard.git
-cd marketing-dashboard
+git clone https://github.com/XDCIndia/Buzzbox.git
+cd Buzzbox
 corepack enable
 pnpm install --frozen-lockfile
 pnpm env:bootstrap
@@ -55,13 +57,15 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
+Optionally seed demo data with `pnpm seed` — seeded rows are flagged as demo in the UI and never presented as real brand data.
+
 The first login is seeded from `AUTH_USER` and `AUTH_PASS` when the users table is empty. Change the example credentials in `.env.local` before starting the application.
 
 ## Local-first architecture
 
 The application, authentication, and SQLite state run locally. Provider connectors are optional and receive credentials from server-side environment variables.
 
-![Marketing Dashboard keeps application state local and treats external services as optional connectors](public/readme/local-first-architecture.jpeg)
+![Buzzbox keeps application state local and treats external services as optional connectors](public/readme/local-first-architecture.jpeg)
 
 | Layer | Implementation |
 |---|---|
@@ -72,7 +76,7 @@ The application, authentication, and SQLite state run locally. Provider connecto
 | Agent connection | OpenClaw CLI and filesystem discovery |
 | Deployment | Local process, standalone build, or private HTTPS host |
 
-Environment variables retain the `HERMES_*` prefix for backward compatibility with existing deployments. The public project name is Marketing Dashboard.
+Environment variables retain the `HERMES_*` prefix (the internal codename) for backward compatibility with existing deployments.
 
 ## Configuration
 
@@ -132,11 +136,11 @@ See [SECURITY.md](SECURITY.md) for private vulnerability reporting and supported
 
 ### Mission-control overview
 
-![Marketing Dashboard overview](public/hermes-dashboard-mission-control.png)
+![Buzzbox overview](public/hermes-dashboard-mission-control.png)
 
 ### CRM and operating surfaces
 
-![Marketing Dashboard CRM](public/hermes-dashboard-overview.png)
+![Buzzbox CRM](public/hermes-dashboard-overview.png)
 
 The screenshot filenames retain their original names for compatibility with existing links.
 
@@ -181,7 +185,7 @@ The export excludes environment files, databases, build output, dependency direc
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) records dependency notices.
 - [CHANGELOG.md](CHANGELOG.md) tracks project changes.
 
-Use [GitHub Issues](https://github.com/builderz-labs/marketing-dashboard/issues) for reproducible bugs and scoped feature requests. Security reports must not be filed publicly.
+Use [GitHub Issues](https://github.com/XDCIndia/Buzzbox/issues) for reproducible bugs and scoped feature requests. Security reports must not be filed publicly.
 
 ## Built by Builderz
 
