@@ -9,6 +9,7 @@ import { searchInstagramMentions, type InstagramMentionResult } from '@/lib/inst
 import { searchTikTokMentions, type TikTokMentionResult } from '@/lib/tiktok-api';
 import { searchRedditMentions, type RedditMentionResult } from '@/lib/reddit-api';
 import { classifyMention } from '@/lib/mention-classify';
+import { evaluateMentionCrisis, insertMentionAlert } from '@/lib/mention-alerts';
 import type { MentionPlatform } from '@/types';
 
 type MentionSyncResult =
@@ -22,6 +23,7 @@ type MentionSyncResult =
 
 function insertResults(
   brandId: string,
+  brandName: string,
   platform: MentionPlatform,
   idPrefix: string,
   results: MentionSyncResult[],
@@ -29,7 +31,11 @@ function insertResults(
   let inserted = 0;
   for (const r of results) {
     const { sentiment, emotion } = classifyMention(r.text);
-    insertBrandMention({
+    const isHighImpact = r.author_reach > 100_000;
+    // Crisis heuristic: negative sentiment from a large account (>= 50k
+    // reach); anything >= 100k reach is high-impact regardless of tone.
+    const isCrisis = r.author_reach >= 50_000 && sentiment === 'negative';
+    const fresh = insertBrandMention({
       id: `${idPrefix}_${r.id}`,
       brand_id: brandId,
       source_type: 'social',
@@ -45,11 +51,25 @@ function insertResults(
       sentiment,
       emotion,
       intent: null,
-      is_crisis: false,
-      is_high_impact: r.author_reach > 100_000,
+      is_crisis: isCrisis,
+      is_high_impact: isHighImpact,
       published_at: r.published_at,
     });
-    inserted++;
+    if (fresh) {
+      inserted++;
+      const kind = evaluateMentionCrisis({ author_reach: r.author_reach, sentiment, is_crisis: isCrisis, is_high_impact: isHighImpact });
+      if (kind) {
+        insertMentionAlert(kind, {
+          brandName,
+          platform,
+          author_name: r.author_name,
+          author_handle: r.author_handle,
+          text: r.text,
+          url: r.url || null,
+          mentionId: `${idPrefix}_${r.id}`,
+        });
+      }
+    }
   }
   return inserted;
 }
@@ -90,6 +110,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
 
   const brand = getBrand(brandId);
   if (!brand) return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
+  const brandName = brand.name;
   const query = brand.keywords[0] || brand.name;
 
   let inserted = 0;
@@ -102,7 +123,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
   if (bearerToken) {
     try {
       const results = await searchXMentions({ bearerToken, query, maxResults: 50 });
-      inserted += insertResults(brandId, 'x', 'x', results);
+      inserted += insertResults(brandId, brandName, 'x', 'x', results);
     } catch (err) {
       errors.x = (err as Error).message;
     }
@@ -121,7 +142,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
         query,
         maxResults: 50,
       });
-      inserted += insertResults(brandId, 'facebook', 'facebook', results);
+      inserted += insertResults(brandId, brandName, 'facebook', 'facebook', results);
     } catch (err) {
       errors.facebook = (err as Error).message;
     }
@@ -139,7 +160,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
         threadsUserId,
         limit: 50,
       });
-      inserted += insertResults(brandId, 'threads', 'threads', results);
+      inserted += insertResults(brandId, brandName, 'threads', 'threads', results);
     } catch (err) {
       errors.threads = (err as Error).message;
     }
@@ -150,7 +171,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
   if (youtubeApiKey) {
     try {
       const results = await searchYouTubeMentions({ apiKey: youtubeApiKey, query, maxResults: 25 });
-      inserted += insertResults(brandId, 'youtube', 'youtube', results);
+      inserted += insertResults(brandId, brandName, 'youtube', 'youtube', results);
     } catch (err) {
       errors.youtube = (err as Error).message;
     }
@@ -166,7 +187,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
         query,
         maxResults: 50,
       });
-      inserted += insertResults(brandId, 'instagram', 'instagram', results);
+      inserted += insertResults(brandId, brandName, 'instagram', 'instagram', results);
     } catch (err) {
       errors.instagram = (err as Error).message;
     }
@@ -177,7 +198,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
   if (tiktokAccessToken) {
     try {
       const results = await searchTikTokMentions({ accessToken: tiktokAccessToken, query, maxResults: 50 });
-      inserted += insertResults(brandId, 'tiktok', 'tiktok', results);
+      inserted += insertResults(brandId, brandName, 'tiktok', 'tiktok', results);
     } catch (err) {
       errors.tiktok = (err as Error).message;
     }
@@ -194,7 +215,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
         query,
         maxResults: 50,
       });
-      inserted += insertResults(brandId, 'reddit', 'reddit', results);
+      inserted += insertResults(brandId, brandName, 'reddit', 'reddit', results);
     } catch (err) {
       errors.reddit = (err as Error).message;
     }

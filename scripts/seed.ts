@@ -112,6 +112,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS brands (
     id TEXT PRIMARY KEY, name TEXT NOT NULL,
     keywords TEXT NOT NULL DEFAULT '[]', sources TEXT NOT NULL DEFAULT '[]',
+    is_demo INTEGER NOT NULL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
   CREATE TABLE IF NOT EXISTS brand_mentions (
