@@ -3,7 +3,7 @@
 import {
   Search, Sun, Moon, Radio, PenLine, Mail, Users, LogOut,
   Bell, Eye, EyeOff, Check, CheckCheck, Boxes, Plus, Contact, Sparkles,
-  ChevronDown,
+  ChevronDown, RefreshCw, RefreshCwOff, AlertTriangle,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState, useRef } from 'react';
@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useDashboard } from '@/store';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { timeAgo } from '@/lib/utils';
+import type { SyncHealth } from '@/lib/sync';
 import { DEFAULT_BRAND_ID } from '@/lib/brand-constants';
 import type { Notification } from '@/types';
 import { BuzzAssistant } from '@/components/chat/buzz-assistant';
@@ -162,18 +163,16 @@ function QuickCreateMenu() {
   );
 }
 
-/** Combined data-mode + sync clock popover (replaces SeedToggle + SyncStatus pair). */
+/** Combined data-mode + sync status popover (replaces SeedToggle + SyncStatus pair).
+ * The sync line reflects real sync state from /api/settings -- wall-clock time is
+ * never presented as a sync event (#69). */
 function DataStatusToggle({ active, onToggle }: { active: boolean; onToggle: () => void }) {
   const [open, setOpen] = useState(false);
-  const [lastSync, setLastSync] = useState<string | null>(null);
+  const { data: syncHealth } = useSmartPoll<SyncHealth>(
+    () => fetch('/api/settings').then(r => (r.ok ? r.json() : null)).then(d => d?.sync_health ?? null),
+    { interval: 30_000 },
+  );
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const update = () => setLastSync(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    update();
-    const timer = setInterval(update, 30_000);
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -199,7 +198,7 @@ function DataStatusToggle({ active, onToggle }: { active: boolean; onToggle: () 
         title="Data mode & sync"
       >
         {active ? <Eye size={13} /> : <EyeOff size={13} />}
-        <span className="font-mono">{lastSync}</span>
+        <SyncBadge health={syncHealth ?? null} />
         <ChevronDown size={11} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -231,14 +230,52 @@ function DataStatusToggle({ active, onToggle }: { active: boolean; onToggle: () 
               </button>
             </div>
             <div className="flex items-center gap-2 pt-2 border-t border-border/60 text-[11px] text-muted-foreground">
-              <span className="w-2 h-2 rounded-full bg-success pulse-dot shrink-0" />
-              Last sync <span className="font-mono text-foreground">{lastSync}</span>
-              <span className="ml-auto font-mono">30s interval</span>
+              <SyncStatusLine health={syncHealth ?? null} />
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function SyncBadge({ health }: { health: SyncHealth | null }) {
+  if (!health?.last_sync_at) {
+    return <RefreshCwOff size={13} className="opacity-60" />;
+  }
+  return health.last_sync_status === 'ok' ? (
+    <RefreshCw size={13} />
+  ) : (
+    <AlertTriangle size={13} />
+  );
+}
+
+function SyncStatusLine({ health }: { health: SyncHealth | null }) {
+  if (!health?.last_sync_at) {
+    return (
+      <span className="flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-muted-foreground/40 shrink-0" />
+        Not yet synchronized
+      </span>
+    );
+  }
+  if (health.last_sync_status === 'error') {
+    return (
+      <span className="flex items-center gap-2 text-destructive" title={health.last_sync_error ?? undefined}>
+        <span className="w-2 h-2 rounded-full bg-destructive shrink-0" />
+        Sync failed
+        <span className="ml-auto font-mono text-foreground">{timeAgo(health.last_sync_at)}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-2">
+      <span className="w-2 h-2 rounded-full bg-success shrink-0" />
+      Synced <span className="font-mono text-foreground">{timeAgo(health.last_sync_at)}</span>
+      {health.last_sync_duration_ms != null && (
+        <span className="ml-auto font-mono">{health.last_sync_duration_ms}ms</span>
+      )}
+    </span>
   );
 }
 

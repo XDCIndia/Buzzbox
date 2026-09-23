@@ -9,6 +9,30 @@ const SYNC_INTERVAL = 30_000; // 30 seconds
 let syncTimer: ReturnType<typeof setInterval> | null = null;
 let lastActivityLine = 0;
 
+/** Real synchronization health, surfaced by /api/settings and the header
+ * indicator (#69). Replaced on every syncAll() attempt -- including failed
+ * ones, so the UI can distinguish success from failure instead of showing a
+ * fake wall-clock time. */
+export interface SyncHealth {
+  last_sync_at: string | null;
+  last_sync_status: 'ok' | 'error' | null;
+  last_sync_error: string | null;
+  last_sync_duration_ms: number | null;
+  last_success_at: string | null;
+}
+
+let syncHealth: SyncHealth = {
+  last_sync_at: null,
+  last_sync_status: null,
+  last_sync_error: null,
+  last_sync_duration_ms: null,
+  last_success_at: null,
+};
+
+export function getSyncHealth(): SyncHealth {
+  return syncHealth;
+}
+
 export function startSync() {
   if (syncTimer) return;
   console.log('[sync] Starting sync service, reading from:', STATE_DIR);
@@ -24,6 +48,8 @@ export function stopSync() {
 }
 
 export function syncAll() {
+  const startedAt = Date.now();
+  const startedIso = new Date(startedAt).toISOString();
   try {
     syncContentQueue();
     syncContentCalendar();
@@ -39,8 +65,22 @@ export function syncAll() {
     syncSuppression();
     syncDailyCounts();
     syncActivityLog();
-    console.log('[sync] Sync complete at', new Date().toISOString());
+    syncHealth = {
+      last_sync_at: startedIso,
+      last_sync_status: 'ok',
+      last_sync_error: null,
+      last_sync_duration_ms: Date.now() - startedAt,
+      last_success_at: startedIso,
+    };
+    console.log('[sync] Sync complete at', startedIso);
   } catch (err) {
+    syncHealth = {
+      last_sync_at: startedIso,
+      last_sync_status: 'error',
+      last_sync_error: err instanceof Error ? err.message : String(err),
+      last_sync_duration_ms: Date.now() - startedAt,
+      last_success_at: syncHealth.last_success_at,
+    };
     console.error('[sync] Error:', err);
   }
 }

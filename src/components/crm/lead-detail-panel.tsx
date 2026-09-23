@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Mail, Linkedin, Clock, ChevronLeft, ChevronRight, Check, XCircle, Save, X, Ban, Pause, Play, Trash2, Edit3, Loader2, ChevronDown, ChevronUp, Send, CheckCircle, MessageSquare, Eye, CalendarCheck, Star, CircleDot } from 'lucide-react';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { timeAgo } from '@/lib/utils';
@@ -51,6 +51,10 @@ export function LeadDetailPanel({
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState('');
   const [nextAction, setNextAction] = useState('');
+  // The next-action date input has no explicit edit mode, so unsaved user
+  // input is tracked with a dirty latch: set on change, cleared after a
+  // successful save -- polling must not overwrite a latched value (#37).
+  const nextActionDirtyRef = useRef(false);
   const [expandedSeq, setExpandedSeq] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
@@ -77,12 +81,16 @@ export function LeadDetailPanel({
     { interval: 30_000, key: detailRefresh },
   );
 
+  // Poll hydration must never clobber unsaved edits (#37): notes take server
+  // values only while their editor is closed, the next-action date only when
+  // the user hasn't latched an unsaved pick, and the profile draft only when
+  // its editor is closed (pre-existing behavior).
   useEffect(() => {
-    if (data?.lead?.notes !== undefined) {
+    if (!editingNotes && data?.lead?.notes !== undefined) {
       setNotesValue(data.lead.notes || '');
     }
-    if (data?.lead?.next_action_at) {
-      setNextAction(data.lead.next_action_at.split('T')[0]);
+    if (!nextActionDirtyRef.current && data?.lead) {
+      setNextAction(data.lead.next_action_at ? data.lead.next_action_at.split('T')[0] : '');
     }
     if (!editingProfile && data?.lead) {
       setProfileDraft({
@@ -98,15 +106,15 @@ export function LeadDetailPanel({
         score: typeof data.lead.score === 'number' ? String(data.lead.score) : '',
       });
     }
-  }, [data?.lead, editingProfile]);
+  }, [data?.lead, editingProfile, editingNotes]);
 
   function showFeedback(type: 'success' | 'error', msg: string) {
     setFeedback({ type, msg });
     setTimeout(() => setFeedback(null), 2500);
   }
 
-  async function patchLead(updates: Record<string, unknown>) {
-    if (!canEdit) return;
+  async function patchLead(updates: Record<string, unknown>): Promise<boolean> {
+    if (!canEdit) return false;
     setSaving(true);
     try {
       const res = await fetch('/api/crm', {
@@ -118,8 +126,10 @@ export function LeadDetailPanel({
       showFeedback('success', 'Updated');
       setDetailRefresh(k => k + 1);
       onMutate();
+      return true;
     } catch {
       showFeedback('error', 'Failed to update');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -448,12 +458,17 @@ export function LeadDetailPanel({
             <input
               type="date"
               value={nextAction}
-              onChange={e => setNextAction(e.target.value)}
+              onChange={e => { nextActionDirtyRef.current = true; setNextAction(e.target.value); }}
               className="bg-muted/30 rounded px-2 py-0.5 text-[10px]"
               disabled={!canEdit || saving}
             />
             <button
-              onClick={() => patchLead({ next_action_at: nextAction ? new Date(`${nextAction}T00:00:00.000Z`).toISOString() : null })}
+              onClick={() => {
+                const iso = nextAction ? new Date(`${nextAction}T00:00:00.000Z`).toISOString() : null;
+                void patchLead({ next_action_at: iso }).then(ok => {
+                  if (ok) nextActionDirtyRef.current = false;
+                });
+              }}
               disabled={!canEdit || saving}
               className="btn btn-ghost btn-sm text-[10px]"
               type="button"

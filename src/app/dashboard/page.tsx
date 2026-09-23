@@ -15,6 +15,7 @@ import { SetupChecklist, BuzzActionRow, NeedsAttention, GoingOutToday } from '@/
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { useDashboard } from '@/store';
 import { formatNumber, timeAgo } from '@/lib/utils';
+import { DEFAULT_BRAND_ID } from '@/lib/brand-constants';
 import { toast } from '@/components/ui/toast';
 import type { OverviewStats, Alert, ActivityEntry, DailyMetrics } from '@/types';
 import { PipelineFunnel } from '@/components/pipeline/pipeline-funnel';
@@ -376,7 +377,7 @@ export default function OverviewPage() {
                   icon={Search}
                   title="No budget data"
                   reason="X API budget will appear once usage tracking is configured."
-                  action={{ label: 'Integrations', href: '/settings/integrations' }}
+                  action={{ label: 'Integrations', href: '/integrations' }}
                 />
               )}
             </div>
@@ -466,7 +467,7 @@ export default function OverviewPage() {
                   icon={Bell}
                   title="No activity yet"
                   reason="Marketing actions will appear here once campaigns and agents start running."
-                  action={{ label: 'Create Campaign', href: `/brand/97cdb115-2c90-42a8-b904-d14abce1d682/create/campaigns` }}
+                  action={{ label: 'Create Campaign', href: `/brand/${DEFAULT_BRAND_ID}/create/campaigns` }}
                 />
               ) : (
                 recentActivity.map(entry => (
