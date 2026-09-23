@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { askDicompute, MissingConfigError } from '@/lib/dicompute';
+import { askDicompute, MissingConfigError, UpstreamProviderError } from '@/lib/dicompute';
 import { sendOrchestratorMessage } from '@/lib/command';
 import { requireApiAdmin } from '@/lib/api-auth';
 import { getOverviewStats, getAlerts, getPendingApprovals, getLeadFunnel, getDailyMetrics, createBuzzContentDraft } from '@/lib/queries';
@@ -696,6 +696,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { ok: false, error: error.message },
         { status: 412 },
+      );
+    }
+
+    // Upstream provider failures answer a concise, clean message -- the raw
+    // response body was already logged server-side in dicompute.ts (#51).
+    if (error instanceof UpstreamProviderError) {
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 502 },
       );
     }
 

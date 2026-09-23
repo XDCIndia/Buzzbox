@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { MessageCircle, Send, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { timeAgo } from '@/lib/utils';
@@ -106,6 +107,8 @@ function parseConversationName(
 }
 
 export function AgentChat() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [me, setMe] = useState<{ username: string; role: Role } | null>(null);
   const role: Role = me?.role ?? 'viewer';
   const username = me?.username ?? 'operator';
@@ -131,7 +134,28 @@ export function AgentChat() {
   }, [role]);
 
   const [expanded, setExpanded] = useState(true);
-  const [activeConv, setActiveConv] = useState<string | null>(null);
+  const [activeConv, setActiveConvState] = useState<string | null>(null);
+
+  // Deep-link support: /agents/comms?conv=<id> opens that conversation
+  // directly (the agent-sessions cards link here with #67's fix).
+  const convParam = searchParams.get('conv');
+  useEffect(() => {
+    if (convParam) {
+      setActiveConvState(convParam);
+      setExpanded(true);
+    }
+  }, [convParam]);
+
+  const setActiveConv = (conv: string | null) => {
+    setActiveConvState(conv);
+    const params = new URLSearchParams(searchParams.toString());
+    if (conv) {
+      params.set('conv', conv);
+    } else {
+      params.delete('conv');
+    }
+    router.replace(params.toString() ? `?${params.toString()}` : '?', { scroll: false });
+  };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);

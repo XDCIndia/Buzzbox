@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb, getDbPath } from '@/lib/db';
 import { getSeedCount } from '@/lib/queries';
+import { getSyncHealth } from '@/lib/sync';
 import fs from 'node:fs';
 import { requireApiUser } from '@/lib/api-auth';
 const TABLE_NAMES = [
@@ -47,7 +48,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       db_size_mb,
       tables,
-      last_sync: null, // could track this in a metadata table
+      last_sync: getSyncHealth().last_sync_at,
+      sync_health: getSyncHealth(),
       seed_count,
     });
   } catch {

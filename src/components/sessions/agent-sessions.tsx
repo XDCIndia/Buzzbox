@@ -72,7 +72,7 @@ export function AgentSessions() {
                   </div>
                 </div>
                 <Link
-                  href={`/agents?conv=${session.conversation_id}`}
+                  href={`/agents/comms?conv=${encodeURIComponent(session.conversation_id)}`}
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <ExternalLink size={14} />
