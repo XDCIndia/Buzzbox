@@ -39,6 +39,25 @@ export function getJobsPath(cronDir: string): string {
   return path.join(cronDir, 'jobs.json');
 }
 
+/** Thrown when jobs.json exists but is not parseable (or not an object).
+ * Read callers must not fall back to an empty schedule: the next mutation
+ * would overwrite the corrupt file and permanently delete the operator's
+ * schedules (#104). */
+export class CronJobsCorruptError extends Error {
+  readonly jobsPath: string;
+  constructor(jobsPath: string) {
+    super(
+      `Cron jobs file is corrupt and was left untouched: ${jobsPath}. Quarantine or repair it (POST /api/cron/jobs/reset) before mutating schedules.`,
+    );
+    this.name = 'CronJobsCorruptError';
+    this.jobsPath = jobsPath;
+  }
+}
+
+/** Maximum retained timestamped backups (`jobs.json.bak.*`). The stable
+ * `jobs.json.bak` is always kept and never counts toward this limit. */
+export const MAX_CRON_BACKUPS = 10;
+
 export function getCronRunsDir(cronDir: string): string {
   return path.join(path.resolve(cronDir), 'runs');
 }
@@ -71,25 +90,35 @@ function normalizeCronJobRecord(job: CronJobConfig): CronJobConfig {
 
 export async function readCronJobsFile(cronDir: string): Promise<CronJobsFile> {
   const jobsPath = getJobsPath(cronDir);
+  let raw: string;
   try {
-    const raw = await fs.readFile(jobsPath, 'utf-8');
-    const parsed = JSON.parse(raw) as unknown;
-    if (Array.isArray(parsed)) {
-      const jobs = (parsed as CronJobConfig[]).map(normalizeCronJobRecord);
-      return { version: 1, jobs };
+    raw = await fs.readFile(jobsPath, 'utf-8');
+  } catch (err) {
+    // A missing file simply means "no schedules yet".
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return { version: 1, jobs: [] };
     }
-    if (typeof parsed === 'object' && parsed !== null) {
-      const obj = parsed as { version?: unknown; jobs?: unknown };
-      const jobs = Array.isArray(obj.jobs)
-        ? (obj.jobs as CronJobConfig[]).map(normalizeCronJobRecord)
-        : [];
-      const version = typeof obj.version === 'number' ? obj.version : 1;
-      return { ...(parsed as Record<string, unknown>), version, jobs };
-    }
-  } catch {
-    // ignore
+    throw err;
   }
-  return { version: 1, jobs: [] };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new CronJobsCorruptError(jobsPath);
+  }
+  if (Array.isArray(parsed)) {
+    const jobs = (parsed as CronJobConfig[]).map(normalizeCronJobRecord);
+    return { version: 1, jobs };
+  }
+  if (typeof parsed === 'object' && parsed !== null) {
+    const obj = parsed as { version?: unknown; jobs?: unknown };
+    const jobs = Array.isArray(obj.jobs)
+      ? (obj.jobs as CronJobConfig[]).map(normalizeCronJobRecord)
+      : [];
+    const version = typeof obj.version === 'number' ? obj.version : 1;
+    return { ...(parsed as Record<string, unknown>), version, jobs };
+  }
+  throw new CronJobsCorruptError(jobsPath);
 }
 
 type CronMutation = (jobsFile: CronJobsFile) => CronJobsFile | null;
@@ -113,6 +142,9 @@ export async function mutateCronJobsFile(
   await previous;
 
   try {
+    // readCronJobsFile throws CronJobsCorruptError on unparseable input, so
+    // a mutation can never silently build on an empty schedule and wipe the
+    // operator's jobs on write (#104).
     const jobsFile = await readCronJobsFile(cronDir);
     const next = mutation(jobsFile);
 
@@ -153,6 +185,58 @@ export async function writeCronJobsFile(cronDir: string, next: CronJobsFile): Pr
 
   await fs.mkdir(cronDir, { recursive: true });
   await writeJsonAtomic(jobsPath, next);
+  await pruneCronBackups(cronDir);
+}
+
+/** Drops old timestamped backups beyond MAX_CRON_BACKUPS (newest kept).
+ * The stable `jobs.json.bak` is never touched. Best-effort: a missing or
+ * unreadable directory is not an error. */
+export async function pruneCronBackups(cronDir: string, keep: number = MAX_CRON_BACKUPS): Promise<void> {
+  let entries: string[];
+  try {
+    entries = await fs.readdir(cronDir);
+  } catch {
+    return;
+  }
+  const stamped = entries
+    .filter((name) => name.startsWith('jobs.json.bak.'))
+    .sort()
+    .reverse();
+  for (const name of stamped.slice(keep)) {
+    await fs.unlink(path.join(cronDir, name)).catch(() => null);
+  }
+}
+
+/** Moves a corrupt jobs.json aside (`jobs.json.corrupt.<timestamp>.<rand>`,
+ * never pruned) and writes a fresh empty schedule. Returns null when there
+ * is nothing to reset (missing file, or a valid schedule). Operators invoke
+ * this explicitly via POST /api/cron/jobs/reset -- it never runs implicitly,
+ * so no code path can surprise-wipe schedules (#104). */
+export async function resetCorruptJobsFile(cronDir: string): Promise<{ quarantined: string } | null> {
+  const jobsPath = getJobsPath(cronDir);
+  let raw: string;
+  try {
+    raw = await fs.readFile(jobsPath, 'utf-8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return null;
+    throw err;
+  }
+  let corrupt = false;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    corrupt = !parsed || typeof parsed !== 'object';
+  } catch {
+    corrupt = true;
+  }
+  if (!corrupt) return null;
+
+  const stamp = new Date().toISOString().replaceAll(':', '').replaceAll('.', '');
+  const rand = Math.random().toString(36).slice(2, 8);
+  const name = `jobs.json.corrupt.${stamp}.${rand}`;
+  await fs.mkdir(cronDir, { recursive: true });
+  await fs.rename(jobsPath, path.join(cronDir, name));
+  await writeJsonAtomic(jobsPath, { version: 1, jobs: [] });
+  return { quarantined: name };
 }
 
 export function normalizeJobId(value: unknown): string | null {

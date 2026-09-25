@@ -6,8 +6,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import {
+  CronJobsCorruptError,
+  MAX_CRON_BACKUPS,
   normalizeJobId,
+  pruneCronBackups,
   readCronJobsFile,
+  resetCorruptJobsFile,
   toggleCronJob,
   triggerCronJobNow,
   upsertCronJob,
@@ -181,4 +185,96 @@ test('mutateCronJobsFile serializes concurrent mutations', async () => {
   const ids = final.jobs.map((job) => job.id);
 
   assert.deepEqual(ids.sort(), ['concurrent-a', 'concurrent-b']);
+});
+
+test('readCronJobsFile throws CronJobsCorruptError on unparseable input and leaves it untouched (#104)', async () => {
+  const cronDir = path.join(tempDir, 'cron-corrupt');
+  await fs.mkdir(cronDir, { recursive: true });
+  const garbage = '{"jobs": [broken json';
+  await fs.writeFile(path.join(cronDir, 'jobs.json'), garbage, 'utf-8');
+
+  await assert.rejects(
+    () => readCronJobsFile(cronDir),
+    (err: unknown) => {
+      assert.ok(err instanceof CronJobsCorruptError);
+      assert.ok(err.jobsPath.endsWith('jobs.json'));
+      return true;
+    },
+  );
+  assert.equal(await fs.readFile(path.join(cronDir, 'jobs.json'), 'utf-8'), garbage);
+});
+
+test('readCronJobsFile rejects non-object JSON as corrupt (#104)', async () => {
+  const cronDir = path.join(tempDir, 'cron-nonobject');
+  await fs.mkdir(cronDir, { recursive: true });
+  await fs.writeFile(path.join(cronDir, 'jobs.json'), '42', 'utf-8');
+  await assert.rejects(() => readCronJobsFile(cronDir), CronJobsCorruptError);
+});
+
+test('mutateCronJobsFile refuses to build on a corrupt file (#104)', async () => {
+  const cronDir = path.join(tempDir, 'cron-corrupt-mutate');
+  await fs.mkdir(cronDir, { recursive: true });
+  const garbage = 'not json at all {{{';
+  await fs.writeFile(path.join(cronDir, 'jobs.json'), garbage, 'utf-8');
+
+  await assert.rejects(
+    () => mutateCronJobsFile(cronDir, (jobsFile) => upsertCronJob(jobsFile, { id: 'x', enabled: true })),
+    CronJobsCorruptError,
+  );
+  // The corrupt original is preserved byte-for-byte: no silent reset.
+  assert.equal(await fs.readFile(path.join(cronDir, 'jobs.json'), 'utf-8'), garbage);
+});
+
+test('resetCorruptJobsFile quarantines the corrupt file and writes a fresh schedule (#104)', async () => {
+  const cronDir = path.join(tempDir, 'cron-reset');
+  await fs.mkdir(cronDir, { recursive: true });
+  const garbage = '{"jobs": [broken';
+  await fs.writeFile(path.join(cronDir, 'jobs.json'), garbage, 'utf-8');
+
+  const result = await resetCorruptJobsFile(cronDir);
+  assert.ok(result);
+  assert.match(result.quarantined, /^jobs\.json\.corrupt\./);
+  assert.equal(await fs.readFile(path.join(cronDir, result.quarantined), 'utf-8'), garbage);
+
+  const fresh = await readCronJobsFile(cronDir);
+  assert.deepEqual(fresh.jobs, []);
+
+  // Second reset is a no-op: the fresh schedule is valid.
+  assert.equal(await resetCorruptJobsFile(cronDir), null);
+});
+
+test('resetCorruptJobsFile is a no-op for missing or valid schedules (#104)', async () => {
+  const missingDir = path.join(tempDir, 'cron-reset-missing');
+  await fs.mkdir(missingDir, { recursive: true });
+  assert.equal(await resetCorruptJobsFile(missingDir), null);
+
+  const validDir = path.join(tempDir, 'cron-reset-valid');
+  await fs.mkdir(validDir, { recursive: true });
+  await fs.writeFile(path.join(validDir, 'jobs.json'), JSON.stringify({ version: 1, jobs: [{ id: 'keep' }] }), 'utf-8');
+  assert.equal(await resetCorruptJobsFile(validDir), null);
+  assert.equal((await readCronJobsFile(validDir)).jobs.length, 1);
+});
+
+test('writeCronJobsFile prunes timestamped backups beyond the cap, keeping the stable .bak (#104)', async () => {
+  const cronDir = path.join(tempDir, 'cron-prune');
+  await fs.mkdir(cronDir, { recursive: true });
+  await fs.writeFile(path.join(cronDir, 'jobs.json'), JSON.stringify({ version: 1, jobs: [] }), 'utf-8');
+  await fs.writeFile(path.join(cronDir, 'jobs.json.bak'), JSON.stringify({ version: 1, jobs: [] }), 'utf-8');
+  for (let i = 0; i < MAX_CRON_BACKUPS + 5; i++) {
+    const stamp = `20260101T00000${String(i).padStart(2, '0')}`;
+    await fs.writeFile(path.join(cronDir, `jobs.json.bak.${stamp}`), '{}', 'utf-8');
+  }
+
+  await writeCronJobsFile(cronDir, { version: 1, jobs: [{ id: 'after-prune' }] });
+
+  const entries = await fs.readdir(cronDir);
+  const stamped = entries.filter((n) => n.startsWith('jobs.json.bak.'));
+  assert.ok(stamped.length <= MAX_CRON_BACKUPS, `expected <= ${MAX_CRON_BACKUPS} stamped backups, found ${stamped.length}`);
+  assert.ok(entries.includes('jobs.json.bak'), 'stable backup must survive pruning');
+  const raw = await fs.readFile(path.join(cronDir, 'jobs.json'), 'utf-8');
+  assert.match(raw, /"id": "after-prune"/);
+});
+
+test('pruneCronBackups tolerates a missing directory (#104)', async () => {
+  await pruneCronBackups(path.join(tempDir, 'cron-no-such-dir'));
 });

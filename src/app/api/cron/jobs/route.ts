@@ -4,12 +4,14 @@ import { requireUser } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 import { allowCronWrite, getInstance, resolveOpenClawPaths } from '@/lib/instances';
 import {
+  CronJobsCorruptError,
   deleteCronJob,
   mutateCronJobsFile,
   normalizeJobId,
   readCronJobsFile,
   upsertCronJob,
   type CronJobConfig,
+  type CronJobsFile,
 } from '@/lib/cron-jobs';
 
 export const dynamic = 'force-dynamic';
@@ -36,10 +38,30 @@ export async function GET(req: NextRequest) {
     const actor = requireUser(req as unknown as Request);
     const instance = getInstance(getInstanceId(req));
     const { cronDir } = resolveOpenClawPaths(instance);
-    const jobsFile = await readCronJobsFile(cronDir);
     const canWrite = allowCronWrite() && (actor.role === 'admin' || actor.role === 'editor');
+    let jobsFile: CronJobsFile;
+    try {
+      jobsFile = await readCronJobsFile(cronDir);
+    } catch (error) {
+      if (error instanceof CronJobsCorruptError) {
+        return NextResponse.json({
+          instance: instance.id,
+          jobs: [],
+          corrupt: true,
+          error: 'Cron jobs file is corrupt. Quarantine or repair it (POST /api/cron/jobs/reset) before mutating schedules.',
+          can_write: canWrite,
+        });
+      }
+      throw error;
+    }
     return NextResponse.json({ instance: instance.id, jobs: jobsFile.jobs, can_write: canWrite });
   } catch (error) {
+    if (error instanceof CronJobsCorruptError) {
+      return NextResponse.json(
+        { error: 'Cron jobs file is corrupt. Quarantine or repair it (POST /api/cron/jobs/reset) before mutating schedules.' },
+        { status: 409 },
+      );
+    }
     console.error("API error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -83,6 +105,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, jobs: next.jobs });
   } catch (error) {
+    if (error instanceof CronJobsCorruptError) {
+      return NextResponse.json(
+        { error: 'Cron jobs file is corrupt. Quarantine or repair it (POST /api/cron/jobs/reset) before mutating schedules.' },
+        { status: 409 },
+      );
+    }
     console.error("API error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -126,6 +154,12 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ ok: true, jobs: next.jobs });
   } catch (error) {
+    if (error instanceof CronJobsCorruptError) {
+      return NextResponse.json(
+        { error: 'Cron jobs file is corrupt. Quarantine or repair it (POST /api/cron/jobs/reset) before mutating schedules.' },
+        { status: 409 },
+      );
+    }
     console.error("API error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -166,6 +200,12 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true, jobs: next.jobs });
   } catch (error) {
+    if (error instanceof CronJobsCorruptError) {
+      return NextResponse.json(
+        { error: 'Cron jobs file is corrupt. Quarantine or repair it (POST /api/cron/jobs/reset) before mutating schedules.' },
+        { status: 409 },
+      );
+    }
     console.error("API error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
