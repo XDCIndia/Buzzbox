@@ -27,6 +27,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 ### Security
 - Facebook Page access token moved from URL query string to `Authorization: Bearer` header (#93, fixes #84); same fix applied to both Threads API call sites (#94).
 - Missing-config errors are typed (412/503) instead of surfacing as 500s (#90, fixes #88; telegram webhook included).
+- `GET /api/dicompute-test` now requires the `manage_system` capability (admin-only), is rate-limited per IP (10/min), and maps missing-provider/upstream failures to 412/502 instead of echoing raw errors; new coverage test asserts every non-auth API route references an auth guard (fixes #99).
 
 ### Closed (superseded/stale)
 - #50 (Turbopack `/login` hang) — non-reproducible on Next 16.1.6 after the #74 frontend rewrite; closed with an evidence battery.
