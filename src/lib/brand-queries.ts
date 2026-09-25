@@ -65,21 +65,22 @@ export function getBrandMentions(filters: {
   return (db.prepare(sql).all(...params) as MentionRow[]).map(rowToMention);
 }
 
-export function getBrandMention(id: string): BrandMention | null {
-  const row = getDb().prepare('SELECT * FROM brand_mentions WHERE id = ?').get(id) as MentionRow | undefined;
+export function getBrandMention(brand_id: string, id: string): BrandMention | null {
+  const row = getDb().prepare('SELECT * FROM brand_mentions WHERE id = ? AND brand_id = ?').get(id, brand_id) as MentionRow | undefined;
   return row ? rowToMention(row) : null;
 }
 
-export function patchMention(id: string, data: { sentiment?: string; emotion?: string; intent?: string }): void {
+export function patchMention(brand_id: string, id: string, data: { sentiment?: string; emotion?: string; intent?: string }): boolean {
   const db = getDb();
   const fields: string[] = [];
   const params: unknown[] = [];
   if (data.sentiment !== undefined) { fields.push('sentiment = ?'); params.push(data.sentiment); }
   if (data.emotion !== undefined) { fields.push('emotion = ?'); params.push(data.emotion); }
   if (data.intent !== undefined) { fields.push('intent = ?'); params.push(data.intent); }
-  if (!fields.length) return;
-  params.push(id);
-  db.prepare(`UPDATE brand_mentions SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+  if (!fields.length) return getBrandMention(brand_id, id) !== null;
+  params.push(id, brand_id);
+  const info = db.prepare(`UPDATE brand_mentions SET ${fields.join(', ')} WHERE id = ? AND brand_id = ?`).run(...params);
+  return info.changes > 0;
 }
 
 // Returns true when the row was newly inserted, false when an identical id
@@ -182,8 +183,9 @@ export function createBrandCompetitor(brand_id: string, name: string): BrandComp
   return getDb().prepare('SELECT * FROM brand_competitors WHERE id = ?').get(id) as BrandCompetitor;
 }
 
-export function deleteBrandCompetitor(id: string): void {
-  getDb().prepare('DELETE FROM brand_competitors WHERE id = ?').run(id);
+export function deleteBrandCompetitor(brand_id: string, id: string): boolean {
+  const info = getDb().prepare('DELETE FROM brand_competitors WHERE id = ? AND brand_id = ?').run(id, brand_id);
+  return info.changes > 0;
 }
 
 // ─── Campaigns ──────────────────────────────────────────
@@ -205,8 +207,9 @@ export function createBrandCampaign(brand_id: string, data: { name: string; keyw
   return rowToCampaign(getDb().prepare('SELECT * FROM brand_campaigns WHERE id = ?').get(id) as CampaignRow);
 }
 
-export function deleteBrandCampaign(id: string): void {
-  getDb().prepare('DELETE FROM brand_campaigns WHERE id = ?').run(id);
+export function deleteBrandCampaign(brand_id: string, id: string): boolean {
+  const info = getDb().prepare('DELETE FROM brand_campaigns WHERE id = ? AND brand_id = ?').run(id, brand_id);
+  return info.changes > 0;
 }
 
 // ─── Alerts ─────────────────────────────────────────────
@@ -228,14 +231,18 @@ export function createBrandAlert(brand_id: string, data: { name: string; filters
   return rowToAlert(getDb().prepare('SELECT * FROM brand_alerts WHERE id = ?').get(id) as AlertRow);
 }
 
-export function deleteBrandAlert(id: string): void {
-  getDb().prepare('DELETE FROM brand_alerts WHERE id = ?').run(id);
+export function deleteBrandAlert(brand_id: string, id: string): boolean {
+  const info = getDb().prepare('DELETE FROM brand_alerts WHERE id = ? AND brand_id = ?').run(id, brand_id);
+  return info.changes > 0;
 }
 
-/** Scans current mentions against an alert's filters and raises an in-app notification if any match arrived since last check. */
-export function checkBrandAlert(id: string): { matched: number } {
+/** Scans current mentions against an alert's filters and raises an in-app notification if any match arrived since last check.
+ * Returns null when the alert does not belong to the given brand (routes answer 404). */
+export function checkBrandAlert(brand_id: string, id: string): { matched: number } | null {
   const db = getDb();
-  const alert = rowToAlert(db.prepare('SELECT * FROM brand_alerts WHERE id = ?').get(id) as AlertRow);
+  const row = db.prepare('SELECT * FROM brand_alerts WHERE id = ? AND brand_id = ?').get(id, brand_id) as AlertRow | undefined;
+  if (!row) return null;
+  const alert = rowToAlert(row);
   const since = alert.last_checked_at;
 
   let sql = 'SELECT * FROM brand_mentions WHERE brand_id = ?';
@@ -248,7 +255,7 @@ export function checkBrandAlert(id: string): { matched: number } {
 
   const matches = (db.prepare(sql).all(...params) as MentionRow[]).map(rowToMention);
 
-  db.prepare('UPDATE brand_alerts SET last_checked_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+  db.prepare('UPDATE brand_alerts SET last_checked_at = CURRENT_TIMESTAMP WHERE id = ? AND brand_id = ?').run(id, brand_id);
 
   if (matches.length) {
     createNotification({

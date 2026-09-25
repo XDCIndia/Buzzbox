@@ -144,15 +144,15 @@ test('alerts POST/DELETE: viewer denied without changes; editor/admin allowed', 
   const alertId = (await created.json()).id as string;
   assert.equal(count('brand_alerts'), 1);
 
-  assert.equal((await alertCheckPost(req('http://localhost/x', { method: 'POST', headers: { cookie: viewerCookie } }), ctx({ alertId }))).status, 403);
-  const checkRes = await alertCheckPost(req('http://localhost/x', { method: 'POST', headers: { cookie: editorCookie } }), ctx({ alertId }));
+  assert.equal((await alertCheckPost(req('http://localhost/x', { method: 'POST', headers: { cookie: viewerCookie } }), ctx({ brandId: BRAND_ID, alertId }))).status, 403);
+  const checkRes = await alertCheckPost(req('http://localhost/x', { method: 'POST', headers: { cookie: editorCookie } }), ctx({ brandId: BRAND_ID, alertId }));
   assert.equal(checkRes.status, 200);
   assert.ok(typeof (await checkRes.json()).matched === 'number');
 
-  assert.equal((await alertDelete(req('http://localhost/x', { method: 'DELETE', headers: { cookie: viewerCookie } }), ctx({ alertId }))).status, 403);
+  assert.equal((await alertDelete(req('http://localhost/x', { method: 'DELETE', headers: { cookie: viewerCookie } }), ctx({ brandId: BRAND_ID, alertId }))).status, 403);
   assert.equal(count('brand_alerts'), 1, 'viewer must not delete alerts');
 
-  assert.equal((await alertDelete(req('http://localhost/x', { method: 'DELETE', headers: { cookie: editorCookie } }), ctx({ alertId }))).status, 200);
+  assert.equal((await alertDelete(req('http://localhost/x', { method: 'DELETE', headers: { cookie: editorCookie } }), ctx({ brandId: BRAND_ID, alertId }))).status, 200);
   assert.equal(count('brand_alerts'), 0);
 });
 
@@ -172,10 +172,10 @@ test('campaigns POST/DELETE: viewer denied; editor/admin allowed', async () => {
   assert.equal(created.status, 201);
   const campaignId = (await created.json()).id as string;
 
-  assert.equal((await campaignDelete(req('http://localhost/x', { method: 'DELETE', headers: { cookie: viewerCookie } }), ctx({ campaignId }))).status, 403);
+  assert.equal((await campaignDelete(req('http://localhost/x', { method: 'DELETE', headers: { cookie: viewerCookie } }), ctx({ brandId: BRAND_ID, campaignId }))).status, 403);
   assert.equal(count('brand_campaigns'), 1);
 
-  assert.equal((await campaignDelete(req('http://localhost/x', { method: 'DELETE', headers: { cookie: editorCookie } }), ctx({ campaignId }))).status, 200);
+  assert.equal((await campaignDelete(req('http://localhost/x', { method: 'DELETE', headers: { cookie: editorCookie } }), ctx({ brandId: BRAND_ID, campaignId }))).status, 200);
   assert.equal(count('brand_campaigns'), 0);
 });
 
@@ -195,10 +195,10 @@ test('competitors POST/DELETE: viewer denied; editor allowed', async () => {
   assert.equal(created.status, 201);
   const competitorId = (await created.json()).id as string;
 
-  assert.equal((await competitorDelete(req('http://localhost/x', { method: 'DELETE', headers: { cookie: viewerCookie } }), ctx({ competitorId }))).status, 403);
+  assert.equal((await competitorDelete(req('http://localhost/x', { method: 'DELETE', headers: { cookie: viewerCookie } }), ctx({ brandId: BRAND_ID, competitorId }))).status, 403);
   assert.equal(count('brand_competitors'), 1);
 
-  assert.equal((await competitorDelete(req('http://localhost/x', { method: 'DELETE', headers: { cookie: editorCookie } }), ctx({ competitorId }))).status, 200);
+  assert.equal((await competitorDelete(req('http://localhost/x', { method: 'DELETE', headers: { cookie: editorCookie } }), ctx({ brandId: BRAND_ID, competitorId }))).status, 200);
   assert.equal(count('brand_competitors'), 0);
 });
 
@@ -219,7 +219,7 @@ test('mention PATCH: viewer denied without change; editor allowed', async () => 
       method: 'PATCH',
       headers: { 'content-type': 'application/json', ...headers },
       body: JSON.stringify({ sentiment: 'negative' }),
-    }), ctx({ mentionId: 'mention_rbac_test' }));
+    }), ctx({ brandId: BRAND_ID, mentionId: 'mention_rbac_test' }));
 
   assert.equal((await patch({})).status, 401);
 

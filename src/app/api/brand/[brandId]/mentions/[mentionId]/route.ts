@@ -4,10 +4,10 @@ import { getBrandMention, patchMention } from '@/lib/brand-queries';
 import { parseAndValidate } from '@/lib/api-validate';
 import { z } from 'zod';
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ mentionId: string }> }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ brandId: string; mentionId: string }> }) {
   const auth = requireApiEditor(req as Request);
   if (auth) return auth;
-  const { mentionId } = await params;
+  const { brandId, mentionId } = await params;
   const parsed = await parseAndValidate(
     req,
     z.object({
@@ -18,6 +18,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ me
   );
   if (!parsed.ok) return parsed.response;
   const body = parsed.data;
-  patchMention(mentionId, { sentiment: body.sentiment, emotion: body.emotion, intent: body.intent });
-  return NextResponse.json(getBrandMention(mentionId));
+  if (!patchMention(brandId, mentionId, { sentiment: body.sentiment, emotion: body.emotion, intent: body.intent })) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+  return NextResponse.json(getBrandMention(brandId, mentionId));
 }
