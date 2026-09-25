@@ -1,14 +1,64 @@
 /**
  * Seed script that populates the Marketing Dashboard SQLite database with sample data.
- * Run with: npx tsx scripts/seed.ts
+ * Run with: npx tsx scripts/seed.ts [--yes] [--force]
+ *
+ * Safety guards (#102): the script refuses to run when NODE_ENV=production
+ * or when the target database holds non-seed (operator) rows, unless
+ * --force is passed. Otherwise it prints the resolved database path and
+ * requires an interactive 'yes' confirmation (skipped with --yes/--force).
  */
-import Database from 'better-sqlite3';
-import path from 'path';
+import fs from 'node:fs';
+import { getDb, getDbPath } from '../src/lib/db';
+import {
+  SEED_TRACKED_TABLES,
+  findNonSeedRows,
+  formatNonSeedReport,
+  isProductionEnv,
+  parseSeedArgs,
+} from './seed-guards';
 
-const DB_PATH = process.env.HERMES_DB_PATH || path.join(process.cwd(), 'hermes.db');
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+// Schema comes from the app migration (getDb runs migrate()), so the seed
+// can never drift from what the routes expect. HERMES_DB_PATH is honored;
+// the default is <HERMES_STATE_DIR>/hermes.db -- the database the app reads.
+const db = getDb();
+
+// ── Safety guards (#102) ──────────────────────────────────────────
+
+const seedArgs = parseSeedArgs(process.argv.slice(2));
+console.log(`Database: ${getDbPath()}`);
+
+if (isProductionEnv() && !seedArgs.force) {
+  console.error('Refusing to seed: NODE_ENV=production. Re-run with --force if you really mean it.');
+  process.exit(1);
+}
+
+const nonSeedRows = findNonSeedRows(db);
+if (nonSeedRows.length > 0 && !seedArgs.force) {
+  console.error('Refusing to seed: the database holds non-seed (operator) data that would be wiped:');
+  console.error(formatNonSeedReport(nonSeedRows));
+  console.error('Re-run with --force to wipe it anyway.');
+  process.exit(1);
+}
+
+function readAnswer(question: string): string | null {
+  if (!process.stdin.isTTY) return null;
+  process.stdout.write(question);
+  try {
+    return fs.readFileSync(0, 'utf-8').split('\n')[0] ?? '';
+  } catch {
+    return null;
+  }
+}
+
+if (!seedArgs.yes) {
+  const answer = readAnswer(
+    `\nSeed will DELETE all rows in ${SEED_TRACKED_TABLES.length} tables. Type 'yes' to continue: `,
+  );
+  if ((answer ?? '').trim().toLowerCase() !== 'yes') {
+    console.error("Aborted: confirmation not given (re-run with --yes to skip the prompt).");
+    process.exit(1);
+  }
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -27,123 +77,6 @@ function dateStr(daysBack: number): string {
 function uid(): string {
   return Math.random().toString(36).slice(2, 10);
 }
-
-// ── Ensure tables exist (same migration as db.ts) ────────────────────
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS content_posts (
-    id TEXT PRIMARY KEY, platform TEXT NOT NULL, format TEXT NOT NULL,
-    pillar INTEGER, text_preview TEXT, full_content TEXT,
-    status TEXT NOT NULL DEFAULT 'draft', scheduled_for DATETIME,
-    published_at DATETIME, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    impressions INTEGER DEFAULT 0, likes INTEGER DEFAULT 0,
-    replies INTEGER DEFAULT 0, reposts INTEGER DEFAULT 0,
-    saves INTEGER DEFAULT 0, engagement_rate REAL DEFAULT 0
-  );
-  CREATE TABLE IF NOT EXISTS leads (
-    id TEXT PRIMARY KEY, first_name TEXT, last_name TEXT, title TEXT,
-    company TEXT, company_size TEXT, industry_segment TEXT, source TEXT,
-    email TEXT, linkedin_url TEXT, status TEXT NOT NULL DEFAULT 'new',
-    score INTEGER, tier TEXT, last_touch_at DATETIME,
-    next_action_at DATETIME, sequence_name TEXT, reply_type TEXT,
-    notes TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS sequences (
-    id TEXT PRIMARY KEY, lead_id TEXT REFERENCES leads(id),
-    sequence_name TEXT, step INTEGER, subject TEXT, body TEXT,
-    status TEXT, tier TEXT, scheduled_for DATETIME, sent_at DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS suppression (
-    email TEXT PRIMARY KEY, type TEXT,
-    added_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS engagements (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, platform TEXT,
-    action_type TEXT, target_url TEXT, target_username TEXT,
-    our_text TEXT, status TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS signals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, type TEXT,
-    username TEXT, tweet_url TEXT, summary TEXT, relevance TEXT,
-    action_taken TEXT, likes INTEGER, impressions INTEGER,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS experiments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, week INTEGER,
-    hypothesis TEXT, action TEXT, metric TEXT, win_threshold TEXT,
-    status TEXT, results TEXT, winner TEXT, margin TEXT,
-    decision TEXT, learning TEXT, next_action TEXT,
-    proposed_at DATETIME, completed_at DATETIME
-  );
-  CREATE TABLE IF NOT EXISTS learnings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, learning TEXT,
-    validated_week INTEGER, confidence TEXT, applied_to TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS daily_metrics (
-    date TEXT PRIMARY KEY, x_posts INTEGER DEFAULT 0,
-    x_threads INTEGER DEFAULT 0, linkedin_drafts INTEGER DEFAULT 0,
-    x_replies INTEGER DEFAULT 0, x_quote_tweets INTEGER DEFAULT 0,
-    x_follows INTEGER DEFAULT 0, linkedin_comments INTEGER DEFAULT 0,
-    discoveries INTEGER DEFAULT 0, enrichments INTEGER DEFAULT 0,
-    sends INTEGER DEFAULT 0, replies_triaged INTEGER DEFAULT 0,
-    opt_outs INTEGER DEFAULT 0, bounces INTEGER DEFAULT 0,
-    total_impressions INTEGER DEFAULT 0, total_engagement INTEGER DEFAULT 0
-  );
-  CREATE TABLE IF NOT EXISTS activity_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, ts DATETIME,
-    action TEXT, detail TEXT, result TEXT
-  );
-`);
-
-// ── Seed registry table ──────────────────────────────────────────────
-db.exec(`
-  CREATE TABLE IF NOT EXISTS seed_registry (
-    table_name TEXT NOT NULL,
-    record_id TEXT NOT NULL,
-    PRIMARY KEY (table_name, record_id)
-  );
-`);
-
-// ── Brand mentions tables (same shape as db.ts migrate()) ────────────
-db.exec(`
-  CREATE TABLE IF NOT EXISTS brands (
-    id TEXT PRIMARY KEY, name TEXT NOT NULL,
-    keywords TEXT NOT NULL DEFAULT '[]', sources TEXT NOT NULL DEFAULT '[]',
-    is_demo INTEGER NOT NULL DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS brand_mentions (
-    id TEXT PRIMARY KEY, brand_id TEXT NOT NULL REFERENCES brands(id),
-    source_type TEXT NOT NULL, platform TEXT NOT NULL,
-    author_name TEXT, author_handle TEXT, author_avatar_url TEXT, author_reach INTEGER DEFAULT 0,
-    text TEXT NOT NULL, url TEXT, likes INTEGER DEFAULT 0, comments INTEGER DEFAULT 0,
-    sentiment TEXT, emotion TEXT, intent TEXT,
-    is_crisis INTEGER DEFAULT 0, is_high_impact INTEGER DEFAULT 0,
-    published_at DATETIME, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS brand_competitors (
-    id TEXT PRIMARY KEY, brand_id TEXT NOT NULL REFERENCES brands(id),
-    name TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS brand_campaigns (
-    id TEXT PRIMARY KEY, brand_id TEXT NOT NULL REFERENCES brands(id),
-    name TEXT NOT NULL, keywords TEXT NOT NULL DEFAULT '[]',
-    starts_at DATETIME, ends_at DATETIME, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS brand_alerts (
-    id TEXT PRIMARY KEY, brand_id TEXT NOT NULL REFERENCES brands(id),
-    name TEXT NOT NULL, filters TEXT NOT NULL DEFAULT '{}',
-    last_checked_at DATETIME, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS brand_digests (
-    id TEXT PRIMARY KEY, brand_id TEXT NOT NULL REFERENCES brands(id),
-    title TEXT, body TEXT, period_start TEXT, period_end TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-`);
 
 // ── Wipe existing seed data ──────────────────────────────────────────
 
@@ -758,6 +691,6 @@ for (const [table, count] of Object.entries(counts)) {
   console.log(`  ${table.padEnd(16)} ${count}`);
 }
 console.log('─────────────────────────────────────────');
-console.log(`\nDatabase: ${DB_PATH}`);
+console.log(`\nDatabase: ${getDbPath()}`);
 
 db.close();

@@ -17,6 +17,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Buzz returns 412 with actionable guidance when Dicompute is unconfigured, matching the X-posting convention (#90, fixes #88); upstream provider errors surface concise status-based messages instead of the provider's raw HTML body (#95, fixes #51).
 - Approvals taken on page routes now write `activity_log`, so the approvals history panel reflects them (#92, fixes #85).
 - Toasts fire only after verified success; automations actions no longer leave buttons disabled after a failure (#93, fixes #66).
+- `pnpm seed` runs the app migration instead of duplicated DDL (schema can no longer drift), targets the database the app reads, refuses on `NODE_ENV=production` or non-seed rows without `--force`, and requires interactive confirmation otherwise (fixes #102).
 
 ### Fixed
 - Agent-sessions cards link to the real `/agents/comms?conv=` route; dashboard uses the default brand id instead of a hardcoded UUID (#95, fixes #67).
