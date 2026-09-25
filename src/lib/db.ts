@@ -35,11 +35,14 @@ export function resetDbForTests(): void {
 }
 
 function migrate(db: Database.Database) {
-  const from = getSchemaVersion(db);
-
-  // v1: baseline schema (idempotent CREATE IF NOT EXISTS — no-ops on legacy DBs
-  // that predate version tracking)
-  if (from < 1) {
+  // Each version step runs in its own transaction and the version is
+  // stamped only after the step succeeds. A partial failure (full disk,
+  // busy lock, corrupt page) therefore rolls back and retries cleanly on
+  // next boot instead of stamping CURRENT and bricking the database with a
+  // half-applied schema (#103). The version is re-read between steps so
+  // each gate reflects what actually landed.
+  if (getSchemaVersion(db) < 1) {
+    runInTransaction(db, () => {
   db.exec(`
     CREATE TABLE IF NOT EXISTS content_posts (
       id TEXT PRIMARY KEY,
@@ -339,24 +342,32 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_content_queue_items_status ON content_queue_items(status);
 
   `);
+    });
+    db.pragma('user_version = 1');
   }
 
   // v2: checked column additions — table_info lookup instead of try/catch so
   // real ALTER failures surface instead of being silently swallowed
-  if (from < 2) {
-    addColumnIfMissing(db, 'leads', 'pause_outreach', 'INTEGER DEFAULT 0');
-    addColumnIfMissing(db, 'content_posts', 'image_url', 'TEXT');
+  if (getSchemaVersion(db) < 2) {
+    runInTransaction(db, () => {
+      addColumnIfMissing(db, 'leads', 'pause_outreach', 'INTEGER DEFAULT 0');
+      addColumnIfMissing(db, 'content_posts', 'image_url', 'TEXT');
+    });
+    db.pragma('user_version = 2');
   }
 
   // v3: is_demo flags the placeholder/demo brand row so the UI can label
   // seeded demo data clearly instead of presenting it as the user's own
   // brand (#89).
-  if (from < 3) {
-    addColumnIfMissing(db, 'brands', 'is_demo', 'INTEGER DEFAULT 0');
-    // Backfill existing deployments: flag the seeded demo brand ('Hermes'
-    // from scripts/seed.ts) and the migration fallback ('My Brand') unless
-    // the operator already renamed them to something real.
-    db.prepare(`UPDATE brands SET is_demo = 1 WHERE id = ? AND name IN ('Hermes', 'My Brand')`).run(DEFAULT_BRAND_ID);
+  if (getSchemaVersion(db) < 3) {
+    runInTransaction(db, () => {
+      addColumnIfMissing(db, 'brands', 'is_demo', 'INTEGER DEFAULT 0');
+      // Backfill existing deployments: flag the seeded demo brand ('Hermes'
+      // from scripts/seed.ts) and the migration fallback ('My Brand') unless
+      // the operator already renamed them to something real.
+      db.prepare(`UPDATE brands SET is_demo = 1 WHERE id = ? AND name IN ('Hermes', 'My Brand')`).run(DEFAULT_BRAND_ID);
+    });
+    db.pragma('user_version = 3');
   }
 
   // Data-level guarantee (runs every boot, deliberately NOT version-gated):
@@ -366,14 +377,29 @@ function migrate(db: Database.Database) {
   db.prepare(
     `INSERT OR IGNORE INTO brands (id, name, keywords, sources, is_demo) VALUES (?, ?, ?, ?, 1)`
   ).run(DEFAULT_BRAND_ID, 'My Brand', '[]', '[]');
-
-  db.pragma(`user_version = ${CURRENT_SCHEMA_VERSION}`);
 }
 
 export const CURRENT_SCHEMA_VERSION = 3;
 
 export function getSchemaVersion(db: Database.Database): number {
   return db.pragma('user_version', { simple: true }) as number;
+}
+
+/** Runs fn inside a transaction, rolling back on failure. Exported for unit
+ * tests simulating a failed migration step (#103). */
+export function runInTransaction(db: Database.Database, fn: () => void): void {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    fn();
+  } catch (err) {
+    try {
+      db.exec('ROLLBACK');
+    } catch {
+      // Nothing to roll back (already rolled back or never began).
+    }
+    throw err;
+  }
+  db.exec('COMMIT');
 }
 
 function addColumnIfMissing(

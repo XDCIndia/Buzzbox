@@ -87,3 +87,35 @@ test('migrations are idempotent — reopening an up-to-date DB does not re-run t
   const leadCount = (reopened.prepare(`SELECT COUNT(*) c FROM leads WHERE id = 'legacy_1'`).get() as { c: number }).c;
   assert.equal(leadCount, 1);
 });
+
+test('a failed migration step rolls back and leaves the version unstamped (#103)', () => {
+  const db = dbm.getDb();
+  const versionBefore = dbm.getSchemaVersion(db);
+  assert.throws(() => {
+    dbm.runInTransaction(db, () => {
+      db.prepare(`INSERT INTO leads (id, first_name, status) VALUES ('doomed_1', 'Bo', 'new')`).run();
+      throw new Error('simulated mid-migration failure (full disk)');
+    });
+  }, /simulated mid-migration failure/);
+  // The partial insert is gone and the version still allows a retry.
+  const leftover = (db.prepare(`SELECT COUNT(*) c FROM leads WHERE id = 'doomed_1'`).get() as { c: number }).c;
+  assert.equal(leftover, 0, 'partial step writes must roll back');
+  assert.equal(dbm.getSchemaVersion(db), versionBefore, 'version must not advance past a failed step');
+});
+
+test('version 0 with a full schema resumes stepwise instead of skipping (#103)', () => {
+  dbm.getDb();
+  dbm.resetDbForTests();
+
+  // Simulate a deployment whose schema landed but whose version stamp was
+  // lost (the exact state the old unconditional stamp could never produce
+  // forward from): full tables, version 0.
+  const rewind = new Database(dbPath);
+  rewind.pragma('user_version = 0');
+  rewind.close();
+
+  const resumed = dbm.getDb();
+  assert.equal(dbm.getSchemaVersion(resumed), dbm.CURRENT_SCHEMA_VERSION);
+  const leadCount = (resumed.prepare(`SELECT COUNT(*) c FROM leads WHERE id = 'legacy_1'`).get() as { c: number }).c;
+  assert.equal(leadCount, 1, 'existing rows must survive the resumed migration');
+});
