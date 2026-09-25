@@ -125,6 +125,7 @@ Start with a local read-only posture, verify each boundary, and enable writeback
 
 - Replace `AUTH_USER`, `AUTH_PASS`, and `API_KEY`.
 - Keep `HERMES_HOST_LOCK=local` unless you have an explicit host allowlist.
+- Treat `HERMES_HOST_LOCK` as a best-effort header check, not a network boundary: it reads the client-controlled `Host` header, so a remote peer can claim to be `localhost`. Enforce locality with the listen address (`HOSTNAME=127.0.0.1`, `PORT=3000`) plus firewall rules.
 - Use HTTPS and `AUTH_COOKIE_SECURE=true` outside local development.
 - Load production secrets from a secret manager or runtime environment.
 - Leave all `HERMES_ALLOW_*_WRITE` variables disabled until their write paths are required and reviewed.

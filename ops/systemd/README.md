@@ -36,6 +36,17 @@ Template-safe defaults:
 - `HERMES_DB_PATH=/var/lib/hermes-dashboard/hermes.db`
 - `HERMES_STATE_DIR=/var/lib/hermes-dashboard/state`
 
+Network binding (`#100`):
+
+- `HERMES_HOST_LOCK` is a best-effort `Host`-header check, not a network
+  boundary — a remote peer can send `Host: localhost`. The real boundary is
+  the listen address plus firewall rules.
+- Local-only posture: `HOSTNAME=127.0.0.1` (+ `PORT=3000`, or your chosen
+  port). The standalone server defaults to `0.0.0.0` when `HOSTNAME` is unset.
+- Tailscale-serve posture: keep the default bind, restrict at the tailnet /
+  firewall layer, and leave `HERMES_HOST_LOCK=local` (it allows `100.*` and
+  `*.ts.net`).
+
 OpenClaw instance discovery:
 
 - Single instance:
