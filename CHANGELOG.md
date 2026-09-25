@@ -29,6 +29,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Missing-config errors are typed (412/503) instead of surfacing as 500s (#90, fixes #88; telegram webhook included).
 - `GET /api/dicompute-test` now requires the `manage_system` capability (admin-only), is rate-limited per IP (10/min), and maps missing-provider/upstream failures to 412/502 instead of echoing raw errors; new coverage test asserts every non-auth API route references an auth guard (fixes #99).
 - Host-lock parsing handles bracketed/bare IPv6 loopback (`[::1]`, `::1`) and normalizes case; documented that `HERMES_HOST_LOCK` is a best-effort header check with the listen address (`HOSTNAME=127.0.0.1`) plus firewall as the real boundary (fixes #100).
+- Brand-child mutations (alert/campaign/competitor deletes, alert checks, mention reads/patches) are scoped to the URL `brandId` and answer 404 on mismatch, closing the cross-brand IDOR (fixes #101).
 
 ### Closed (superseded/stale)
 - #50 (Turbopack `/login` hang) — non-reproducible on Next 16.1.6 after the #74 frontend rewrite; closed with an evidence battery.
