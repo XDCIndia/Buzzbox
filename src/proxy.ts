@@ -38,6 +38,25 @@ function startsWithOrigin(header: string, allowedOrigin: string): boolean {
   }
 }
 
+/** Parse a Host header value into a bare lowercase hostname.
+ * Handles `example.com:3000`, bare names, bracketed IPv6 (`[::1]:3000`),
+ * and bare IPv6 (`::1`). The naive `split(':')[0]` turned `[::1]:3000`
+ * into `'['`, rejecting genuine IPv6 loopback while adding nothing against
+ * spoofed names (#100). */
+function parseHostName(host: string): string {
+  const raw = (host || '').trim().toLowerCase();
+  if (!raw) return '';
+  if (raw.startsWith('[')) {
+    const end = raw.indexOf(']');
+    if (end === -1) return raw;
+    return raw.slice(1, end);
+  }
+  // A bare IPv6 literal holds more than one colon and carries no port.
+  if ((raw.match(/:/g) || []).length > 1) return raw;
+  const colon = raw.indexOf(':');
+  return colon === -1 ? raw : raw.slice(0, colon);
+}
+
 function isHostAllowedByLock(hostName: string): boolean {
   const mode = (process.env.HERMES_HOST_LOCK || 'local').trim().toLowerCase();
   if (mode === 'off' || mode === 'disabled' || mode === 'false' || mode === '0') {
@@ -45,7 +64,11 @@ function isHostAllowedByLock(hostName: string): boolean {
   }
 
   if (mode === 'local') {
-    const isLocalhost = hostName === 'localhost' || hostName === '127.0.0.1';
+    // Best-effort header check only: the Host header is client-controlled,
+    // so a remote peer can always claim to be `localhost`. The real network
+    // boundary is the listen address (HOSTNAME=127.0.0.1) plus firewall
+    // rules -- see "Deployment safety" in the README (#100).
+    const isLocalhost = hostName === 'localhost' || hostName === '127.0.0.1' || hostName === '::1';
     const isTailscale = hostName.startsWith('100.') || hostName.endsWith('.ts.net');
     return isLocalhost || isTailscale;
   }
@@ -61,7 +84,7 @@ function isHostAllowedByLock(hostName: string): boolean {
 
 export function proxy(request: NextRequest) {
   const host = request.headers.get('host') || '';
-  const hostName = host.split(':')[0];
+  const hostName = parseHostName(host);
   if (!isHostAllowedByLock(hostName)) {
     return new NextResponse('Forbidden', { status: 403 });
   }
