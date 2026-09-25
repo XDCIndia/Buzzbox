@@ -10,12 +10,14 @@ import { parseAndValidate } from '@/lib/api-validate';
 import { z } from 'zod';
 import { allowCronWrite, getInstance, resolveOpenClawPaths } from '@/lib/instances';
 import {
+  CronJobsCorruptError,
   mutateCronJobsFile,
   normalizeJobId,
   readCronJobsFile,
   toggleCronJob,
   triggerCronJobNow,
   type CronJobConfig,
+  type CronJobsFile,
 } from '@/lib/cron-jobs';
 
 export const dynamic = 'force-dynamic';
@@ -45,26 +47,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ notified: 0 });
     }
 
-    const data = JSON.parse(fsSync.readFileSync(jobsPath, 'utf-8'));
-    const jobs = data.jobs || [];
+    let data: { jobs?: unknown };
+    try {
+      data = JSON.parse(fsSync.readFileSync(jobsPath, 'utf-8'));
+    } catch {
+      // Corrupt schedule: nothing to notify on, and the file is left alone
+      // for the operator to reset via POST /api/cron/jobs/reset (#104).
+      return NextResponse.json({ notified: 0, corrupt: true });
+    }
+    const jobs = ((data as { jobs?: unknown }).jobs as CronJobConfig[] | undefined) || [];
     let notified = 0;
 
     for (const job of jobs) {
-      if (!job.state?.lastRunAtMs) continue;
+      const state: Record<string, unknown> =
+        typeof job.state === 'object' && job.state !== null
+          ? (job.state as Record<string, unknown>)
+          : {};
+      const lastRunAtMs = state.lastRunAtMs;
+      if (typeof lastRunAtMs !== 'number' || !lastRunAtMs) continue;
       const jobId = normalizeJobId(job.id ?? job.jobId);
       if (!jobId) continue;
 
       // Check if we already notified for this run
-      const key = `cron:${instance.id}:${jobId}:${job.state.lastRunAtMs}`;
+      const key = `cron:${instance.id}:${jobId}:${lastRunAtMs}`;
       const existing = db
         .prepare('SELECT 1 FROM notifications WHERE data LIKE ? LIMIT 1')
         .get(`%${key}%`);
 
       if (!existing) {
-        const status = job.state.lastStatus === 'ok' ? 'info' : 'warning';
-        const duration = job.state.lastDurationMs
-          ? `${Math.round(job.state.lastDurationMs / 1000)}s`
-          : '';
+        const status = state.lastStatus === 'ok' ? 'info' : 'warning';
+        const lastDurationMs = typeof state.lastDurationMs === 'number' ? state.lastDurationMs : 0;
+        const duration = lastDurationMs ? `${Math.round(lastDurationMs / 1000)}s` : '';
         const agentLabel = (job.agentId || 'unknown').charAt(0).toUpperCase() + (job.agentId || 'unknown').slice(1);
 
         db.prepare(`
@@ -73,8 +86,8 @@ export async function POST(request: Request) {
         `).run(
           status,
           `${agentLabel}: ${job.name} completed`,
-          `${job.skill || jobId} finished in ${duration}. Status: ${job.state.lastStatus || 'unknown'}`,
-          JSON.stringify({ key, job_id: jobId, agent_id: job.agentId, duration_ms: job.state.lastDurationMs }),
+          `${job.skill || jobId} finished in ${duration}. Status: ${String(state.lastStatus || 'unknown')}`,
+          JSON.stringify({ key, job_id: jobId, agent_id: job.agentId, duration_ms: lastDurationMs }),
         );
         notified++;
       }
@@ -96,8 +109,25 @@ export async function GET(request: Request) {
     const { cronDir } = resolveOpenClawPaths(instance);
     const logsDir = path.join(cronDir, 'logs');
 
-    // Read cron jobs config
-    const jobsFile = await readCronJobsFile(cronDir);
+    // Read cron jobs config. A corrupt jobs.json surfaces as degraded state
+    // (never a silent empty schedule); mutations refuse until it is reset.
+    let jobsFile: CronJobsFile;
+    try {
+      jobsFile = await readCronJobsFile(cronDir);
+    } catch (error) {
+      if (error instanceof CronJobsCorruptError) {
+        const isEditor = actor.role === 'admin' || actor.role === 'editor';
+        return NextResponse.json({
+          instance: instance.id,
+          jobs: [],
+          corrupt: true,
+          error: 'Cron jobs file is corrupt. Quarantine or repair it (POST /api/cron/jobs/reset) before mutating schedules.',
+          can_write: allowCronWrite() && isEditor,
+          can_templates_write: isEditor,
+        });
+      }
+      throw error;
+    }
     const jobs = jobsFile.jobs as CronJobConfig[];
 
     // Read recent logs for each job
@@ -189,6 +219,12 @@ export async function PUT(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof CronJobsCorruptError) {
+      return NextResponse.json(
+        { error: 'Cron jobs file is corrupt. Quarantine or repair it (POST /api/cron/jobs/reset) before mutating schedules.' },
+        { status: 409 },
+      );
+    }
     console.error("API error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
