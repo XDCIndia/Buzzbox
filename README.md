@@ -57,7 +57,7 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
-Optionally seed demo data with `pnpm seed` — seeded rows are flagged as demo in the UI and never presented as real brand data.
+Optionally seed demo data with `pnpm seed` — seeded rows are flagged as demo in the UI and never presented as real brand data. The script seeds the app database (`HERMES_DB_PATH`, default `<state dir>/hermes.db`), refuses when `NODE_ENV=production` or non-seed rows exist unless passed `--force`, and otherwise asks for confirmation (`--yes` skips the prompt).
 
 The first login is seeded from `AUTH_USER` and `AUTH_PASS` when the users table is empty. Change the example credentials in `.env.local` before starting the application.
 
