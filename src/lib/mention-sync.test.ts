@@ -30,10 +30,12 @@ for (const v of [
 
 type DbModule = typeof import('./db');
 type AuthModule = typeof import('./auth');
+type SyncLib = typeof import('./mention-sync');
 type SyncRoute = typeof import('../app/api/brand/[brandId]/mentions/sync/route');
 let dbm: DbModule;
 let authm: AuthModule;
-let route: SyncRoute;
+let synclib: SyncLib;
+let routePost: SyncRoute['POST'];
 let editorCookie: string;
 
 async function imp<T>(specifier: string): Promise<T> {
@@ -44,7 +46,8 @@ async function imp<T>(specifier: string): Promise<T> {
 before(async () => {
   dbm = await imp<DbModule>('./db');
   authm = await imp<AuthModule>('./auth');
-  route = await imp<SyncRoute>('../app/api/brand/[brandId]/mentions/sync/route');
+  synclib = await imp<SyncLib>('./mention-sync');
+  routePost = (await imp<SyncRoute>('../app/api/brand/[brandId]/mentions/sync/route')).POST;
 
   authm.ensureAuthTables();
   const db = dbm.getDb();
@@ -60,27 +63,27 @@ after(() => {
 });
 
 test('syncQueriesForBrand uses all keywords, deduped and capped (#121)', () => {
-  assert.deepEqual(route.syncQueriesForBrand(['a', 'b', 'a', ' ', 'c'], 'Brand'), ['a', 'b', 'c']);
-  assert.deepEqual(route.syncQueriesForBrand([], 'Brand'), ['Brand']);
-  assert.deepEqual(route.syncQueriesForBrand(['  '], 'Brand'), ['Brand']);
+  assert.deepEqual(synclib.syncQueriesForBrand(['a', 'b', 'a', ' ', 'c'], 'Brand'), ['a', 'b', 'c']);
+  assert.deepEqual(synclib.syncQueriesForBrand([], 'Brand'), ['Brand']);
+  assert.deepEqual(synclib.syncQueriesForBrand(['  '], 'Brand'), ['Brand']);
   const many = ['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7'];
-  const capped = route.syncQueriesForBrand(many, 'Brand');
-  assert.equal(capped.length, route.MAX_SYNC_KEYWORDS);
-  assert.deepEqual(capped, many.slice(0, route.MAX_SYNC_KEYWORDS));
+  const capped = synclib.syncQueriesForBrand(many, 'Brand');
+  assert.equal(capped.length, synclib.MAX_SYNC_KEYWORDS);
+  assert.deepEqual(capped, many.slice(0, synclib.MAX_SYNC_KEYWORDS));
 });
 
 test('conciseProviderError strips bodies to one short line (#121)', () => {
   const raw = new Error('X API failed (401): <html>big body' + 'x'.repeat(5000) + '</html>\nsecond line');
-  const concise = route.conciseProviderError(raw);
+  const concise = synclib.conciseProviderError(raw);
   assert.ok(!concise.includes('<html>'));
   assert.ok(!concise.includes('\n'));
   assert.ok(concise.length <= 200);
   assert.match(concise, /X API failed/);
-  assert.equal(route.conciseProviderError('plain string'), 'plain string');
+  assert.equal(synclib.conciseProviderError('plain string'), 'plain string');
 });
 
 test('buildMentionSyncResponse is honest: 200, 207, 502 (#121)', () => {
-  const ok = route.buildMentionSyncResponse(
+  const ok = synclib.buildMentionSyncResponse(
     [{ platform: 'x', inserted: 3 }, { platform: 'reddit', inserted: 0 }],
     ['tiktok'],
     ['alpha'],
@@ -88,7 +91,7 @@ test('buildMentionSyncResponse is honest: 200, 207, 502 (#121)', () => {
   assert.equal(ok.status, 200);
   assert.deepEqual(ok.body, { synced: 3, skipped: ['tiktok'], queries: ['alpha'] });
 
-  const partial = route.buildMentionSyncResponse(
+  const partial = synclib.buildMentionSyncResponse(
     [{ platform: 'x', inserted: 2 }, { platform: 'reddit', error: 'boom' }],
     [],
     ['alpha', 'beta'],
@@ -101,13 +104,13 @@ test('buildMentionSyncResponse is honest: 200, 207, 502 (#121)', () => {
     errors: { reddit: 'boom' },
   });
 
-  const total = route.buildMentionSyncResponse([{ platform: 'x', error: 'down' }], ['tiktok'], ['alpha']);
+  const total = synclib.buildMentionSyncResponse([{ platform: 'x', error: 'down' }], ['tiktok'], ['alpha']);
   assert.equal(total.status, 502);
   assert.deepEqual(total.body.errors, { x: 'down' });
 });
 
 test('POST answers 412 with guidance when no connector is configured (#121)', async () => {
-  const res = await route.POST(
+  const res = await routePost(
     new Request('http://localhost/api/brand/msync-brand/mentions/sync', {
       method: 'POST',
       headers: { cookie: editorCookie },
@@ -117,3 +120,4 @@ test('POST answers 412 with guidance when no connector is configured (#121)', as
   assert.equal(res.status, 412);
   assert.match(String((await res.json()).error), /No social connector is configured/);
 });
+
