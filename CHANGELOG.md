@@ -29,6 +29,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Dashboard `MetricColumn` no longer renders each KPI value block twice (fixes #117).
 - CRM task-done, lead-create, and kanban-drop failures now surface error toasts (and refresh to server truth) instead of failing silently (fixes #118).
 - Sync runs each source in isolation with per-source health, corrupt state files error instead of silently skipping, and the activity-log offset persists across restarts with truncation recovery (fixes #119).
+- X publishing is serialized per content item in a new `x_publish_claims` table (schema v4): concurrent approves get 409 instead of double-posting, completed tweet ids make crash-retries finalize without reposting, stale claims expire after 5 minutes, and the budget check runs inside a publish mutex (fixes #120).
 - CRM lead-detail poll no longer clobbers in-progress edits (dirty latch on the next-action date; hydration skips open editors) (#95, fixes #37).
 - Chat session sync rebuilt: byte-accurate offset resumption, entry-id idempotency, fixed the never-matching cron-title regex (#93, fixes #60).
 - CSRF origin check treats `127.0.0.1` and `localhost` as equivalent at the same scheme+port; cross-site, other ports, and scheme changes still rejected (#92, fixes #86).

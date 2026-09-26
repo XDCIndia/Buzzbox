@@ -370,6 +370,22 @@ function migrate(db: Database.Database) {
     db.pragma('user_version = 3');
   }
 
+  // v4: publish claims make X posting idempotent. Concurrent approves race
+  // the draft -> ready transition and crash-retry reposts; the claim row
+  // serializes publishers and records the tweet id once posted (#120).
+  if (getSchemaVersion(db) < 4) {
+    runInTransaction(db, () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS x_publish_claims (
+          content_id TEXT PRIMARY KEY,
+          claimed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          tweet_id TEXT
+        );
+      `);
+    });
+    db.pragma('user_version = 4');
+  }
+
   // Data-level guarantee (runs every boot, deliberately NOT version-gated):
   // the default brand row must exist because brand-scoped API routes and
   // FK-constrained inserts (brand_mentions, brand_digests, etc.) assume
@@ -379,7 +395,7 @@ function migrate(db: Database.Database) {
   ).run(DEFAULT_BRAND_ID, 'My Brand', '[]', '[]');
 }
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 export function getSchemaVersion(db: Database.Database): number {
   return db.pragma('user_version', { simple: true }) as number;
