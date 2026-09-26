@@ -47,6 +47,17 @@ const CATEGORY_ROUTES: Record<string, string> = {
   activity: '/activity',
 };
 
+/** Deep-link for a search result. Leads have a dedicated record page
+ * (/crm/[id]); every other category has no per-record URL, so those fall
+ * back to their list route (#138). */
+export function resultPathForResult(result: SearchResult): string {
+  if (result.category === 'lead') {
+    const id = String(result.id ?? '').trim();
+    if (id) return `/crm/${encodeURIComponent(id)}`;
+  }
+  return CATEGORY_ROUTES[result.category] || '/';
+}
+
 export function CommandPalette() {
   const realOnly = useDashboard(s => s.realOnly);
   const [open, setOpen] = useState(false);
@@ -127,7 +138,7 @@ export function CommandPalette() {
     if (item.type === 'nav') {
       router.push(item.path);
     } else {
-      router.push(CATEGORY_ROUTES[item.category] || '/');
+      router.push(resultPathForResult(item));
     }
     setOpen(false);
   };
