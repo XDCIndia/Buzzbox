@@ -15,6 +15,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 ### Changed
 - Content-item API falls back to `content_posts` (queue → posts) before returning 404 (#90, fixes #87).
 - Buzz returns 412 with actionable guidance when Dicompute is unconfigured, matching the X-posting convention (#90, fixes #88); upstream provider errors surface concise status-based messages instead of the provider's raw HTML body (#95, fixes #51).
+- Standalone asset copy and template export are Node scripts (no bash/rsync needed); the export keeps `.env.example` and drops test/runtime artifacts (fixes #107).
 - Approvals taken on page routes now write `activity_log`, so the approvals history panel reflects them (#92, fixes #85).
 - Toasts fire only after verified success; automations actions no longer leave buttons disabled after a failure (#93, fixes #66).
 - `pnpm seed` runs the app migration instead of duplicated DDL (schema can no longer drift), targets the database the app reads, refuses on `NODE_ENV=production` or non-seed rows without `--force`, and requires interactive confirmation otherwise (fixes #102).

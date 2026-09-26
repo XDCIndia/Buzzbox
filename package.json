@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test --test-concurrency=1 src/lib/*.test.ts",
     "test:e2e": "pnpm build && playwright test",
-    "prepare:standalone": "bash scripts/prepare-standalone.sh",
+    "prepare:standalone": "node scripts/prepare-standalone.mjs",
     "build:standalone": "pnpm build && pnpm run prepare:standalone",
     "postbuild": "pnpm run prepare:standalone"
   },
