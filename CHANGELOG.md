@@ -20,6 +20,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - `pnpm seed` runs the app migration instead of duplicated DDL (schema can no longer drift), targets the database the app reads, refuses on `NODE_ENV=production` or non-seed rows without `--force`, and requires interactive confirmation otherwise (fixes #102).
 - SQLite migrations run each version step in its own transaction and stamp the version only on success, so a partial failure rolls back and retries on next boot instead of bricking the database (fixes #103).
 - Corrupt `jobs.json` no longer resets to an empty schedule: reads throw a typed error, GETs surface degraded state, mutations answer 409, an explicit `POST /api/cron/jobs/reset` quarantines and reinitializes, and timestamped backups are pruned to the newest 10 (fixes #104).
+- Submitted cron jobs must match a validated contract (known fields, size caps, cron-expression charset, 128k total; unknown keys stripped) instead of persisting `body.job` verbatim — `POST`/`PATCH /api/cron/jobs` answer 400 otherwise (fixes #105).
 
 ### Fixed
 - Agent-sessions cards link to the real `/agents/comms?conv=` route; dashboard uses the default brand id instead of a hardcoded UUID (#95, fixes #67).

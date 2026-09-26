@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import fsSync from 'node:fs';
 import path from 'node:path';
+import { z } from 'zod';
 
 export type CronSchedule = {
   kind?: string;
@@ -245,6 +246,81 @@ export function normalizeJobId(value: unknown): string | null {
   if (id.length > 128) return null;
   if (!/^[a-z0-9][a-z0-9_-]*$/i.test(id)) return null;
   return id;
+}
+
+// ─── Job input validation (#105) ─────────────────────────────
+// POST/PATCH /api/cron/jobs used to persist body.job verbatim (only the id
+// was checked), letting any editor store arbitrary schedules, payloads, and
+// skills for the agent runner to execute. Submitted jobs must match the
+// contract below: known fields are validated and size-capped, unknown keys
+// are stripped (zod default), and the whole object is byte-capped like
+// cron templates (MAX_JOB_JSON_BYTES in cron-templates.ts).
+
+export const MAX_CRON_JOB_JSON_BYTES = 128 * 1024;
+const MAX_JOB_NAME = 80;
+const MAX_JOB_SHORT_STRING = 128;
+const MAX_JOB_PAYLOAD_BYTES = 32 * 1024;
+const MAX_JOB_SMALL_RECORD_BYTES = 8 * 1024;
+
+function byteLength(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).length;
+}
+
+function cappedRecord(maxBytes: number) {
+  return z.record(z.string(), z.unknown()).refine(
+    (v) => byteLength(v) <= maxBytes,
+    { message: `object exceeds ${maxBytes} bytes` },
+  );
+}
+
+const cronScheduleSchema = z.object({
+  kind: z.string().max(32).optional(),
+  expr: z.string().max(64).regex(/^[0-9*,/\sA-Za-z-]+$/, 'Invalid schedule expression').optional(),
+  tz: z.string().max(64).optional(),
+  at: z.string().max(64).optional(),
+  everyMs: z.number().int().positive().max(365 * 24 * 3600 * 1000).optional(),
+  staggerMs: z.number().int().min(0).max(3600 * 1000).optional(),
+});
+
+const cronJobInputSchema = z.object({
+  id: z.unknown().optional(),
+  jobId: z.unknown().optional(),
+  agentId: z.string().max(MAX_JOB_SHORT_STRING).optional(),
+  name: z.string().max(MAX_JOB_NAME).optional(),
+  enabled: z.boolean().optional(),
+  createdAtMs: z.number().int().nonnegative().optional(),
+  updatedAtMs: z.number().int().nonnegative().optional(),
+  schedule: cronScheduleSchema.optional(),
+  sessionTarget: z.string().max(MAX_JOB_SHORT_STRING).optional(),
+  wakeMode: z.string().max(MAX_JOB_SHORT_STRING).optional(),
+  payload: cappedRecord(MAX_JOB_PAYLOAD_BYTES).optional(),
+  delivery: cappedRecord(MAX_JOB_SMALL_RECORD_BYTES).optional(),
+  skill: z.string().max(MAX_JOB_SHORT_STRING).optional(),
+  state: cappedRecord(MAX_JOB_SMALL_RECORD_BYTES).optional(),
+});
+
+export type CronJobValidation =
+  | { ok: true; job: CronJobConfig; id: string }
+  | { ok: false; error: string };
+
+/** Validates a submitted job body (after derived-field stripping). Returns
+ * the stripped, normalized job plus its canonical id, or a 400-ready error. */
+export function validateCronJobInput(rawJob: unknown): CronJobValidation {
+  if (!rawJob || typeof rawJob !== 'object' || Array.isArray(rawJob)) {
+    return { ok: false, error: 'Invalid job: expected an object' };
+  }
+  if (byteLength(rawJob) > MAX_CRON_JOB_JSON_BYTES) {
+    return { ok: false, error: `Invalid job: exceeds ${MAX_CRON_JOB_JSON_BYTES} bytes` };
+  }
+  const parsed = cronJobInputSchema.safeParse(rawJob);
+  if (!parsed.success) {
+    const first = parsed.error.issues[0];
+    const where = first.path.length ? ` (${first.path.join('.')})` : '';
+    return { ok: false, error: `Invalid job${where}: ${first.message}` };
+  }
+  const id = normalizeJobId(parsed.data.id ?? parsed.data.jobId);
+  if (!id) return { ok: false, error: 'Invalid job.id' };
+  return { ok: true, job: parsed.data as CronJobConfig, id };
 }
 
 export function upsertCronJob(jobsFile: CronJobsFile, job: CronJobConfig): CronJobsFile {
