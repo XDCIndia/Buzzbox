@@ -127,7 +127,6 @@ export default function OverviewPage() {
   const impressionData = metricsReversed.map(m => ({ date: m.date, value: m.total_impressions }));
   const engagementData = metricsReversed.map(m => ({ date: m.date, value: m.total_engagement }));
   const sendsData = metricsReversed.map(m => ({ date: m.date, value: m.sends }));
-  const discoveryData = metricsReversed.map(m => ({ date: m.date, value: m.discoveries }));
 
   const pendingActions = action_items ?? [];
   const hasBudget = budget && !('error' in budget);
@@ -219,14 +218,15 @@ export default function OverviewPage() {
               href="/outreach"
               sparkline={sendsData.slice(-14).map(d => ({ value: d.value }))}
             />
+            {/* Pipeline shows the point-in-time CRM count with no trend: the
+                only nearby series is daily discoveries, and labeling that
+                delta/sparkline as pipeline movement would mislead (#139). */}
             <MetricColumn
               label="Pipeline"
               value={stats.pipeline_count}
               icon={Users}
               color="var(--info)"
-              delta={dayDelta(discoveryData)}
               href="/crm"
-              sparkline={discoveryData.slice(-14).map(d => ({ value: d.value }))}
             />
           </div>
         )}
