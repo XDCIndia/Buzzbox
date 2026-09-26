@@ -141,12 +141,14 @@ test('direct requests for hidden directories are rejected with 404', async () =>
   }
 });
 
-test('traversal attempts remain rejected with 400', async () => {
+test('traversal attempts are rejected without confirming path structure (#106)', async () => {
+  // Escapes and malformed paths both answer 404 so reads never reveal
+  // whether a path was malformed, missing, or outside the root.
   for (const p of ['../outside.txt', 'a/../../b', '/etc/passwd']) {
     const res = await GET(makeRequest(p, ADMIN));
-    assert.equal(res.status, 400, `expected 400 for ${JSON.stringify(p)}`);
+    assert.equal(res.status, 404, `expected 404 for ${JSON.stringify(p)}`);
     const body = await res.json();
-    assert.equal(body.error, 'Invalid path');
+    assert.equal(body.error, 'Not found');
   }
 });
 

@@ -9,7 +9,7 @@ import {
   getAgentWorkspaceRoot,
   isAllowedWorkspaceWritePath,
   normalizeWorkspaceRelativePath,
-  resolveWorkspacePath,
+  resolveWorkspaceRealPath,
   WORKSPACE_MAX_FILE_BYTES,
 } from '@/lib/agent-workspace';
 
@@ -63,8 +63,14 @@ function shouldHide(relPosix: string): boolean {
 }
 
 async function listDir(root: string, relDir: string, depth: number, maxEntries: number): Promise<Entry[]> {
-  const absDir = relDir ? resolveWorkspacePath(root, relDir) : root;
+  // Resolve through symlinks once: every entry below is checked against the
+  // real root, and traversal never follows symlinked directories (their
+  // targets stay reachable via their real paths) (#106).
+  const rootReal = await fs.realpath(root).catch(() => null);
+  if (!rootReal) return [];
+  const absDir = relDir ? await resolveWorkspaceRealPath(root, relDir) : rootReal;
   if (!absDir) return [];
+  const insideRoot = (p: string) => p === rootReal || p.startsWith(rootReal + path.sep);
 
   const out: Entry[] = [];
   const queue: Array<{ abs: string; rel: string; d: number }> = [{ abs: absDir, rel: relDir, d: 0 }];
@@ -81,11 +87,29 @@ async function listDir(root: string, relDir: string, depth: number, maxEntries: 
     for (const name of names) {
       if (!name) continue;
       const abs = path.join(cur.abs, name);
-      let st: import('node:fs').Stats | null = null;
+      let lst: import('node:fs').Stats | null = null;
       try {
-        st = await fs.stat(abs);
+        lst = await fs.lstat(abs);
       } catch {
         continue;
+      }
+
+      // Resolve symlinks (files and dirs) and drop anything escaping the
+      // root, including dangling links.
+      let real = abs;
+      if (lst.isSymbolicLink()) {
+        const resolved = await fs.realpath(abs).catch(() => null);
+        if (!resolved || !insideRoot(resolved)) continue;
+        real = resolved;
+      } else if (!insideRoot(abs)) {
+        continue;
+      }
+
+      let st = lst;
+      if (lst.isSymbolicLink()) {
+        const target = await fs.stat(real).catch(() => null);
+        if (!target) continue;
+        st = target;
       }
 
       const rel = cur.rel ? `${cur.rel.replace(/\/+$/, '')}/${name}` : name;
@@ -94,8 +118,8 @@ async function listDir(root: string, relDir: string, depth: number, maxEntries: 
 
       if (st.isDirectory()) {
         out.push({ path: relPosix, type: 'dir', mtimeMs: st.mtimeMs });
-        if (cur.d + 1 < depth) {
-          queue.push({ abs, rel: relPosix, d: cur.d + 1 });
+        if (!lst.isSymbolicLink() && cur.d + 1 < depth) {
+          queue.push({ abs: real, rel: relPosix, d: cur.d + 1 });
         }
       } else if (st.isFile()) {
         out.push({ path: relPosix, type: 'file', size: st.size, mtimeMs: st.mtimeMs });
@@ -202,8 +226,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ rootId: root.id, rootLabel: root.label, kind: root.kind, writable: root.writable, entries });
     }
 
-    const abs = resolveWorkspacePath(root.abs, rel);
-    if (!abs) return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+    // Real-path containment: symlinks escaping the root (and missing
+    // files) answer 404 without revealing which (#106).
+    const abs = await resolveWorkspaceRealPath(root.abs, rel);
+    if (!abs) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     // Direct reads must obey the same sensitive-path policy as listings.
     const relNormalized = normalizeWorkspaceRelativePath(rel);
@@ -261,7 +287,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Root is read-only' }, { status: 403 });
     }
 
-    const abs = resolveWorkspacePath(root.abs, rel);
+    const abs = await resolveWorkspaceRealPath(root.abs, rel);
     if (!abs) return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
 
     await fs.mkdir(path.dirname(abs), { recursive: true });
@@ -308,7 +334,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Root is read-only' }, { status: 403 });
     }
 
-    const abs = resolveWorkspacePath(root.abs, rel);
+    const abs = await resolveWorkspaceRealPath(root.abs, rel);
     if (!abs) return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
 
     const st = await fs.stat(abs).catch(() => null);
@@ -355,7 +381,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Root is read-only' }, { status: 403 });
     }
 
-    const abs = resolveWorkspacePath(root.abs, rel);
+    const abs = await resolveWorkspaceRealPath(root.abs, rel);
     if (!abs) return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
 
     const st = await fs.stat(abs).catch(() => null);
