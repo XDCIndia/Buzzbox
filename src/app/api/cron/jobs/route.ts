@@ -10,6 +10,7 @@ import {
   normalizeJobId,
   readCronJobsFile,
   upsertCronJob,
+  validateCronJobInput,
   type CronJobConfig,
   type CronJobsFile,
 } from '@/lib/cron-jobs';
@@ -76,10 +77,12 @@ export async function POST(req: NextRequest) {
   const actor = requireUser(req as unknown as Request);
   const body = await req.json().catch(() => ({}));
 
-  const rawJob = body?.job as CronJobConfig | undefined;
-  const job = rawJob ? stripDerivedFields(rawJob) : undefined;
-  const id = normalizeJobId(job?.id ?? job?.jobId);
-  if (!id) return NextResponse.json({ error: 'Invalid job.id' }, { status: 400 });
+  // Submitted jobs must match the validated contract -- unknown keys are
+  // stripped and sizes capped -- before anything reaches jobs.json (#105).
+  const rawJob = (body as { job?: unknown })?.job;
+  const validated = validateCronJobInput(rawJob ? stripDerivedFields(rawJob as CronJobConfig) : undefined);
+  if (!validated.ok) return NextResponse.json({ error: validated.error }, { status: 400 });
+  const { job, id } = validated;
 
   try {
     const instance = getInstance(getInstanceId(req));
@@ -89,7 +92,7 @@ export async function POST(req: NextRequest) {
     return null;
   }
 
-    return upsertCronJob(jobsFile, { ...(job || {}), id, jobId: id });
+    return upsertCronJob(jobsFile, { ...job, id, jobId: id });
 });
 
   if (!next) {
@@ -100,7 +103,7 @@ export async function POST(req: NextRequest) {
       actor,
       action: 'cron.create',
       target: `cron:${instance.id}:${id}`,
-      detail: { instance: instance.id },
+      detail: { instance: instance.id, name: job.name },
     });
 
     return NextResponse.json({ ok: true, jobs: next.jobs });
@@ -125,10 +128,10 @@ export async function PATCH(req: NextRequest) {
   const actor = requireUser(req as unknown as Request);
   const body = await req.json().catch(() => ({}));
 
-  const rawJob = body?.job as CronJobConfig | undefined;
-  const job = rawJob ? stripDerivedFields(rawJob) : undefined;
-  const id = normalizeJobId(job?.id ?? job?.jobId);
-  if (!id) return NextResponse.json({ error: 'Invalid job.id' }, { status: 400 });
+  const rawJob = (body as { job?: unknown })?.job;
+  const validated = validateCronJobInput(rawJob ? stripDerivedFields(rawJob as CronJobConfig) : undefined);
+  if (!validated.ok) return NextResponse.json({ error: validated.error }, { status: 400 });
+  const { job, id } = validated;
 
   try {
     const instance = getInstance(getInstanceId(req));
@@ -138,7 +141,7 @@ export async function PATCH(req: NextRequest) {
     return null;
   }
 
-    return upsertCronJob(jobsFile, { ...(job || {}), id, jobId: id });
+    return upsertCronJob(jobsFile, { ...job, id, jobId: id });
 });
 
   if (!next) {
@@ -149,7 +152,7 @@ export async function PATCH(req: NextRequest) {
       actor,
       action: 'cron.update',
       target: `cron:${instance.id}:${id}`,
-      detail: { instance: instance.id },
+      detail: { instance: instance.id, name: job.name },
     });
 
     return NextResponse.json({ ok: true, jobs: next.jobs });
