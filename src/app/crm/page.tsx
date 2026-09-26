@@ -12,6 +12,7 @@ import {
   LayoutList, Kanban, AlertCircle, BarChart3, ExternalLink,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { toast } from '@/components/ui/toast';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { useDashboard } from '@/store';
 import { timeAgo } from '@/lib/utils';
@@ -203,14 +204,19 @@ export default function CrmPage() {
   async function markTaskDone(leadId: string) {
     if (!canEdit) return;
     try {
-      await fetch('/api/crm', {
+      const res = await fetch('/api/crm', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: leadId, next_action_at: null, task_done: true }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(String(data?.error || `Request failed (${res.status})`));
+      }
+      toast.success('Task marked done');
       setRefreshKey(k => k + 1);
     } catch {
-      // ignore
+      toast.error('Failed to mark task done');
     }
   }
 
@@ -270,14 +276,17 @@ export default function CrmPage() {
       });
       setRefreshKey(k => k + 1);
       if (data?.lead?.id) setSelectedLead(data.lead.id);
+      toast.success('Lead created');
     } catch {
-      // ignore
+      toast.error('Failed to create lead');
     } finally {
       setCreateSubmitting(false);
     }
   }
 
-  // Kanban drag handler
+  // Kanban drag handler. The drop is applied server-side only -- on failure
+  // the card is explicitly refreshed to server truth instead of waiting for
+  // the next poll tick, so a failed drag never looks successful (#118).
   async function handleKanbanDrop(leadId: string, newStage: string) {
     if (!canEdit) return;
     try {
@@ -286,10 +295,15 @@ export default function CrmPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: leadId, status: newStage }),
       });
-      if (!res.ok) throw new Error('Update failed');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(String(data?.error || `Request failed (${res.status})`));
+      }
+      toast.success(`Lead moved to ${newStage}`);
       setRefreshKey(k => k + 1);
     } catch {
-      // silently fail, will refresh on next poll
+      toast.error('Failed to move lead');
+      setRefreshKey(k => k + 1);
     }
   }
 
