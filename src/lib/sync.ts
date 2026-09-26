@@ -7,18 +7,27 @@ const STATE_DIR = getHermesStateDir();
 const SYNC_INTERVAL = 30_000; // 30 seconds
 
 let syncTimer: ReturnType<typeof setInterval> | null = null;
-let lastActivityLine = 0;
+
+/** Per-source outcome for one syncAll() pass. */
+export interface SyncSourceStatus {
+  name: string;
+  status: 'ok' | 'error';
+  error: string | null;
+  duration_ms: number;
+}
 
 /** Real synchronization health, surfaced by /api/settings and the header
  * indicator (#69). Replaced on every syncAll() attempt -- including failed
  * ones, so the UI can distinguish success from failure instead of showing a
- * fake wall-clock time. */
+ * fake wall-clock time. `sources` records the per-source breakdown so one
+ * failing source no longer hides behind (or sinks) the rest (#119). */
 export interface SyncHealth {
   last_sync_at: string | null;
   last_sync_status: 'ok' | 'error' | null;
   last_sync_error: string | null;
   last_sync_duration_ms: number | null;
   last_success_at: string | null;
+  sources: SyncSourceStatus[];
 }
 
 let syncHealth: SyncHealth = {
@@ -27,6 +36,7 @@ let syncHealth: SyncHealth = {
   last_sync_error: null,
   last_sync_duration_ms: null,
   last_success_at: null,
+  sources: [],
 };
 
 export function getSyncHealth(): SyncHealth {
@@ -50,38 +60,62 @@ export function stopSync() {
 export function syncAll() {
   const startedAt = Date.now();
   const startedIso = new Date(startedAt).toISOString();
-  try {
-    syncContentQueue();
-    syncContentCalendar();
-    syncContentMetrics();
-    syncEngagementLog();
-    syncLinkedInComments();
-    syncXResearch();
-    syncListeningSignals();
-    syncExperimentLog();
-    syncExperimentLearnings();
-    syncLeads();
-    syncSequences();
-    syncSuppression();
-    syncDailyCounts();
-    syncActivityLog();
-    syncHealth = {
-      last_sync_at: startedIso,
-      last_sync_status: 'ok',
-      last_sync_error: null,
-      last_sync_duration_ms: Date.now() - startedAt,
-      last_success_at: startedIso,
-    };
+  // Per-source isolation: one failing source must not starve the rest (#119).
+  const sources: SyncSourceStatus[] = [];
+  for (const source of SYNC_SOURCES) {
+    const sourceStarted = Date.now();
+    try {
+      source.run();
+      sources.push({ name: source.name, status: 'ok', error: null, duration_ms: Date.now() - sourceStarted });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      sources.push({ name: source.name, status: 'error', error: message, duration_ms: Date.now() - sourceStarted });
+      console.error(`[sync] Source ${source.name} failed:`, err);
+    }
+  }
+  const failed = sources.filter((s) => s.status === 'error');
+  const ok = failed.length === 0;
+  syncHealth = {
+    last_sync_at: startedIso,
+    last_sync_status: ok ? 'ok' : 'error',
+    last_sync_error: ok ? null : failed.map((f) => `${f.name}: ${f.error}`).join('; '),
+    last_sync_duration_ms: Date.now() - startedAt,
+    last_success_at: ok ? startedIso : syncHealth.last_success_at,
+    sources,
+  };
+  if (ok) {
     console.log('[sync] Sync complete at', startedIso);
-  } catch (err) {
-    syncHealth = {
-      last_sync_at: startedIso,
-      last_sync_status: 'error',
-      last_sync_error: err instanceof Error ? err.message : String(err),
-      last_sync_duration_ms: Date.now() - startedAt,
-      last_success_at: syncHealth.last_success_at,
-    };
-    console.error('[sync] Error:', err);
+  } else {
+    console.error('[sync] Sync completed with errors:', syncHealth.last_sync_error);
+  }
+}
+
+const SYNC_SOURCES: { name: string; run: () => void }[] = [
+  { name: 'content-queue', run: syncContentQueue },
+  { name: 'content-calendar', run: syncContentCalendar },
+  { name: 'content-metrics', run: syncContentMetrics },
+  { name: 'engagement-log', run: syncEngagementLog },
+  { name: 'linkedin-comments', run: syncLinkedInComments },
+  { name: 'x-research', run: syncXResearch },
+  { name: 'listening-signals', run: syncListeningSignals },
+  { name: 'experiment-log', run: syncExperimentLog },
+  { name: 'experiment-learnings', run: syncExperimentLearnings },
+  { name: 'leads', run: syncLeads },
+  { name: 'sequences', run: syncSequences },
+  { name: 'suppression', run: syncSuppression },
+  { name: 'daily-counts', run: syncDailyCounts },
+  { name: 'activity-log', run: syncActivityLog },
+];
+
+/** Thrown when a state file exists but is not valid JSON. Missing or empty
+ * files still mean "no data" (null) -- only corruption is an error, so it
+ * surfaces in per-source health instead of silently skipping (#119). */
+export class SyncParseError extends Error {
+  readonly filename: string;
+  constructor(filename: string) {
+    super(`State file is not valid JSON: ${filename}`);
+    this.name = 'SyncParseError';
+    this.filename = filename;
   }
 }
 
@@ -92,9 +126,9 @@ function readJson<T>(filename: string): T | null {
     const raw = fs.readFileSync(fp, 'utf-8').trim();
     if (!raw) return null;
     return JSON.parse(raw) as T;
-  } catch {
-    console.warn(`[sync] Failed to parse ${filename}`);
-    return null;
+  } catch (err) {
+    if (err instanceof SyntaxError) throw new SyncParseError(filename);
+    throw err;
   }
 }
 
@@ -672,28 +706,50 @@ function num(v: unknown): number {
 }
 
 // ─── Activity Log (JSONL) ──────────────────────────────
+const ACTIVITY_OFFSET_FILE = 'activity-log.offset.json';
+
+function readActivityOffset(): number {
+  try {
+    const fp = path.join(STATE_DIR, ACTIVITY_OFFSET_FILE);
+    if (!fs.existsSync(fp)) return 0;
+    const parsed = JSON.parse(fs.readFileSync(fp, 'utf-8')) as { lines?: unknown };
+    return typeof parsed.lines === 'number' && parsed.lines >= 0 ? Math.floor(parsed.lines) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeActivityOffset(lines: number): void {
+  try {
+    fs.writeFileSync(path.join(STATE_DIR, ACTIVITY_OFFSET_FILE), JSON.stringify({ lines }), 'utf-8');
+  } catch (err) {
+    // A lost watermark only replays lines on the next pass; warn loudly.
+    console.warn('[sync] Failed to persist activity-log offset:', err);
+  }
+}
+
 function syncActivityLog() {
   const fp = path.join(STATE_DIR, 'activity-log.jsonl');
-  try {
-    if (!fs.existsSync(fp)) return;
-    const lines = fs.readFileSync(fp, 'utf-8').split('\n').filter(l => l.trim());
-    if (lines.length <= lastActivityLine) return;
+  if (!fs.existsSync(fp)) return;
+  const lines = fs.readFileSync(fp, 'utf-8').split('\n').filter(l => l.trim());
+  // The offset is persisted in STATE_DIR, so restarts resume instead of
+  // re-inserting every line. A shorter file means truncation or rotation:
+  // start over rather than stalling forever (#119).
+  const offset = lines.length < readActivityOffset() ? 0 : readActivityOffset();
+  if (lines.length <= offset) return;
 
-    const db = getDb();
-    const insert = db.prepare(`
-      INSERT INTO activity_log (ts, action, detail, result) VALUES (?, ?, ?, ?)
-    `);
-    const newLines = lines.slice(lastActivityLine);
-    db.transaction(() => {
-      for (const line of newLines) {
-        try {
-          const entry = JSON.parse(line) as { ts?: string; action?: string; detail?: string; result?: string };
-          insert.run(entry.ts || null, entry.action || null, entry.detail || null, entry.result || null);
-        } catch { /* skip malformed lines */ }
-      }
-    })();
-    lastActivityLine = lines.length;
-  } catch {
-    console.warn('[sync] Failed to read activity-log.jsonl');
-  }
+  const db = getDb();
+  const insert = db.prepare(`
+    INSERT INTO activity_log (ts, action, detail, result) VALUES (?, ?, ?, ?)
+  `);
+  const newLines = lines.slice(offset);
+  db.transaction(() => {
+    for (const line of newLines) {
+      try {
+        const entry = JSON.parse(line) as { ts?: string; action?: string; detail?: string; result?: string };
+        insert.run(entry.ts || null, entry.action || null, entry.detail || null, entry.result || null);
+      } catch { /* skip malformed lines */ }
+    }
+  })();
+  writeActivityOffset(lines.length);
 }
