@@ -575,25 +575,6 @@ function MetricColumn({
           <Icon size={18} />
         </div>
       </div>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="section-label">{label}</p>
-          <p className="mt-2.5 text-3xl font-semibold tracking-tight font-mono text-foreground group-hover:text-primary transition-colors">
-            {formatNumber(value)}
-          </p>
-          {delta !== null && delta !== undefined && (
-            <p className={`mt-1 text-[11px] font-mono font-medium ${delta >= 0 ? 'text-success' : 'text-warning'}`}>
-              {delta >= 0 ? '+' : ''}{delta.toFixed(1)}% vs yesterday
-            </p>
-          )}
-        </div>
-        <div
-          className="w-9 h-9 rounded-md flex items-center justify-center shrink-0"
-          style={{ background: `color-mix(in srgb, ${color} 10%, var(--surface-2))`, color }}
-        >
-          <Icon size={18} />
-        </div>
-      </div>
       {sparkline && sparkline.length > 1 && (
         <div className="h-10 mt-3">
           {/* Fixed pixel height (matches h-10) instead of "100%" so Recharts has a
