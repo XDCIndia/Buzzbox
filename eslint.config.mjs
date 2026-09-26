@@ -12,6 +12,18 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Nested build output (e.g. worktree copies under .tmp/): the bare
+    // patterns above match only top-level directories (#116).
+    "**/.next/**",
+    "**/out/**",
+    "**/build/**",
+    // Runtime/test artifacts (all gitignored, see .gitignore):
+    ".tmp/**",
+    "test-results/**",
+    "playwright-report/**",
+    "state/**",
+    "coverage/**",
+    ".eslintcache",
   ]),
 ]);
 

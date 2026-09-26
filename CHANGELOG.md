@@ -22,6 +22,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Corrupt `jobs.json` no longer resets to an empty schedule: reads throw a typed error, GETs surface degraded state, mutations answer 409, an explicit `POST /api/cron/jobs/reset` quarantines and reinitializes, and timestamped backups are pruned to the newest 10 (fixes #104).
 - Submitted cron jobs must match a validated contract (known fields, size caps, cron-expression charset, 128k total; unknown keys stripped) instead of persisting `body.job` verbatim — `POST`/`PATCH /api/cron/jobs` answer 400 otherwise (fixes #105).
 - Workspace paths resolve through symlinks with containment re-checked on real paths: escaping links answer 404 (reads/listings) or 400 (writes) without touching outside files, listings skip out-of-root links and never descend into symlinked dirs, and the write allowlist now matches the hidden-tree policy (`sessions`/`sandboxes`/`sandbox`) (fixes #106).
+- Bare `pnpm lint` ignores nested build output and runtime/test artifacts (`.tmp/`, `test-results/`, `playwright-report/`, `state/`, `coverage/`, `**/.next/`), so stray worktree builds no longer fail the contributor gate (fixes #116).
 
 ### Fixed
 - Agent-sessions cards link to the real `/agents/comms?conv=` route; dashboard uses the default brand id instead of a hardcoded UUID (#95, fixes #67).
