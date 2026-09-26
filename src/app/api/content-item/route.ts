@@ -185,6 +185,7 @@ export async function PATCH(req: NextRequest) {
     // Approving/publishing a queued X item is the moment it actually needs
     // to go out -- wire the real post here rather than just flipping a status flag.
     const publishResult = await maybePublishToX({
+      contentId: id,
       platform,
       previousStatus: (current.status as string | undefined) ?? null,
       nextStatus: status,

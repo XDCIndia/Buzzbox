@@ -52,7 +52,8 @@ function readAnswer(question: string): string | null {
 
 if (!seedArgs.yes) {
   const answer = readAnswer(
-    `\nSeed will DELETE all rows in ${SEED_TRACKED_TABLES.length} tables. Type 'yes' to continue: `,
+    // +1: publish claims are wiped alongside the seeded tables (#120).
+    `\nSeed will DELETE all rows in ${SEED_TRACKED_TABLES.length + 1} tables. Type 'yes' to continue: `,
   );
   if ((answer ?? '').trim().toLowerCase() !== 'yes') {
     console.error("Aborted: confirmation not given (re-run with --yes to skip the prompt).");
@@ -84,6 +85,9 @@ const tables = [
   'activity_log', 'daily_metrics', 'learnings', 'experiments',
   'signals', 'engagements', 'suppression', 'sequences', 'leads', 'content_posts',
   'brand_mentions', 'brand_competitors', 'brand_campaigns', 'brand_alerts', 'brand_digests', 'brands',
+  // Publish claims reference wiped content rows; stale claims would wrongly
+  // finalize re-seeded ids as already-posted (#120).
+  'x_publish_claims',
 ];
 for (const t of tables) db.exec(`DELETE FROM ${t}`);
 db.exec('DELETE FROM seed_registry');
