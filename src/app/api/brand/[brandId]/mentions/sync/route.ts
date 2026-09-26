@@ -10,6 +10,12 @@ import { searchTikTokMentions, type TikTokMentionResult } from '@/lib/tiktok-api
 import { searchRedditMentions, type RedditMentionResult } from '@/lib/reddit-api';
 import { classifyMention } from '@/lib/mention-classify';
 import { evaluateMentionCrisis, insertMentionAlert } from '@/lib/mention-alerts';
+import {
+  buildMentionSyncResponse,
+  conciseProviderError,
+  syncQueriesForBrand,
+  type ProviderOutcome,
+} from '@/lib/mention-sync';
 import type { MentionPlatform } from '@/types';
 
 type MentionSyncResult =
@@ -111,22 +117,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
   const brand = getBrand(brandId);
   if (!brand) return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
   const brandName = brand.name;
-  const query = brand.keywords[0] || brand.name;
+  const queries = syncQueriesForBrand(brand.keywords, brandName);
 
-  let inserted = 0;
   const skipped: string[] = [];
-  const errors: Record<string, string> = {};
+  const tasks: Promise<ProviderOutcome>[] = [];
 
-  // Every platform below is independently best-effort: missing config or a
-  // failed request only skips that platform, it never fails the whole sync.
+  // Providers run concurrently (each has its own fetch timeout); queries
+  // within a provider stay sequential to respect provider rate limits.
+  // Every provider is independently best-effort: missing config or a
+  // failed request only skips that provider, it never fails the whole sync.
 
   if (bearerToken) {
-    try {
-      const results = await searchXMentions({ bearerToken, query, maxResults: 50 });
-      inserted += insertResults(brandId, brandName, 'x', 'x', results);
-    } catch (err) {
-      errors.x = (err as Error).message;
-    }
+    tasks.push((async (): Promise<ProviderOutcome> => {
+      try {
+        let inserted = 0;
+        for (const query of queries) {
+          const results = await searchXMentions({ bearerToken, query, maxResults: 50 });
+          inserted += insertResults(brandId, brandName, 'x', 'x', results);
+        }
+        return { platform: 'x', inserted };
+      } catch (err) {
+        return { platform: 'x', error: conciseProviderError(err) };
+      }
+    })());
   } else {
     skipped.push('x');
   }
@@ -135,17 +148,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
   // a Page access token only grants visibility into that Page's own posts
   // and comments, so this is scoped to searching the Page's recent posts.
   if (fbPageAccessToken && fbPageId) {
-    try {
-      const results = await searchFacebookPageMentions({
-        pageAccessToken: fbPageAccessToken,
-        pageId: fbPageId,
-        query,
-        maxResults: 50,
-      });
-      inserted += insertResults(brandId, brandName, 'facebook', 'facebook', results);
-    } catch (err) {
-      errors.facebook = (err as Error).message;
-    }
+    tasks.push((async (): Promise<ProviderOutcome> => {
+      try {
+        let inserted = 0;
+        for (const query of queries) {
+          const results = await searchFacebookPageMentions({
+            pageAccessToken: fbPageAccessToken,
+            pageId: fbPageId,
+            query,
+            maxResults: 50,
+          });
+          inserted += insertResults(brandId, brandName, 'facebook', 'facebook', results);
+        }
+        return { platform: 'facebook', inserted };
+      } catch (err) {
+        return { platform: 'facebook', error: conciseProviderError(err) };
+      }
+    })());
   } else {
     skipped.push('facebook');
   }
@@ -154,74 +173,102 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
   // account -- it has no open, cross-platform keyword search like X's
   // search/recent endpoint, so `query`/brand.keywords are not used here.
   if (threadsAccessToken && threadsUserId) {
-    try {
-      const results = await fetchThreadsMentions({
-        accessToken: threadsAccessToken,
-        threadsUserId,
-        limit: 50,
-      });
-      inserted += insertResults(brandId, brandName, 'threads', 'threads', results);
-    } catch (err) {
-      errors.threads = (err as Error).message;
-    }
+    tasks.push((async (): Promise<ProviderOutcome> => {
+      try {
+        const results = await fetchThreadsMentions({
+          accessToken: threadsAccessToken,
+          threadsUserId,
+          limit: 50,
+        });
+        return { platform: 'threads', inserted: insertResults(brandId, brandName, 'threads', 'threads', results) };
+      } catch (err) {
+        return { platform: 'threads', error: conciseProviderError(err) };
+      }
+    })());
   } else {
     skipped.push('threads');
   }
 
   if (youtubeApiKey) {
-    try {
-      const results = await searchYouTubeMentions({ apiKey: youtubeApiKey, query, maxResults: 25 });
-      inserted += insertResults(brandId, brandName, 'youtube', 'youtube', results);
-    } catch (err) {
-      errors.youtube = (err as Error).message;
-    }
+    tasks.push((async (): Promise<ProviderOutcome> => {
+      try {
+        let inserted = 0;
+        for (const query of queries) {
+          const results = await searchYouTubeMentions({ apiKey: youtubeApiKey, query, maxResults: 25 });
+          inserted += insertResults(brandId, brandName, 'youtube', 'youtube', results);
+        }
+        return { platform: 'youtube', inserted };
+      } catch (err) {
+        return { platform: 'youtube', error: conciseProviderError(err) };
+      }
+    })());
   } else {
     skipped.push('youtube');
   }
 
   if (igAccessToken && igBusinessAccountId) {
-    try {
-      const results = await searchInstagramMentions({
-        accessToken: igAccessToken,
-        businessAccountId: igBusinessAccountId,
-        query,
-        maxResults: 50,
-      });
-      inserted += insertResults(brandId, brandName, 'instagram', 'instagram', results);
-    } catch (err) {
-      errors.instagram = (err as Error).message;
-    }
+    tasks.push((async (): Promise<ProviderOutcome> => {
+      try {
+        let inserted = 0;
+        for (const query of queries) {
+          const results = await searchInstagramMentions({
+            accessToken: igAccessToken,
+            businessAccountId: igBusinessAccountId,
+            query,
+            maxResults: 50,
+          });
+          inserted += insertResults(brandId, brandName, 'instagram', 'instagram', results);
+        }
+        return { platform: 'instagram', inserted };
+      } catch (err) {
+        return { platform: 'instagram', error: conciseProviderError(err) };
+      }
+    })());
   } else {
     skipped.push('instagram');
   }
 
   if (tiktokAccessToken) {
-    try {
-      const results = await searchTikTokMentions({ accessToken: tiktokAccessToken, query, maxResults: 50 });
-      inserted += insertResults(brandId, brandName, 'tiktok', 'tiktok', results);
-    } catch (err) {
-      errors.tiktok = (err as Error).message;
-    }
+    tasks.push((async (): Promise<ProviderOutcome> => {
+      try {
+        let inserted = 0;
+        for (const query of queries) {
+          const results = await searchTikTokMentions({ accessToken: tiktokAccessToken, query, maxResults: 50 });
+          inserted += insertResults(brandId, brandName, 'tiktok', 'tiktok', results);
+        }
+        return { platform: 'tiktok', inserted };
+      } catch (err) {
+        return { platform: 'tiktok', error: conciseProviderError(err) };
+      }
+    })());
   } else {
     skipped.push('tiktok');
   }
 
   if (redditConfigured) {
-    try {
-      const results = await searchRedditMentions({
-        clientId: redditClientId as string,
-        clientSecret: redditClientSecret as string,
-        userAgent: redditUserAgent as string,
-        query,
-        maxResults: 50,
-      });
-      inserted += insertResults(brandId, brandName, 'reddit', 'reddit', results);
-    } catch (err) {
-      errors.reddit = (err as Error).message;
-    }
+    tasks.push((async (): Promise<ProviderOutcome> => {
+      try {
+        let inserted = 0;
+        for (const query of queries) {
+          const results = await searchRedditMentions({
+            clientId: redditClientId as string,
+            clientSecret: redditClientSecret as string,
+            userAgent: redditUserAgent as string,
+            query,
+            maxResults: 50,
+          });
+          inserted += insertResults(brandId, brandName, 'reddit', 'reddit', results);
+        }
+        return { platform: 'reddit', inserted };
+      } catch (err) {
+        return { platform: 'reddit', error: conciseProviderError(err) };
+      }
+    })());
   } else {
     skipped.push('reddit');
   }
 
-  return NextResponse.json({ synced: inserted, skipped, ...(Object.keys(errors).length ? { errors } : {}) });
+  const outcomes = await Promise.all(tasks);
+  const { status, body } = buildMentionSyncResponse(outcomes, skipped, queries);
+  return NextResponse.json(body, { status });
 }
