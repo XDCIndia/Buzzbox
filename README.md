@@ -173,10 +173,10 @@ Before sharing or publishing a derived template:
 
 ```bash
 bash ./scripts/template-audit.sh
-bash ./scripts/template-export.sh ./export
+node ./scripts/template-export.mjs ./export
 ```
 
-The export excludes environment files, databases, build output, dependency directories, test artifacts, and runtime state.
+The export excludes secret environment files (keeping `.env.example`), databases, build output, dependency directories, test artifacts, and runtime state.
 
 ## Repository policy
 
