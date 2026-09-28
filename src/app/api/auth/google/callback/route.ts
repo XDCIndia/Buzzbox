@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createSession, destroySession, recordGoogleLoginAttempt, upsertGoogleUser } from '@/lib/auth';
+import { createSession, destroySession, recordGoogleLoginAttempt, safeRedirectPath, upsertGoogleUser } from '@/lib/auth';
 
 const STATE_COOKIE = 'hermes-google-state';
 const SESSION_COOKIE = 'hermes-session';
@@ -56,7 +56,9 @@ function parseStateCookie(request: Request): { state: string; from: string } | n
   const [state, encodedFrom] = value.split(':');
   if (!state) return null;
   const from = encodedFrom ? decodeURIComponent(encodedFrom) : '/';
-  return { state, from: from.startsWith('/') ? from : '/' };
+  // Same-origin absolute paths only: a bare startsWith('/') check admits
+  // protocol-relative URLs (//evil.com) and thus post-login open redirects.
+  return { state, from: safeRedirectPath(from) };
 }
 
 async function exchangeCodeForToken(code: string) {
