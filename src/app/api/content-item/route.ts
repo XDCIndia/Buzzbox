@@ -10,6 +10,22 @@ import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
+// Statuses accepted by PATCH /api/content (status enum there) -- typos must
+// not persist here either (#134).
+const CONTENT_STATUSES = ['draft', 'pending_approval', 'ready', 'rejected', 'published', 'scheduled'] as const;
+
+// Mirror the cron template payload cap: full threads can be long, but an
+// unbounded record bloats queue_json/full_content columns (#134).
+const MAX_CONTENT_ITEM_BYTES = 128 * 1024;
+
+function byteLength(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).length;
+}
+
+function invalidInputStatus(value: unknown): boolean {
+  return value !== undefined && (typeof value !== 'string' || !(CONTENT_STATUSES as readonly string[]).includes(value));
+}
+
 const STATE_DIR = getHermesStateDir();
 const QUEUE_FILE = path.join(STATE_DIR, 'content-queue.json');
 
@@ -25,7 +41,11 @@ function readQueueFile(): QueueItem[] {
 
 function writeQueueFile(items: QueueItem[]) {
   fs.mkdirSync(path.dirname(QUEUE_FILE), { recursive: true });
-  fs.writeFileSync(QUEUE_FILE, JSON.stringify(items, null, 2), 'utf-8');
+  // Atomic rename (unique tmp name): a concurrent sync reader never sees a
+  // half-written file, unlike direct overwrites (#134).
+  const tmp = `${QUEUE_FILE}.tmp.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}`;
+  fs.writeFileSync(tmp, JSON.stringify(items, null, 2), 'utf-8');
+  fs.renameSync(tmp, QUEUE_FILE);
 }
 
 function writeItemToQueueFile(item: QueueItem) {
@@ -149,6 +169,16 @@ export async function PATCH(req: NextRequest) {
 
     const id = body?.id;
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+
+    if (body.item !== undefined && byteLength(body.item) > MAX_CONTENT_ITEM_BYTES) {
+      return NextResponse.json({ error: 'item exceeds size limit' }, { status: 400 });
+    }
+    if (body.patch !== undefined && byteLength(body.patch) > MAX_CONTENT_ITEM_BYTES) {
+      return NextResponse.json({ error: 'patch exceeds size limit' }, { status: 400 });
+    }
+    if (invalidInputStatus(body.item?.status) || invalidInputStatus((body.patch as { status?: unknown } | undefined)?.status)) {
+      return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+    }
 
     const db = getDb();
     const row = db.prepare('SELECT * FROM content_queue_items WHERE id = ?').get(id) as Record<string, unknown> | undefined;
