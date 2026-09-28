@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { askDicompute, MissingConfigError, UpstreamProviderError } from '@/lib/dicompute';
 import { sendOrchestratorMessage } from '@/lib/command';
 import { requireApiAdmin } from '@/lib/api-auth';
+import { rateLimit } from '@/lib/rate-limit';
 import { getOverviewStats, getAlerts, getPendingApprovals, getLeadFunnel, getDailyMetrics, createBuzzContentDraft } from '@/lib/queries';
 import { computeSocialAnalytics } from '@/lib/analytics';
 import { parseAndValidate } from '@/lib/api-validate';
@@ -270,8 +271,24 @@ export async function POST(request: NextRequest) {
 
   if (auth) return auth;
 
+  // Each request fans out into 2-3 paid LLM calls plus a subprocess, so an
+  // unbounded message is a cost-amplification primitive: cap input length
+  // and throttle callers per IP like the login and dicompute-test routes.
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
+  const limit = rateLimit(`buzz:ip:${ip}`, { max: 20, windowMs: 60_000 });
+  if (!limit.allowed) {
+    const retryAfterSec = Math.ceil(limit.retryAfterMs / 1000);
+    return NextResponse.json(
+      { ok: false, error: 'Too many Buzz requests. Try again later.' },
+      { status: 429, headers: { 'Retry-After': String(retryAfterSec) } },
+    );
+  }
+
   try {
-    const parsed = await parseAndValidate(request, z.object({ message: z.string() }));
+    const parsed = await parseAndValidate(request, z.object({ message: z.string().max(4000) }));
     if (!parsed.ok) return parsed.response;
 
     const userMessage = parsed.data.message.trim();

@@ -36,6 +36,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Brand mention sync fans out over all keywords (capped at five) with providers running concurrently, answers 200/207/502 honestly instead of always 200, and truncates provider errors to markup-free single lines (fixes #121).
 - X publishing is serialized per content item in a new `x_publish_claims` table (schema v4): concurrent approves get 409 instead of double-posting, completed tweet ids make crash-retries finalize without reposting, stale claims expire after 5 minutes, and the budget check runs inside a publish mutex (fixes #120).
 - Production build uses the default (Turbopack) builder instead of the pinned `--webpack` flag, which crashed on Windows scanning a protected home-dir junction; no webpack-specific configuration existed to preserve (fixes #108, unblocks #109).
+- List reads (`content_posts`, `leads`, `sequences`, `suppression`, `experiments`, `learnings`, CRM list) cap at 200 rows like the other capped queries (fixes #133).
 - CRM lead-detail poll no longer clobbers in-progress edits (dirty latch on the next-action date; hydration skips open editors) (#95, fixes #37).
 - Chat session sync rebuilt: byte-accurate offset resumption, entry-id idempotency, fixed the never-matching cron-title regex (#93, fixes #60).
 - CSRF origin check treats `127.0.0.1` and `localhost` as equivalent at the same scheme+port; cross-site, other ports, and scheme changes still rejected (#92, fixes #86).
@@ -46,6 +47,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Password changes (admin reset and `AUTH_PASS` rotation) invalidate all of the user's sessions (fixes #130).
 - Post-OAuth redirects accept same-origin absolute paths only, closing the protocol-relative open redirect (fixes #131).
 - `GET /api/deploy-status` requires the `manage_system` capability (admin-only) instead of any login (fixes #136).
+- `POST /api/buzz` caps messages at 4000 chars and rate-limits callers (20/min per IP) since each request fans out into paid LLM calls (fixes #132).
 - `GET /api/dicompute-test` now requires the `manage_system` capability (admin-only), is rate-limited per IP (10/min), and maps missing-provider/upstream failures to 412/502 instead of echoing raw errors; new coverage test asserts every non-auth API route references an auth guard (fixes #99).
 - Host-lock parsing handles bracketed/bare IPv6 loopback (`[::1]`, `::1`) and normalizes case; documented that `HERMES_HOST_LOCK` is a best-effort header check with the listen address (`HOSTNAME=127.0.0.1`) plus firewall as the real boundary (fixes #100).
 - Brand-child mutations (alert/campaign/competitor deletes, alert checks, mention reads/patches) are scoped to the URL `brandId` and answer 404 on mismatch, closing the cross-brand IDOR (fixes #101).

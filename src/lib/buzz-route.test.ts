@@ -59,3 +59,31 @@ test('POST /api/buzz returns 412 with a stable body when DICOMPUTE_API_KEY is un
   assert.equal(body.ok, false);
   assert.match(String(body.error), /DICOMPUTE_API_KEY is not configured/);
 });
+
+test('POST /api/buzz rejects oversized messages with 400 (#132)', async () => {
+  const res = await buzzPost(
+    new NextRequest('http://localhost/api/buzz', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': 'test-api-key' },
+      body: JSON.stringify({ message: 'x'.repeat(4001) }),
+    }),
+  );
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/buzz rate-limits callers with 429 and Retry-After (#132)', async () => {
+  const { resetRateLimits } = await import('./rate-limit');
+  resetRateLimits();
+  let last: Response | null = null;
+  for (let i = 0; i < 21; i++) {
+    last = await buzzPost(
+      new NextRequest('http://localhost/api/buzz', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': 'test-api-key' },
+        body: JSON.stringify({ message: 'hello buzz' }),
+      }),
+    );
+  }
+  assert.equal(last!.status, 429);
+  assert.ok(last!.headers.get('retry-after'), '429 must carry a Retry-After header');
+});

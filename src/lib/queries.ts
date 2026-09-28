@@ -160,7 +160,7 @@ export function getContentPosts(filters?: {
   if (filters?.pillar) { sql += ' AND pillar = ?'; params.push(filters.pillar); }
   if (filters?.excludeSeed) { sql += ` ${seedFilter('content_posts')}`; }
 
-  sql += ' ORDER BY created_at DESC';
+  sql += ' ORDER BY created_at DESC LIMIT 200';
   return db.prepare(sql).all(...params) as ContentPost[];
 }
 
@@ -202,7 +202,7 @@ export function getLeads(filters?: {
     ? filters!.sort
     : 'created_at';
   const order = filters?.order === 'asc' ? 'ASC' : 'DESC';
-  sql += ` ORDER BY ${sortCol} ${order}`;
+  sql += ` ORDER BY ${sortCol} ${order} LIMIT 200`;
 
   return db.prepare(sql).all(...params) as Lead[];
 }
@@ -232,7 +232,7 @@ export function getSequences(filters?: { status?: string; lead_id?: string; excl
   if (filters?.lead_id) { sql += ' AND lead_id = ?'; params.push(filters.lead_id); }
   if (filters?.excludeSeed) { sql += ` ${seedFilter('sequences')}`; }
 
-  sql += ' ORDER BY created_at DESC';
+  sql += ' ORDER BY created_at DESC LIMIT 200';
   return db.prepare(sql).all(...params) as Sequence[];
 }
 
@@ -245,7 +245,7 @@ export function updateSequenceStatus(id: string, status: string): void {
 export function getSuppression(filters?: { excludeSeed?: boolean }): Suppression[] {
   const db = getDb();
   const sf = filters?.excludeSeed ? seedFilter('suppression', 'email') : '';
-  return db.prepare(`SELECT * FROM suppression WHERE 1=1 ${sf} ORDER BY added_at DESC`).all() as Suppression[];
+  return db.prepare(`SELECT * FROM suppression WHERE 1=1 ${sf} ORDER BY added_at DESC LIMIT 200`).all() as Suppression[];
 }
 
 // ─── Engagement ────────────────────────────────────────
@@ -297,14 +297,14 @@ export function getExperiments(filters?: { status?: string; excludeSeed?: boolea
   if (filters?.status) { sql += ' AND status = ?'; params.push(filters.status); }
   if (filters?.excludeSeed) { sql += ` ${seedFilter('experiments')}`; }
 
-  sql += ' ORDER BY week DESC, id DESC';
+  sql += ' ORDER BY week DESC, id DESC LIMIT 200';
   return db.prepare(sql).all(...params) as Experiment[];
 }
 
 export function getLearnings(filters?: { excludeSeed?: boolean }): Learning[] {
   const db = getDb();
   const sf = filters?.excludeSeed ? seedFilter('learnings') : '';
-  return db.prepare(`SELECT * FROM learnings WHERE 1=1 ${sf} ORDER BY validated_week DESC, id DESC`).all() as Learning[];
+  return db.prepare(`SELECT * FROM learnings WHERE 1=1 ${sf} ORDER BY validated_week DESC, id DESC LIMIT 200`).all() as Learning[];
 }
 
 // ─── KPIs ──────────────────────────────────────────────

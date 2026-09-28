@@ -134,7 +134,7 @@ export async function GET(request: Request) {
     params.push(like, like, like, like);
   }
 
-  sql += ' ORDER BY score DESC, created_at DESC';
+  sql += ' ORDER BY score DESC, created_at DESC LIMIT 200';
   const leads = db.prepare(sql).all(...params) as Lead[];
 
   const stages = ["new", "validated", "approved", "contacted", "replied", "interested", "booked", "qualified", "rejected", "disqualified"]; 
