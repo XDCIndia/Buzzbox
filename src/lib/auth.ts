@@ -159,6 +159,9 @@ export function seedAdmin(): void {
       hashPassword(password),
       username,
     );
+    // A password change must kill existing sessions, otherwise a stolen
+    // session survives rotation (#130).
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(existingAdmin.id);
   }
 }
 
@@ -446,6 +449,19 @@ export function resetUserPassword(userId: number, password: string): void {
   }
   const db = getDb();
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), userId);
+  // A password change must kill existing sessions, otherwise a stolen
+  // session survives rotation and incident remediation (#130).
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+}
+
+/** Safe post-login redirect target. Accepts same-origin absolute paths
+ * only: rejects protocol-relative (`//evil.com`), backslashes, and CR/LF
+ * smuggling, falling back to `/` (#131). */
+export function safeRedirectPath(from: unknown): string {
+  if (typeof from !== 'string') return '/';
+  if (!from.startsWith('/') || from.startsWith('//')) return '/';
+  if (from.includes('\\') || /[\r\n]/.test(from)) return '/';
+  return from;
 }
 
 export function deleteUser(userId: number): void {

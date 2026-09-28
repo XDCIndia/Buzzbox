@@ -22,7 +22,9 @@ import {
   listGoogleLoginRequests,
   recordGoogleLoginAttempt,
   requireUser,
+  resetUserPassword,
   reviewGoogleLoginRequest,
+  safeRedirectPath,
   seedAdmin,
   validateSession,
 } from './auth';
@@ -74,6 +76,53 @@ test('session lifecycle validates and invalidates correctly', () => {
 
   destroySession(token);
   assert.equal(validateSession(token), null);
+});
+
+test('resetUserPassword invalidates existing sessions (#130)', () => {
+  seedAdmin();
+  const user = authenticate('admin_test', 'super-secure-pass');
+  assert.ok(user);
+
+  const token = createSession(user.id);
+  assert.ok(validateSession(token), 'session starts valid');
+
+  resetUserPassword(user.id, 'brand-new-pass-123');
+  assert.equal(validateSession(token), null, 'stolen session must die on rotation');
+  assert.ok(authenticate('admin_test', 'brand-new-pass-123'), 'new password works');
+  assert.equal(authenticate('admin_test', 'super-secure-pass'), null, 'old password stops working');
+});
+
+test('seedAdmin password sync invalidates existing sessions (#130)', () => {
+  seedAdmin();
+  const user = authenticate('admin_test', 'super-secure-pass');
+  assert.ok(user);
+  const token = createSession(user.id);
+  assert.ok(validateSession(token));
+
+  const previousPass = process.env.AUTH_PASS;
+  process.env.AUTH_PASS = 'rotated-pass-456';
+  try {
+    seedAdmin();
+  } finally {
+    process.env.AUTH_PASS = previousPass;
+  }
+  assert.equal(validateSession(token), null, 'env rotation must kill sessions too');
+  assert.ok(authenticate('admin_test', 'rotated-pass-456'));
+});
+
+test('safeRedirectPath only allows same-origin absolute paths (#131)', () => {
+  assert.equal(safeRedirectPath('/dashboard'), '/dashboard');
+  assert.equal(safeRedirectPath('/agents/comms?conv=abc'), '/agents/comms?conv=abc');
+  assert.equal(safeRedirectPath('/'), '/');
+  assert.equal(safeRedirectPath('//evil.com'), '/');
+  assert.equal(safeRedirectPath('//evil.com/phish'), '/');
+  assert.equal(safeRedirectPath('https://evil.com'), '/');
+  assert.equal(safeRedirectPath('javascript:alert(1)'), '/');
+  assert.equal(safeRedirectPath('/\\evil.com'), '/');
+  assert.equal(safeRedirectPath('/login?x=1\r\nSet-Cookie: a=b'), '/');
+  assert.equal(safeRedirectPath(''), '/');
+  assert.equal(safeRedirectPath(undefined), '/');
+  assert.equal(safeRedirectPath(null), '/');
 });
 
 test('requireUser throws on invalid session cookie', () => {
