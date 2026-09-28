@@ -38,15 +38,18 @@ export async function PATCH(req: NextRequest) {
   const { id, status } = parsed.data;
 
   const current = getContentPostById(id);
+  if (!current) {
+    return NextResponse.json({ error: 'not found' }, { status: 404 });
+  }
 
   // Approving a queued X post is the moment it actually needs to go out --
   // wire the real post here rather than just flipping a status flag.
   const publishResult = await maybePublishToX({
     contentId: id,
-    platform: current?.platform,
-    previousStatus: current?.status,
+    platform: current.platform,
+    previousStatus: current.status,
     nextStatus: status,
-    text: current?.full_content || current?.text_preview,
+    text: current.full_content || current.text_preview,
   });
   if (publishResult.attempted && !publishResult.ok) {
     return NextResponse.json({ error: publishResult.error }, { status: publishResult.status });
