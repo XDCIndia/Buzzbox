@@ -27,6 +27,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ### Fixed
 - Agent-sessions cards link to the real `/agents/comms?conv=` route; dashboard uses the default brand id instead of a hardcoded UUID (#95, fixes #67).
+- `PATCH /api/content` answers 404 for unknown ids instead of reporting success (fixes #135).
 - Command-palette results deep-link to the lead record page instead of always landing on generic lists (fixes #138).
 - Dashboard Pipeline card no longer shows a delta/sparkline borrowed from the discoveries metric (fixes #139).
 - Dashboard `MetricColumn` no longer renders each KPI value block twice (fixes #117).

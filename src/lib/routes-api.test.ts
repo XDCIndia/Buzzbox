@@ -204,6 +204,14 @@ test('content PATCH rejects malformed JSON with 400', async () => {
   assert.equal(res.status, 400);
 });
 
+test('content PATCH answers 404 for unknown ids without side effects (#135)', async () => {
+  const res = await contentPatch(
+    jsonRequest('http://localhost/api/content', { id: 'no-such-post', status: 'ready' }),
+  );
+  assert.equal(res.status, 404);
+  assert.equal((await res.json()).error, 'not found');
+});
+
 /* ── content PATCH: status transition ─────────────────────────────────── */
 
 test('content PATCH transitions draft to ready', async () => {
