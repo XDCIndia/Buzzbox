@@ -34,6 +34,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Sync runs each source in isolation with per-source health, corrupt state files error instead of silently skipping, and the activity-log offset persists across restarts with truncation recovery (fixes #119).
 - Brand mention sync fans out over all keywords (capped at five) with providers running concurrently, answers 200/207/502 honestly instead of always 200, and truncates provider errors to markup-free single lines (fixes #121).
 - X publishing is serialized per content item in a new `x_publish_claims` table (schema v4): concurrent approves get 409 instead of double-posting, completed tweet ids make crash-retries finalize without reposting, stale claims expire after 5 minutes, and the budget check runs inside a publish mutex (fixes #120).
+- Production build uses the default (Turbopack) builder instead of the pinned `--webpack` flag, which crashed on Windows scanning a protected home-dir junction; no webpack-specific configuration existed to preserve (fixes #108, unblocks #109).
 - CRM lead-detail poll no longer clobbers in-progress edits (dirty latch on the next-action date; hydration skips open editors) (#95, fixes #37).
 - Chat session sync rebuilt: byte-accurate offset resumption, entry-id idempotency, fixed the never-matching cron-title regex (#93, fixes #60).
 - CSRF origin check treats `127.0.0.1` and `localhost` as equivalent at the same scheme+port; cross-site, other ports, and scheme changes still rejected (#92, fixes #86).
