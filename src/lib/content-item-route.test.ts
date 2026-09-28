@@ -107,3 +107,51 @@ test('PATCH still returns 404 when neither table nor file has the id', async () 
   );
   assert.equal(res.status, 404);
 });
+
+test('PATCH rejects unknown statuses instead of persisting typos (#134)', async () => {
+  seedPost('cp-status-1', 'draft');
+  const res = await contentItemPatch(
+    new NextRequest('http://localhost/api/content-item', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...API },
+      body: JSON.stringify({ id: 'cp-status-1', patch: { status: 'go-viral' } }),
+    }),
+  );
+  assert.equal(res.status, 400);
+  assert.match(String((await res.json()).error), /Invalid status/);
+  const post = db.prepare(`SELECT status FROM content_posts WHERE id = ?`).get('cp-status-1') as { status: string };
+  assert.equal(post.status, 'draft', 'rejected patch must not persist');
+});
+
+test('PATCH rejects oversized item payloads (#134)', async () => {
+  seedPost('cp-size-1', 'draft');
+  const res = await contentItemPatch(
+    new NextRequest('http://localhost/api/content-item', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...API },
+      body: JSON.stringify({ id: 'cp-size-1', item: { id: 'cp-size-1', platform: 'x', text: 'x'.repeat(140 * 1024) } }),
+    }),
+  );
+  assert.equal(res.status, 400);
+  assert.match(String((await res.json()).error), /exceeds size limit/);
+});
+
+test('queue writeback leaves valid JSON and no temp files behind (#134)', async () => {
+  seedPost('cp-atomic-1', 'pending_approval');
+  const res = await contentItemPatch(
+    new NextRequest('http://localhost/api/content-item', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...API },
+      body: JSON.stringify({ id: 'cp-atomic-1', patch: { status: 'ready' } }),
+    }),
+  );
+  assert.equal(res.status, 200);
+
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const leftovers = readdirSync(tempDir).filter((f) => f.includes('.tmp.'));
+  assert.deepEqual(leftovers, []);
+  const queueFile = path.join(tempDir, 'content-queue.json');
+  const parsed = JSON.parse(readFileSync(queueFile, 'utf-8')) as unknown[];
+  assert.ok(Array.isArray(parsed));
+  assert.ok(parsed.some((x) => (x as { id?: string })?.id === 'cp-atomic-1'));
+});
