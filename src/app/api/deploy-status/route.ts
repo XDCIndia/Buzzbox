@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
-import { requireApiUser } from '@/lib/api-auth';
+import { requireApiCapability } from '@/lib/api-auth';
 import { getInstance, resolveOpenClawPaths } from '@/lib/instances';
 
 export const dynamic = 'force-dynamic';
@@ -77,7 +77,9 @@ function latestLog(logDir: string) {
 }
 
 export async function GET(request: Request) {
-  const auth = requireApiUser(request as Request);
+  // System surface (service names, paths, pids, log tails, validator
+  // output): admin-only, like the other manage_system routes (#136).
+  const auth = requireApiCapability(request as Request, 'manage_system');
   if (auth) return auth;
 
   const instance = getInstance(getInstanceId(request));
