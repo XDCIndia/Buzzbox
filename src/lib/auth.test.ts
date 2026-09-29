@@ -24,6 +24,7 @@ import {
   requireUser,
   resetUserPassword,
   reviewGoogleLoginRequest,
+  safeDecodeURIComponent,
   safeRedirectPath,
   seedAdmin,
   validateSession,
@@ -110,8 +111,7 @@ test('seedAdmin password sync invalidates existing sessions (#130)', () => {
   assert.ok(authenticate('admin_test', 'rotated-pass-456'));
 });
 
-test('safeRedirectPath only allows same-origin absolute paths (#131)', () => {
-  assert.equal(safeRedirectPath('/dashboard'), '/dashboard');
+test('safeRedirectPath only allows same-origin absolute paths (#131)', () => {  assert.equal(safeRedirectPath('/dashboard'), '/dashboard');
   assert.equal(safeRedirectPath('/agents/comms?conv=abc'), '/agents/comms?conv=abc');
   assert.equal(safeRedirectPath('/'), '/');
   assert.equal(safeRedirectPath('//evil.com'), '/');
@@ -123,6 +123,33 @@ test('safeRedirectPath only allows same-origin absolute paths (#131)', () => {
   assert.equal(safeRedirectPath(''), '/');
   assert.equal(safeRedirectPath(undefined), '/');
   assert.equal(safeRedirectPath(null), '/');
+});
+
+test('malformed session cookies decode to absent instead of throwing (#149)', () => {
+  assert.equal(safeDecodeURIComponent('%'), null);
+  assert.equal(safeDecodeURIComponent('%ZZ'), null);
+  assert.equal(safeDecodeURIComponent('abc%2'), null);
+  assert.equal(safeDecodeURIComponent('valid-token-123'), 'valid-token-123');
+  assert.equal(safeDecodeURIComponent('hello%20world'), 'hello world');
+
+  const request = new Request('http://localhost/api/test', {
+    headers: { cookie: 'hermes-session=%ZZ' },
+  });
+  assert.equal(getUserFromRequest(request), null);
+  assert.throws(() => requireUser(request), /unauthorized/);
+});
+
+test('login still succeeds with a malformed session cookie present (#149)', async () => {
+  seedAdmin();
+  const { POST } = await import('../app/api/auth/login/route');
+  const res = await POST(
+    new Request('http://localhost/api/auth/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'hermes-session=%' },
+      body: JSON.stringify({ username: 'admin_test', password: 'super-secure-pass' }),
+    }) as never,
+  );
+  assert.equal(res.status, 200);
 });
 
 test('requireUser throws on invalid session cookie', () => {

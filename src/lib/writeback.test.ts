@@ -43,3 +43,22 @@ test('writebackLeadDelete removes an existing lead', () => {
   assert.equal(data[0].id, 'lead_a');
 });
 
+test('corrupt state file is left untouched instead of wiped (#148)', () => {
+  const fp = path.join(tempDir, 'leads.json');
+  const garbage = '{"leads": [broken json {{{';
+  writeFileSync(fp, garbage, 'utf-8');
+
+  writebackLeadCreate({ id: 'new-lead', first_name: 'New' });
+
+  assert.equal(readFileSync(fp, 'utf-8'), garbage);
+});
+
+test('create upserts without dropping sibling rows (#148)', () => {
+  const fp = path.join(tempDir, 'leads.json');
+  writeFileSync(fp, JSON.stringify([{ id: 'sibling', first_name: 'Sib' }]), 'utf-8');
+
+  writebackLeadCreate({ id: 'added', first_name: 'Added' });
+
+  const parsed = JSON.parse(readFileSync(fp, 'utf-8')) as { id?: string }[];
+  assert.equal(parsed.length, 2);
+});

@@ -48,6 +48,8 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Password changes (admin reset and `AUTH_PASS` rotation) invalidate all of the user's sessions (fixes #130).
 - Post-OAuth redirects accept same-origin absolute paths only, closing the protocol-relative open redirect (fixes #131).
 - `GET /api/deploy-status` requires the `manage_system` capability (admin-only) instead of any login (fixes #136).
+- Cookie decoding never throws: malformed session cookies are treated as absent (401 / proceed to login / clear on logout) instead of 500ing into an unrecoverable lockout (fixes #149).
+- Appending to an unreadable state file is refused instead of replacing it with a single row (fixes #148).
 - Baseline security headers (CSP, HSTS, framing, MIME-sniff, referrer) on every route, asserted in E2E (fixes #137).
 - `POST /api/buzz` caps messages at 4000 chars and rate-limits callers (20/min per IP) since each request fans out into paid LLM calls (fixes #132).
 - `GET /api/dicompute-test` now requires the `manage_system` capability (admin-only), is rate-limited per IP (10/min), and maps missing-provider/upstream failures to 412/502 instead of echoing raw errors; new coverage test asserts every non-auth API route references an auth guard (fixes #99).
