@@ -475,6 +475,10 @@ export function createBuzzContentDraft({
 }) {
   const db = getDb();
 
+  // Canonical X value is 'x'; normalize the legacy 'twitter' alias so
+  // drafts are publishable and visible in platform=x listings (#150).
+  const canonicalPlatform = platform.toLowerCase() === 'twitter' ? 'x' : platform;
+
   const id = `buzz-${Date.now()}-${Math.random()
     .toString(36)
     .slice(2, 10)}`;
@@ -495,7 +499,7 @@ export function createBuzzContentDraft({
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
-    platform,
+    canonicalPlatform,
     'post',
     1,
     content.slice(0, 160),

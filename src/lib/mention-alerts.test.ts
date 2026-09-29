@@ -226,3 +226,54 @@ test('end-to-end: crisis mention in a sync creates exactly one notification; re-
     globalThis.fetch = originalFetch;
   }
 });
+
+test('checkBrandAlert notifies and advances the watermark atomically (#152)', () => {
+  const brandId = '97cdb115-2c90-42a8-b904-d14abce1d682';
+  // Keyword-scoped: other tests share this brand's mentions table.
+  const alert = bq.createBrandAlert(brandId, { name: 'Atomic check', filters: { keyword: 'atomic hello' } });
+  bq.insertBrandMention({
+    id: 'atomic_m1',
+    brand_id: brandId,
+    source_type: 'social',
+    platform: 'x',
+    author_name: 'A',
+    author_handle: 'a',
+    author_avatar_url: null,
+    author_reach: 10,
+    text: 'atomic hello',
+    url: null,
+    likes: 0,
+    comments: 0,
+    sentiment: 'neutral',
+    emotion: 'neutral',
+    intent: null,
+    is_crisis: false,
+    is_high_impact: false,
+    published_at: null,
+  });
+
+  const notifiedBefore = (
+    db.prepare("SELECT COUNT(*) n FROM notifications WHERE type = 'brand_alert'").get() as { n: number }
+  ).n;
+  const first = bq.checkBrandAlert(brandId, alert.id);
+  assert.deepEqual(first, { matched: 1 });
+  const notifiedAfter = (
+    db.prepare("SELECT COUNT(*) n FROM notifications WHERE type = 'brand_alert'").get() as { n: number }
+  ).n;
+  assert.equal(notifiedAfter, notifiedBefore + 1, 'one notification for the match');
+
+  const watermark = (
+    db.prepare('SELECT last_checked_at AS w FROM brand_alerts WHERE id = ?').get(alert.id) as { w: string }
+  ).w;
+  assert.ok(watermark, 'watermark advances with the notification, not before it');
+
+  // Second check sees nothing new and notifies nothing.
+  const second = bq.checkBrandAlert(brandId, alert.id);
+  assert.deepEqual(second, { matched: 0 });
+  const notifiedFinal = (
+    db.prepare("SELECT COUNT(*) n FROM notifications WHERE type = 'brand_alert'").get() as { n: number }
+  ).n;
+  assert.equal(notifiedFinal, notifiedAfter, 'no duplicate notification');
+
+  bq.deleteBrandAlert(brandId, alert.id);
+});

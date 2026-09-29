@@ -50,6 +50,8 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - `GET /api/deploy-status` requires the `manage_system` capability (admin-only) instead of any login (fixes #136).
 - Cookie decoding never throws: malformed session cookies are treated as absent (401 / proceed to login / clear on logout) instead of 500ing into an unrecoverable lockout (fixes #149).
 - Appending to an unreadable state file is refused instead of replacing it with a single row (fixes #148).
+- Buzz accepts `x` (normalizing legacy `twitter`) for AI-drafted posts so approvals actually publish (fixes #150).
+- Brand alert checks notify and advance their watermark in one transaction instead of stamping first (fixes #152).
 - Baseline security headers (CSP, HSTS, framing, MIME-sniff, referrer) on every route, asserted in E2E (fixes #137).
 - `POST /api/buzz` caps messages at 4000 chars and rate-limits callers (20/min per IP) since each request fans out into paid LLM calls (fixes #132).
 - `GET /api/dicompute-test` now requires the `manage_system` capability (admin-only), is rate-limited per IP (10/min), and maps missing-provider/upstream failures to 412/502 instead of echoing raw errors; new coverage test asserts every non-auth API route references an auth guard (fixes #99).

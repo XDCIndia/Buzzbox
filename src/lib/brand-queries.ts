@@ -255,17 +255,22 @@ export function checkBrandAlert(brand_id: string, id: string): { matched: number
 
   const matches = (db.prepare(sql).all(...params) as MentionRow[]).map(rowToMention);
 
-  db.prepare('UPDATE brand_alerts SET last_checked_at = CURRENT_TIMESTAMP WHERE id = ? AND brand_id = ?').run(id, brand_id);
-
-  if (matches.length) {
-    createNotification({
-      type: 'brand_alert',
-      severity: alert.filters.sentiment === 'negative' ? 'warning' : 'info',
-      title: alert.name,
-      message: `${matches.length} new mention${matches.length === 1 ? '' : 's'} matched "${alert.name}"`,
-      data: { alert_id: id, mention_ids: matches.map(m => m.id) },
-    });
-  }
+  // The watermark must move atomically with the notification: stamping it
+  // first means a crash (or a throwing insert) skips those mentions forever
+  // on the next check (#152). createNotification shares this connection, so
+  // it participates in the same transaction.
+  db.transaction(() => {
+    if (matches.length) {
+      createNotification({
+        type: 'brand_alert',
+        severity: alert.filters.sentiment === 'negative' ? 'warning' : 'info',
+        title: alert.name,
+        message: `${matches.length} new mention${matches.length === 1 ? '' : 's'} matched "${alert.name}"`,
+        data: { alert_id: id, mention_ids: matches.map(m => m.id) },
+      });
+    }
+    db.prepare('UPDATE brand_alerts SET last_checked_at = CURRENT_TIMESTAMP WHERE id = ? AND brand_id = ?').run(id, brand_id);
+  })();
 
   return { matched: matches.length };
 }

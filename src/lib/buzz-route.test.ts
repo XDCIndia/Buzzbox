@@ -25,12 +25,14 @@ delete process.env.DICOMPUTE_API_KEY;
 let dbm: typeof import('./db');
 let buzzPost: typeof import('../app/api/buzz/route')['POST'];
 let dicompute: typeof import('./dicompute');
+let createBuzzContentDraft: typeof import('./queries')['createBuzzContentDraft'];
 
 before(async () => {
   dbm = await import('./db');
   const route = await import('../app/api/buzz/route');
   dicompute = await import('./dicompute');
   buzzPost = route.POST;
+  createBuzzContentDraft = (await import('./queries')).createBuzzContentDraft;
   dbm.getDb();
 });
 
@@ -86,4 +88,11 @@ test('POST /api/buzz rate-limits callers with 429 and Retry-After (#132)', async
   }
   assert.equal(last!.status, 429);
   assert.ok(last!.headers.get('retry-after'), '429 must carry a Retry-After header');
+});
+
+test("createBuzzContentDraft normalizes legacy 'twitter' to publishable 'x' (#150)", () => {
+  const legacy = createBuzzContentDraft({ platform: 'twitter', content: 'hello x' }) as { platform: string };
+  assert.equal(legacy.platform, 'x');
+  const normal = createBuzzContentDraft({ platform: 'linkedin', content: 'hello li' }) as { platform: string };
+  assert.equal(normal.platform, 'linkedin');
 });
