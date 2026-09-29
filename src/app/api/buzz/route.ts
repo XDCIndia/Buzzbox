@@ -559,7 +559,7 @@ export async function POST(request: NextRequest) {
     }
 
     Rules:
-    - platform must be one of: linkedin, twitter, instagram
+    - platform must be one of: linkedin, x, instagram (use 'x' for X/Twitter)
     - content must contain the complete post
     - Do not use markdown code fences.
     - Do not include explanations outside the JSON.
@@ -609,12 +609,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const platform =
-        generatedContent.platform.toLowerCase();
+      // Canonical X value is 'x'; accept the legacy 'twitter' alias older
+      // prompts (and models) still emit, so approvals actually publish (#150).
+      const rawPlatform = generatedContent.platform.toLowerCase();
+      const platform = rawPlatform === 'twitter' ? 'x' : rawPlatform;
 
       const allowedPlatforms = [
         'linkedin',
-        'twitter',
+        'x',
         'instagram',
       ];
 
