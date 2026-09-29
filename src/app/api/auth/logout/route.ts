@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { destroySession } from '@/lib/auth';
+import { destroySession, safeDecodeURIComponent } from '@/lib/auth';
 
 const SESSION_COOKIE = 'hermes-session';
 
@@ -22,7 +22,7 @@ function shouldUseSecureCookies(request: Request): boolean {
 export async function POST(request: Request) {
   const cookie = request.headers.get('cookie') || '';
   const match = cookie.match(/(?:^|;\s*)hermes-session=([^;]*)/);
-  const token = match ? decodeURIComponent(match[1]) : null;
+  const token = match ? safeDecodeURIComponent(match[1]) : null;
 
   if (token) destroySession(token);
 

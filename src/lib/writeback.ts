@@ -66,9 +66,18 @@ function updateJsonFile(
 function appendJsonFile(filename: string, row: Record<string, unknown>): void {
   const filePath = path.join(getStateDir(), filename);
   try {
-    const exists = fs.existsSync(filePath);
-    const data = exists ? safeReadJson(filePath) : [];
-    const container = getArrayContainer(data) ?? { kind: 'array' as const, arr: [] as JsonRow[] };
+    if (!fs.existsSync(filePath)) {
+      atomicWriteJson(filePath, [row]);
+      return;
+    }
+    const container = getArrayContainer(safeReadJson(filePath));
+    // A present-but-unreadable file is operator data in an unknown state:
+    // never replace it with a single row -- refuse and leave it for the
+    // operator to repair (#148).
+    if (!container) {
+      console.warn(`[writeback] Refusing to overwrite unreadable state file: ${filePath}`);
+      return;
+    }
 
     const id = row.id;
     const idx = container.arr.findIndex((d) => d?.id === id);

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createSession, destroySession, recordGoogleLoginAttempt, safeRedirectPath, upsertGoogleUser } from '@/lib/auth';
+import { createSession, destroySession, recordGoogleLoginAttempt, safeDecodeURIComponent, safeRedirectPath, upsertGoogleUser } from '@/lib/auth';
 
 const STATE_COOKIE = 'hermes-google-state';
 const SESSION_COOKIE = 'hermes-session';
@@ -51,11 +51,11 @@ function shouldUseSecureCookies(request: Request): boolean {
 function parseStateCookie(request: Request): { state: string; from: string } | null {
   const rawCookie = request.headers.get('cookie') || '';
   const match = rawCookie.match(/(?:^|;\s*)hermes-google-state=([^;]*)/);
-  const value = match ? decodeURIComponent(match[1]) : '';
+  const value = match ? (safeDecodeURIComponent(match[1]) ?? '') : '';
   if (!value) return null;
   const [state, encodedFrom] = value.split(':');
   if (!state) return null;
-  const from = encodedFrom ? decodeURIComponent(encodedFrom) : '/';
+  const from = encodedFrom ? (safeDecodeURIComponent(encodedFrom) ?? '/') : '/';
   // Same-origin absolute paths only: a bare startsWith('/') check admits
   // protocol-relative URLs (//evil.com) and thus post-login open redirects.
   return { state, from: safeRedirectPath(from) };
@@ -149,7 +149,7 @@ export async function GET(request: Request) {
     // Invalidate existing session token if present.
     const cookie = request.headers.get('cookie') || '';
     const existingMatch = cookie.match(/(?:^|;\s*)hermes-session=([^;]*)/);
-    const existingToken = existingMatch ? decodeURIComponent(existingMatch[1]) : null;
+    const existingToken = existingMatch ? safeDecodeURIComponent(existingMatch[1]) : null;
     if (existingToken) destroySession(existingToken);
 
     const token = createSession(user.id);

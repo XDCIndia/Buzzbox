@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { authenticate, createSession, destroySession, seedAdmin } from '@/lib/auth';
+import { authenticate, createSession, destroySession, safeDecodeURIComponent, seedAdmin } from '@/lib/auth';
 import { rateLimit } from '@/lib/rate-limit';
 import { parseAndValidate } from '@/lib/api-validate';
 import { z } from 'zod';
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   // Invalidate any previously presented session token to reduce session fixation risk.
   const cookie = request.headers.get('cookie') || '';
   const existingMatch = cookie.match(/(?:^|;\s*)hermes-session=([^;]*)/);
-  const existingToken = existingMatch ? decodeURIComponent(existingMatch[1]) : null;
+  const existingToken = existingMatch ? safeDecodeURIComponent(existingMatch[1]) : null;
   if (existingToken) {
     destroySession(existingToken);
   }

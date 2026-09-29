@@ -207,6 +207,18 @@ export function destroySession(token: string): void {
   getDb().prepare('DELETE FROM sessions WHERE token = ?').run(token);
 }
 
+/** Cookie-safe decode: a truncated or mangled cookie value (%-escapes cut
+ * by a proxy, copy-paste damage) must never throw. Callers treat null as
+ * "no usable token" -- 401, proceed to login, or clear on logout -- instead
+ * of 500ing every request into an unrecoverable lockout (#149). */
+export function safeDecodeURIComponent(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
 export function listUsers(): User[] {
   ensureAuthTables();
   const db = getDb();
@@ -475,7 +487,7 @@ export function deleteUser(userId: number): void {
 export function getUserFromRequest(request: Request): User | null {
   const cookie = request.headers.get('cookie') || '';
   const match = cookie.match(/(?:^|;\s*)hermes-session=([^;]*)/);
-  const token = match ? decodeURIComponent(match[1]) : null;
+  const token = match ? safeDecodeURIComponent(match[1]) : null;
   if (token) {
     const user = validateSession(token);
     if (user) return user;
