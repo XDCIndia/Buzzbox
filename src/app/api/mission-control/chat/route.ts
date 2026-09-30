@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { sendAgentMessage, sendOrchestratorMessage } from '@/lib/command';
+import { claimMissionControlSend, isMissionControlRateLimit } from '@/lib/mission-control-send';
 import { requireApiAdmin } from '@/lib/api-auth';
 import { requireAdmin } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
@@ -138,53 +139,27 @@ export async function POST(request: NextRequest) {
     }
 
     const db = getDb();
-    const now = Math.floor(Date.now() / 1000);
     const conversationId = body.conversation_id || toConversationId(mode, fromAgent, toAgent);
-    const actorRateKey = `%"source":"mission-control"%`;
 
-    const last = db.prepare(
-      `SELECT created_at
-       FROM messages
-       WHERE from_agent = ? AND metadata LIKE ?
-       ORDER BY created_at DESC
-       LIMIT 1`,
-    ).get(actor.username, actorRateKey) as { created_at?: number } | undefined;
-    const lastTs = Number(last?.created_at ?? 0);
-    const cooldownSec = 3;
-    if (lastTs > 0 && now - lastTs < cooldownSec) {
-      return NextResponse.json(
-        { error: `Cooldown active. Please wait ${cooldownSec - (now - lastTs)}s before sending another command.` },
-        { status: 429 },
-      );
+    // Cooldown/cap guard + send insert run atomically inside the claim, so
+    // concurrent sends serialize instead of all reading stale counts (#168).
+    let metadata: string;
+    try {
+      metadata = claimMissionControlSend({
+        username: actor.username,
+        conversationId,
+        toAgent: mode === 'agent_bridge' ? (toAgent as string) : 'orchestrator',
+        content,
+        mode,
+        fromAgent: fromAgent ?? null,
+        toAgentName: toAgent ?? null,
+      }).metadata;
+    } catch (err) {
+      if (isMissionControlRateLimit(err)) {
+        return NextResponse.json({ error: (err as Error).message }, { status: 429 });
+      }
+      throw err;
     }
-
-    const windowSec = 300;
-    const maxPerWindow = 30;
-    const recentCountRow = db.prepare(
-      `SELECT COUNT(*) as c
-       FROM messages
-       WHERE from_agent = ? AND metadata LIKE ? AND created_at >= ?`,
-    ).get(actor.username, actorRateKey, now - windowSec) as { c?: number } | undefined;
-    const recentCount = Number(recentCountRow?.c ?? 0);
-    if (recentCount >= maxPerWindow) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded for mission-control sends. Try again in a few minutes.' },
-        { status: 429 },
-      );
-    }
-
-    const metadata = JSON.stringify({
-      source: 'mission-control',
-      mode,
-      actor: actor.username,
-      from_agent: fromAgent ?? null,
-      to_agent: toAgent ?? null,
-    });
-
-    db.prepare(
-      `INSERT INTO messages (conversation_id, from_agent, to_agent, content, message_type, metadata, created_at)
-       VALUES (?, ?, ?, ?, 'text', ?, ?)`,
-    ).run(conversationId, actor.username, mode === 'agent_bridge' ? toAgent : 'orchestrator', content, metadata, now);
 
     let responseText = '';
     if (mode === 'orchestrator') {
