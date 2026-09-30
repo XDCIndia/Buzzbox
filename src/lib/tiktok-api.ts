@@ -66,7 +66,9 @@ async function postForm(url: string, body: Record<string, string>): Promise<TikT
   const json = (await res.json().catch(() => ({}))) as TikTokTokenResponse & TikTokOAuthErrorBody;
   if (!res.ok || json.error) {
     const detail = json.error_description || json.message || json.error || (await res.text().catch(() => ''));
-    throw new Error(`TikTok OAuth failed (${res.status}): ${detail}`.slice(0, 400));
+    // Provider-supplied detail stays server-side only (#51/#157).
+    console.error(`[tiktok] OAuth upstream error ${res.status} detail (truncated):`, String(detail).slice(0, 2000));
+    throw new Error(`TikTok OAuth failed with status ${res.status}. Please try again later.`);
   }
   return json;
 }
@@ -145,7 +147,9 @@ async function tiktokGet<T>(url: string, accessToken: string): Promise<T> {
   const json = (await res.json().catch(() => ({}))) as T & { error?: { code?: string; message?: string } };
   if (!res.ok || (json as { error?: { code?: string } }).error?.code) {
     const err = (json as { error?: { code?: string; message?: string } }).error;
-    throw new Error(`TikTok API failed (${res.status}): ${err?.code || ''} ${err?.message || ''}`.trim().slice(0, 400));
+    // Provider-supplied fields stay server-side only (#51/#157).
+    console.error(`[tiktok] Upstream error ${res.status} detail (truncated):`, JSON.stringify(err).slice(0, 2000));
+    throw new Error(`TikTok API failed with status ${res.status}. Please try again later.`);
   }
   return json;
 }
@@ -294,12 +298,15 @@ export async function searchTikTokMentions(opts: {
   const json = (await res.json().catch(() => ({}))) as TikTokResearchQueryResponse;
   if (!res.ok || json.error) {
     const msg = json.error?.message || '';
+    // Provider-supplied detail stays server-side only (#51/#157).
+    console.error(`[tiktok] Research API upstream error ${res.status} detail (truncated):`, msg.slice(0, 2000));
     if (/scope|permission|research|access/i.test(msg)) {
       throw new Error(
-        `TikTok mention search requires Research API access — TikTok rejected the request: ${msg}`.slice(0, 400)
+        'TikTok mention search requires Research API access — the configured TikTok token/app is not on that approved tier. ' +
+        'Use fetchOwnTikTokVideos()/fetchOwnTikTokAnalytics() for the owned-account Display API instead.'
       );
     }
-    throw new Error(`TikTok Research API failed (${res.status}): ${msg}`.slice(0, 400));
+    throw new Error(`TikTok Research API failed with status ${res.status}. Please try again later.`);
   }
 
   const videos = json.data?.videos ?? [];

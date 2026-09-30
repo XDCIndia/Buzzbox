@@ -58,6 +58,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Buzz accepts `x` (normalizing legacy `twitter`) for AI-drafted posts so approvals actually publish (fixes #150).
 - Brand alert checks notify and advance their watermark in one transaction instead of stamping first (fixes #152).
 - Baseline security headers (CSP, HSTS, framing, MIME-sniff, referrer) on every route, asserted in E2E (fixes #137).
+- Provider upstream errors log bodies server-side and throw status-only messages instead of embedding response text (fixes #157).
 - `POST /api/buzz` caps messages at 4000 chars and rate-limits callers (20/min per IP) since each request fans out into paid LLM calls (fixes #132).
 - `GET /api/dicompute-test` now requires the `manage_system` capability (admin-only), is rate-limited per IP (10/min), and maps missing-provider/upstream failures to 412/502 instead of echoing raw errors; new coverage test asserts every non-auth API route references an auth guard (fixes #99).
 - Host-lock parsing handles bracketed/bare IPv6 loopback (`[::1]`, `::1`) and normalizes case; documented that `HERMES_HOST_LOCK` is a best-effort header check with the listen address (`HOSTNAME=127.0.0.1`) plus firewall as the real boundary (fixes #100).
