@@ -47,6 +47,15 @@ const CATEGORY_ROUTES: Record<string, string> = {
   activity: '/activity',
 };
 
+/** Window event that opens the palette. The header search trigger dispatches
+ * this instead of faking a keyboard event (which is untrusted, fragile, and
+ * untestable) (#156). */
+export const PALETTE_OPEN_EVENT = 'buzzbox:open-palette';
+
+export function openCommandPalette() {
+  window.dispatchEvent(new CustomEvent(PALETTE_OPEN_EVENT));
+}
+
 /** Deep-link for a search result. Leads have a dedicated record page
  * (/crm/[id]); every other category has no per-record URL, so those fall
  * back to their list route (#138). */
@@ -84,8 +93,18 @@ export function CommandPalette() {
       }
       if (e.key === 'Escape') setOpen(false);
     };
+    const openHandler = () => {
+      setQuery('');
+      setResults([]);
+      setActiveIndex(0);
+      setOpen(true);
+    };
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener(PALETTE_OPEN_EVENT, openHandler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      window.removeEventListener(PALETTE_OPEN_EVENT, openHandler);
+    };
   }, []);
 
   // Search debounce
@@ -171,22 +190,31 @@ export function CommandPalette() {
         <div className="glass-strong rounded-xl border border-border/50 shadow-2xl overflow-hidden">
           {/* Input */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border/30">
-              <Search size={18} className="text-muted-foreground shrink-0" />
-              <input
-                type="text"
-                value={query}
-                onChange={e => {
-                  const next = e.target.value;
-                  setQuery(next);
-                  if (next.length < 2) {
-                    setLoading(false);
-                  }
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="Search leads, content, signals... or navigate"
-                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
-                autoFocus
-              />
+            <Search size={18} className="text-muted-foreground shrink-0" />
+            <input
+              type="text"
+              role="combobox"
+              aria-label="Search leads, content, signals, or navigate"
+              aria-expanded={visibleResults.length > 0}
+              aria-controls="command-palette-listbox"
+              aria-activedescendant={
+                visibleResults.length > 0 && activeIndex >= filteredNav.length
+                  ? `palette-option-${activeIndex - filteredNav.length}`
+                  : undefined
+              }
+              value={query}
+              onChange={e => {
+                const next = e.target.value;
+                setQuery(next);
+                if (next.length < 2) {
+                  setLoading(false);
+                }
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="Search leads, content, signals... or navigate"
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+              autoFocus
+            />
             <kbd className="hidden sm:inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
               ESC
             </kbd>
@@ -229,12 +257,16 @@ export function CommandPalette() {
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-1 mb-1">
                   Results
                 </div>
+                <div role="listbox" id="command-palette-listbox" aria-label="Search results">
                 {visibleResults.map((result, i) => {
                   const Icon = CATEGORY_ICONS[result.category] || List;
                   const idx = filteredNav.length + i;
                   return (
                     <button
                       key={`${result.category}-${result.id}`}
+                      id={`palette-option-${i}`}
+                      role="option"
+                      aria-selected={activeIndex === idx}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
                         activeIndex === idx
                           ? 'bg-primary/10 text-primary'
@@ -259,6 +291,7 @@ export function CommandPalette() {
                     </button>
                   );
                 })}
+                </div>
               </div>
             )}
 

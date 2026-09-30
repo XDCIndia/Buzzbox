@@ -34,6 +34,8 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Dashboard `MetricColumn` no longer renders each KPI value block twice (fixes #117).
 - Dialogs share a Modal shell with Escape-to-close, focus trap, initial focus, and scroll-lock (fixes #153).
 - Lead notes stay open on failed saves instead of discarding the draft (fixes #154).
+- Kanban cards move between stages with Left/Right arrow keys, announced via key shortcuts (fixes #155).
+- Command palette exposes combobox/listbox semantics and opens via a shared action instead of a synthetic key event (fixes #156).
 - CRM task-done, lead-create, and kanban-drop failures now surface error toasts (and refresh to server truth) instead of failing silently (fixes #118).
 - Sync runs each source in isolation with per-source health, corrupt state files error instead of silently skipping, and the activity-log offset persists across restarts with truncation recovery (fixes #119).
 - Brand mention sync fans out over all keywords (capped at five) with providers running concurrently, answers 200/207/502 honestly instead of always 200, and truncates provider errors to markup-free single lines (fixes #121).

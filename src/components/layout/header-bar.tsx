@@ -15,6 +15,7 @@ import type { SyncHealth } from '@/lib/sync';
 import { DEFAULT_BRAND_ID } from '@/lib/brand-constants';
 import type { Notification } from '@/types';
 import { BuzzAssistant } from '@/components/chat/buzz-assistant';
+import { openCommandPalette } from '@/components/command-palette';
 
 interface HeaderStats {
   posts_today: number;
@@ -416,7 +417,7 @@ function SearchTrigger() {
   return (
     <button
       className="hidden md:flex items-center gap-2 h-7 px-2.5 rounded-lg bg-surface-1 hover:bg-surface-2 border border-border text-xs text-muted-foreground hover:text-foreground transition-all focus:outline-none focus:ring-2 focus:ring-primary"
-      onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+      onClick={() => openCommandPalette()}
       aria-label="Search application"
     >
       <Search size={13} />

@@ -39,6 +39,9 @@ interface CrmData {
 
 const STAGES = ['new', 'validated', 'approved', 'contacted', 'replied', 'interested', 'booked', 'qualified'] as const;
 
+// Linear order for keyboard moves between kanban columns (#155).
+const MOVE_STAGE_ORDER: string[] = [...STAGES, 'rejected', 'disqualified'];
+
 const STAGE_ICONS: Record<string, typeof Send> = {
   new: CircleDot,
   validated: CheckCircle,
@@ -729,6 +732,11 @@ function KanbanBoard({
 
   return (
     <div className="space-y-4">
+      {canEdit && (
+        <p className="sr-only">
+          Kanban cards can be moved between stages with the Left and Right arrow keys when focused.
+        </p>
+      )}
       {/* Board + Detail side by side on lg */}
       <div className="flex gap-4">
         <div
@@ -756,6 +764,7 @@ function KanbanBoard({
                 slaNewDays={slaNewDays}
                 isDragOver={dragOverStage === stage}
                 onSelectLead={onSelectLead}
+                onMoveLead={onDropLead}
                 onDragOver={(e) => {
                   if (!canEdit) return;
                   e.preventDefault();
@@ -787,6 +796,7 @@ function KanbanBoard({
               slaNewDays={slaNewDays}
               isDragOver={dragOverStage === 'rejected'}
               onSelectLead={onSelectLead}
+              onMoveLead={onDropLead}
               onDragOver={(e) => {
                 if (!canEdit) return;
                 e.preventDefault();
@@ -817,6 +827,7 @@ function KanbanBoard({
               slaNewDays={slaNewDays}
               isDragOver={dragOverStage === 'disqualified'}
               onSelectLead={onSelectLead}
+              onMoveLead={onDropLead}
               onDragOver={(e) => {
                 if (!canEdit) return;
                 e.preventDefault();
@@ -884,6 +895,7 @@ function KanbanColumn({
   slaNewDays,
   isDragOver,
   onSelectLead,
+  onMoveLead,
   onDragOver,
   onDragLeave,
   onDrop,
@@ -899,6 +911,7 @@ function KanbanColumn({
   slaNewDays: number;
   isDragOver: boolean;
   onSelectLead: (id: string) => void;
+  onMoveLead: (leadId: string, stage: string) => void;
   onDragOver: (e: DragEvent) => void;
   onDragLeave: () => void;
   onDrop: (e: DragEvent) => void;
@@ -931,6 +944,7 @@ function KanbanColumn({
             slaStaleDays={slaStaleDays}
             slaNewDays={slaNewDays}
             onSelect={() => onSelectLead(lead.id)}
+            onMove={(stage) => onMoveLead(lead.id, stage)}
           />
         ))}
         {leads.length === 0 && (
@@ -945,7 +959,7 @@ function KanbanColumn({
 
 /* ─── Kanban Card ──────────────────────────────────────── */
 
-function KanbanCard({ lead, selected, onSelect, nowMs, canEdit, slaStaleDays, slaNewDays }: { lead: Lead; selected: boolean; onSelect: () => void; nowMs: number | null; canEdit: boolean; slaStaleDays: number; slaNewDays: number }) {
+function KanbanCard({ lead, selected, onSelect, onMove, nowMs, canEdit, slaStaleDays, slaNewDays }: { lead: Lead; selected: boolean; onSelect: () => void; onMove: (stage: string) => void; nowMs: number | null; canEdit: boolean; slaStaleDays: number; slaNewDays: number }) {
   const isPaused = (lead as { pause_outreach?: number }).pause_outreach === 1;
   const missingEmail = !lead.email;
   const missingCompany = !lead.company;
@@ -963,13 +977,28 @@ function KanbanCard({ lead, selected, onSelect, nowMs, canEdit, slaStaleDays, sl
     e.dataTransfer.effectAllowed = 'move';
   }
 
+  // Keyboard move path for drag-and-drop parity (#155): Left/Right arrows
+  // move the focused card along the stage order. No extra UI needed, and no
+  // nested interactive elements inside the card button.
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (!canEdit) return;
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const idx = MOVE_STAGE_ORDER.indexOf(lead.status);
+    if (idx === -1) return;
+    const next = e.key === 'ArrowRight' ? MOVE_STAGE_ORDER[idx + 1] : MOVE_STAGE_ORDER[idx - 1];
+    if (next && next !== lead.status) onMove(next);
+  }
+
   return (
     <button
       type="button"
       draggable={canEdit}
       onDragStart={handleDragStart}
       onClick={onSelect}
+      onKeyDown={handleKeyDown}
       aria-pressed={selected}
+      aria-keyshortcuts={canEdit ? 'ArrowLeft ArrowRight' : undefined}
       aria-label={`${lead.first_name ?? ''} ${lead.last_name ?? ''}${lead.company ? `, ${lead.company}` : ''}`.trim() || 'Lead'}
       className={`card p-2.5 transition-all text-left hover:border-primary/30 ${
         selected ? 'border-primary/50 bg-primary/5' : ''

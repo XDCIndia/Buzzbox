@@ -28,6 +28,17 @@ test.describe('command palette', () => {
 
     const result = page.locator('button', { hasText: unique }).first();
     await expect(result).toBeVisible();
+
+    // Combobox semantics (#156): labeled input, listbox container, options
+    // with selection state.
+    await expect(input).toHaveAttribute('role', 'combobox');
+    await expect(input).toHaveAttribute('aria-expanded', 'true');
+    const listbox = page.locator('#command-palette-listbox');
+    await expect(listbox).toBeVisible();
+    const options = listbox.locator('[role="option"]');
+    expect(await options.count()).toBeGreaterThan(0);
+    await expect(options.first()).toHaveAttribute('aria-selected', 'true');
+
     await result.click();
 
     await page.waitForURL(/\/crm\/.+/);
