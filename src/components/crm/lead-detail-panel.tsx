@@ -506,7 +506,7 @@ export function LeadDetailPanel({
               <div className="flex items-center gap-2 justify-end">
                 <button onClick={() => setEditingNotes(false)} className="btn btn-ghost btn-sm text-xs" type="button">Cancel</button>
                 <button
-                  onClick={() => { patchLead({ notes: notesValue }); setEditingNotes(false); }}
+                  onClick={async () => { if (await patchLead({ notes: notesValue })) setEditingNotes(false); }}
                   disabled={!canEdit || saving}
                   className="btn btn-sm text-xs bg-primary/15 text-primary hover:bg-primary/25"
                   type="button"
