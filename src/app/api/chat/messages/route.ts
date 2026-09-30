@@ -65,10 +65,10 @@ export async function POST(req: NextRequest) {
     const parsed = await parseAndValidate(
       req,
       z.object({
-        content: z.string(),
-        to: z.string().optional(),
-        message_type: z.string().optional(),
-        conversation_id: z.string().optional(),
+        content: z.string().max(4000),
+        to: z.string().max(100).optional(),
+        message_type: z.enum(['text', 'system', 'handoff', 'status']).optional(),
+        conversation_id: z.string().max(200).optional(),
         forward: z.boolean().optional(),
       }),
     );

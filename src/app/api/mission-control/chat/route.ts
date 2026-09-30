@@ -111,10 +111,10 @@ export async function POST(request: NextRequest) {
       request,
       z.object({
         mode: z.enum(['orchestrator', 'agent_bridge']).optional(),
-        content: z.string().optional(),
-        from_agent: z.string().optional(),
-        to_agent: z.string().optional(),
-        conversation_id: z.string().optional(),
+        content: z.string().max(4000).optional(),
+        from_agent: z.string().max(100).optional(),
+        to_agent: z.string().max(100).optional(),
+        conversation_id: z.string().max(200).optional(),
       }),
     );
     if (!parsed.ok) return parsed.response;
