@@ -12,6 +12,7 @@ import {
   LayoutList, Kanban, AlertCircle, BarChart3, ExternalLink,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Modal } from '@/components/ui/modal';
 import { toast } from '@/components/ui/toast';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { useDashboard } from '@/store';
@@ -101,15 +102,6 @@ export default function CrmPage() {
     notes: '',
     next_action_at: '',
   });
-
-  useEffect(() => {
-    if (!createOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [createOpen]);
 
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState('');
@@ -310,15 +302,8 @@ export default function CrmPage() {
   return (
     <div className="space-y-6 animate-in">
       {createOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            aria-label="Close"
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setCreateOpen(false)}
-          />
-          <div className="panel relative w-full max-w-xl" role="dialog" aria-modal="true" aria-labelledby="crm-add-lead-title">
-            <div className="panel-header flex items-center justify-between">
+        <Modal labelledBy="crm-add-lead-title" onClose={() => setCreateOpen(false)}>
+          <div className="panel-header flex items-center justify-between">
               <h2 id="crm-add-lead-title" className="text-sm font-medium">Add Lead</h2>
               <button type="button" aria-label="Close add lead" onClick={() => setCreateOpen(false)} className="text-muted-foreground hover:text-foreground">
                 <X size={16} />
@@ -357,8 +342,7 @@ export default function CrmPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+          </Modal>
       )}
 
       {/* Header */}

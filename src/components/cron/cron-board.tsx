@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Play, Pause, RotateCcw, History, ThermometerSun, Pencil, Plus, Trash2, X, BookmarkPlus } from 'lucide-react';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { toast } from '@/components/ui/toast';
+import { Modal } from '@/components/ui/modal';
 
 interface CronJob {
   id: string;
@@ -288,15 +289,8 @@ export function CronBoard({ variant = 'embedded' }: { variant?: 'page' | 'embedd
   return (
       <div className={wrapperClass}>
       {editOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            aria-label="Close"
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setEditOpen(false)}
-          />
-          <div className="panel relative w-full max-w-3xl" role="dialog" aria-modal="true" aria-labelledby="cron-edit-title">
-            <div className="panel-header flex items-center justify-between gap-3">
+        <Modal labelledBy="cron-edit-title" onClose={() => setEditOpen(false)} wide>
+          <div className="panel-header flex items-center justify-between gap-3">
               <div>
                 <h2 id="cron-edit-title" className="text-sm font-medium">
                   {editMode === 'create' ? 'Add Cron Job' : `Edit Cron Job${editJobId ? `: ${editJobId}` : ''}`}
@@ -361,8 +355,7 @@ export function CronBoard({ variant = 'embedded' }: { variant?: 'page' | 'embedd
                 </button>
               </div>
             </div>
-          </div>
-        </div>
+          </Modal>
       )}
 
       <div className={variant === 'page' ? 'panel' : 'panel-header'}>
