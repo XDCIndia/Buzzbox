@@ -16,10 +16,13 @@ import { getDb, resetDbForTests } from './db';
 import {
   authenticate,
   createSession,
+  createUser,
+  deleteUser,
   destroySession,
   ensureAuthTables,
   getUserFromRequest,
   listGoogleLoginRequests,
+  listUsers,
   recordGoogleLoginAttempt,
   requireUser,
   resetUserPassword,
@@ -27,6 +30,7 @@ import {
   safeDecodeURIComponent,
   safeRedirectPath,
   seedAdmin,
+  updateUserRole,
   validateSession,
 } from './auth';
 
@@ -198,4 +202,42 @@ test('reviewing login requests clears stale pending error metadata', () => {
   assert.equal(rows[0].status, 'denied');
   assert.equal(rows[0].attempts, 0);
   assert.equal(rows[0].last_error, null);
+});
+
+test('interleaved last-admin demotes cannot leave zero admins (#165)', () => {
+  seedAdmin();
+  const first = authenticate('admin_test', 'super-secure-pass');
+  assert.ok(first);
+  const second = createUser('second_admin', 'second-secure-pass-99', 'admin');
+
+  const db = getDb();
+  // Old check-then-act pattern: with two admins, both standalone COUNT
+  // checks pass — so without an atomic guard both demotions would commit.
+  const countExcludingFirst = (db.prepare("SELECT COUNT(*) as c FROM users WHERE role = 'admin' AND id != ?").get(first.id) as { c: number }).c;
+  const countExcludingSecond = (db.prepare("SELECT COUNT(*) as c FROM users WHERE role = 'admin' AND id != ?").get(second.id) as { c: number }).c;
+  assert.equal(countExcludingFirst, 1, 'first check passes pre-race');
+  assert.equal(countExcludingSecond, 1, 'second check passes pre-race');
+
+  // Sequential commits through the new atomic helper: the first demote
+  // wins, the second sees the fresh count inside its IMMEDIATE transaction
+  // and is refused.
+  updateUserRole(first.id, 'editor');
+  assert.throws(() => updateUserRole(second.id, 'viewer'), /Cannot remove the last admin/);
+
+  // Failed demote rolls back — the survivor is still an admin.
+  const roles = new Map(listUsers().map((u) => [u.username, u.role]));
+  assert.equal(roles.get('admin_test'), 'editor');
+  assert.equal(roles.get('second_admin'), 'admin');
+
+  // Deleting the last remaining admin is refused and preserves the row.
+  assert.throws(() => deleteUser(second.id), /Cannot remove the last admin/);
+  assert.equal(listUsers().find((u) => u.username === 'second_admin')?.role, 'admin');
+
+  // Demoting via the legacy `operator` alias is the same non-admin write.
+  assert.throws(() => updateUserRole(second.id, 'operator'), /Cannot remove the last admin/);
+  assert.equal(listUsers().find((u) => u.username === 'second_admin')?.role, 'admin');
+
+  // Non-admin writes are unaffected: removing the demoted editor succeeds.
+  deleteUser(first.id);
+  assert.equal(listUsers().filter((u) => u.role === 'admin').length, 1);
 });

@@ -14,16 +14,6 @@ function normalizeRole(value: unknown): Role | null {
   return null;
 }
 
-function ensureAnotherAdminExists(excludingUserId: number) {
-  const db = getDb();
-  const row = db
-    .prepare("SELECT COUNT(*) as c FROM users WHERE role = 'admin' AND id != ?")
-    .get(excludingUserId) as { c: number };
-  if ((row?.c ?? 0) <= 0) {
-    throw new Error('Cannot remove the last admin');
-  }
-}
-
 export async function GET(request: Request) {
   try {
     requireAdmin(request);
@@ -70,7 +60,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const admin = requireAdmin(request);
+    requireAdmin(request);
     const parsed = await parseAndValidate(
       request,
       z.object({
@@ -86,9 +76,7 @@ export async function PATCH(request: Request) {
     if (body.role) {
       const normalizedRole = normalizeRole(body.role);
       if (!normalizedRole) return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
-      if (admin.id === body.id && normalizedRole !== 'admin') {
-        ensureAnotherAdminExists(admin.id);
-      }
+      // Last-admin guard lives atomically inside updateUserRole (#165).
       updateUserRole(body.id, normalizedRole);
     }
 
@@ -109,20 +97,15 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const admin = requireAdmin(request);
+    requireAdmin(request);
     const parsed = await parseAndValidate(request, z.object({ id: z.number().int() }));
     if (!parsed.ok) return parsed.response;
     const body = parsed.data;
     if (!body.id) return NextResponse.json({ error: 'id required' }, { status: 400 });
-    if (admin.id === body.id) {
-      ensureAnotherAdminExists(admin.id);
-    }
     const db = getDb();
     const row = db.prepare('SELECT role FROM users WHERE id = ?').get(body.id) as { role?: string } | undefined;
     if (!row) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    if (row.role === 'admin') {
-      ensureAnotherAdminExists(body.id);
-    }
+    // Last-admin guard lives atomically inside deleteUser (#165).
     deleteUser(body.id);
     return NextResponse.json({ ok: true });
   } catch (err) {
