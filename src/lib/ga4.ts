@@ -125,7 +125,9 @@ async function ga4Fetch<T>(accessToken: string, url: string, body: unknown): Pro
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`GA4 Data API failed (${res.status}): ${text.slice(0, 300)}`);
+    // Raw provider bodies stay server-side only (#51/#157).
+    console.error(`[ga4] Upstream error ${res.status} body (truncated):`, text.slice(0, 2000));
+    throw new Error(`GA4 Data API failed with status ${res.status}. Please try again later.`);
   }
   return (await res.json()) as T;
 }

@@ -8,6 +8,20 @@ import { test } from 'node:test';
  * If this test fails, someone reintroduced `{ error: String(error) }` —
  * log server-side with console.error and return a generic message instead. */
 
+const PROVIDER_LIBS = [
+  'x-api.ts',
+  'facebook-api.ts',
+  'instagram-api.ts',
+  'threads-api.ts',
+  'youtube-api.ts',
+  'linkedin.ts',
+  'ga4.ts',
+  'reddit-api.ts',
+  'tiktok-api.ts',
+  'plausible.ts',
+  'dicompute.ts',
+];
+
 function routeFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true, recursive: true })) {
@@ -35,4 +49,20 @@ test('no route echoes raw errors into JSON responses (#54)', () => {
 test('generic-500 hardening is actually in place across the API', () => {
   const hardened = files.filter(f => /['"]Internal server error['"]/.test(readFileSync(f, 'utf-8'))).length;
   assert.ok(hardened >= 16, `expected >=16 hardened routes, found ${hardened}`);
+});
+
+test('provider libs never embed upstream bodies in thrown errors (#157)', () => {
+  // Upstream response text must be logged server-side (console.error) and
+  // never interpolated into the thrown message, which routes forward to
+  // clients. Catches both shapes: `${...text.slice(0, 300)...}` inside the
+  // template, and `...`.slice(0, 400)` caps over the whole message.
+  const libDir = join(process.cwd(), 'src', 'lib');
+  const offenders = PROVIDER_LIBS.filter((name) => {
+    const src = readFileSync(join(libDir, name), 'utf-8');
+    return (
+      /throw new Error\(`[^`]*\$\{[^}]*\.slice\(0,/.test(src) ||
+      /throw new Error\(`[^`]*\}`[\s\S]{0,40}?\.slice\(0,/.test(src)
+    );
+  });
+  assert.deepEqual(offenders, []);
 });

@@ -83,7 +83,9 @@ async function getRedditAccessToken(opts: {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Reddit OAuth token request failed (${res.status}): ${text.slice(0, 300)}`);
+    // Raw provider bodies stay server-side only (#51/#157).
+    console.error(`[reddit] OAuth token request upstream error ${res.status} body (truncated):`, text.slice(0, 2000));
+    throw new Error(`Reddit OAuth token request failed with status ${res.status}. Please try again later.`);
   }
 
   const data = (await res.json()) as RedditTokenResponse;
@@ -127,7 +129,9 @@ export async function searchRedditMentions(opts: {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Reddit search failed (${res.status}): ${text.slice(0, 300)}`);
+    // Raw provider bodies stay server-side only (#51/#157).
+    console.error(`[reddit] Upstream error ${res.status} body (truncated):`, text.slice(0, 2000));
+    throw new Error(`Reddit search failed with status ${res.status}. Please try again later.`);
   }
 
   const json = (await res.json()) as RedditSearchResponse;
