@@ -49,6 +49,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Post-OAuth redirects accept same-origin absolute paths only, closing the protocol-relative open redirect (fixes #131).
 - `GET /api/deploy-status` requires the `manage_system` capability (admin-only) instead of any login (fixes #136).
 - Cookie decoding never throws: malformed session cookies are treated as absent (401 / proceed to login / clear on logout) instead of 500ing into an unrecoverable lockout (fixes #149).
+- Agent subprocess timeouts reject instead of resolving truncated output as success, and child output is capped at 256k per stream (fixes #151).
 - Appending to an unreadable state file is refused instead of replacing it with a single row (fixes #148).
 - Buzz accepts `x` (normalizing legacy `twitter`) for AI-drafted posts so approvals actually publish (fixes #150).
 - Brand alert checks notify and advance their watermark in one transaction instead of stamping first (fixes #152).
