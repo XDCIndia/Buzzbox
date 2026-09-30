@@ -1,5 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
-import { getDb } from './db';
+import { getDb, runInTransaction } from './db';
 import { secureCompare } from './secure-compare';
 
 const SALT_LENGTH = 16;
@@ -452,7 +452,22 @@ export function updateUserRole(userId: number, role: UserRoleInput): void {
   }
   const normalizedRole = normalizeRoleInput(role);
   const db = getDb();
-  db.prepare('UPDATE users SET role = ? WHERE id = ?').run(normalizedRole, userId);
+  // Guard + mutation run in one IMMEDIATE transaction so two concurrent
+  // demotions cannot both pass the count check and leave zero admins (#165).
+  // The count is re-checked inside the transaction; the second committer
+  // blocks on the write lock, then sees the new count and gets 400.
+  runInTransaction(db, () => {
+    const current = db.prepare('SELECT role FROM users WHERE id = ?').get(userId) as { role?: string } | undefined;
+    if (current && normalizeRole(current.role ?? '') === 'admin' && normalizedRole !== 'admin') {
+      const row = db
+        .prepare("SELECT COUNT(*) as c FROM users WHERE role = 'admin' AND id != ?")
+        .get(userId) as { c: number };
+      if ((row?.c ?? 0) <= 0) {
+        throw new Error('Cannot remove the last admin');
+      }
+    }
+    db.prepare('UPDATE users SET role = ? WHERE id = ?').run(normalizedRole, userId);
+  });
 }
 
 export function resetUserPassword(userId: number, password: string): void {
@@ -478,10 +493,21 @@ export function safeRedirectPath(from: unknown): string {
 
 export function deleteUser(userId: number): void {
   const db = getDb();
-  db.transaction(() => {
+  // Same atomicity as updateUserRole: the last-admin count is re-checked
+  // inside the IMMEDIATE transaction that performs the delete (#165).
+  runInTransaction(db, () => {
+    const target = db.prepare('SELECT role FROM users WHERE id = ?').get(userId) as { role?: string } | undefined;
+    if (target && normalizeRole(target.role ?? '') === 'admin') {
+      const row = db
+        .prepare("SELECT COUNT(*) as c FROM users WHERE role = 'admin' AND id != ?")
+        .get(userId) as { c: number };
+      if ((row?.c ?? 0) <= 0) {
+        throw new Error('Cannot remove the last admin');
+      }
+    }
     db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM users WHERE id = ?').run(userId);
-  })();
+  });
 }
 
 export function getUserFromRequest(request: Request): User | null {
