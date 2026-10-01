@@ -44,9 +44,16 @@ export function AlertsTab({ brandId }: { brandId: string }) {
     setChecking(id);
     try {
       const res = await fetch(`/api/brand/${brandId}/alerts/${id}/check`, { method: 'POST' });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || typeof data.matched !== 'number') {
+        throw new Error(
+          typeof data?.error === 'string' && data.error ? data.error : 'Check failed — try again.',
+        );
+      }
       setResult(prev => ({ ...prev, [id]: `${data.matched} match${data.matched === 1 ? '' : 'es'} — check the notification bell.` }));
       load();
+    } catch (err) {
+      setResult(prev => ({ ...prev, [id]: err instanceof Error ? err.message : 'Check failed — try again.' }));
     } finally {
       setChecking(null);
     }

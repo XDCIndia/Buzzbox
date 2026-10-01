@@ -56,6 +56,21 @@ test.describe('brand create validation', () => {
 
     const created = (await apiList(page, 'alerts')).find((a) => a.name === alertName);
     expect(created, 'alert must exist server-side').toBeTruthy();
+
+    // #178: a failing check must surface the error, never "undefined matches".
+    const row = page.locator('.brand-stat-tile', { hasText: alertName });
+    await page.route('**/api/brand/*/alerts/*/check', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'E2E forced failure' }) }),
+    );
+    await row.getByRole('button', { name: 'Check now' }).click();
+    await expect(row.getByText('E2E forced failure')).toBeVisible({ timeout: 10_000 });
+    await expect(row.getByText('undefined matches')).toHaveCount(0);
+    await page.unroute('**/api/brand/*/alerts/*/check');
+
+    // Positive control: a real check reports a match count.
+    await row.getByRole('button', { name: 'Check now' }).click();
+    await expect(row.getByText('0 matches')).toBeVisible({ timeout: 10_000 });
+
     await page.request.delete(`/api/brand/${BRAND_ID}/alerts/${created!.id}`, { headers: ORIGIN });
   });
 
