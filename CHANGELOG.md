@@ -66,6 +66,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Host-lock parsing handles bracketed/bare IPv6 loopback (`[::1]`, `::1`) and normalizes case; documented that `HERMES_HOST_LOCK` is a best-effort header check with the listen address (`HOSTNAME=127.0.0.1`) plus firewall as the real boundary (fixes #100).
 - Brand-child mutations (alert/campaign/competitor deletes, alert checks, mention reads/patches) are scoped to the URL `brandId` and answer 404 on mismatch, closing the cross-brand IDOR (fixes #101).
 - Last-admin demotions and deletes re-check the admin count inside the same IMMEDIATE transaction as the write, so concurrent requests cannot both pass the guard and leave zero admins (fixes #165).
+- Privileged user actions (create, role change, password reset, delete, OAuth login-request approve/deny) append actor/action/target rows to `audit_log`; failed mutations and password material are never recorded (fixes #170).
 
 ### Closed (superseded/stale)
 - #50 (Turbopack `/login` hang) — non-reproducible on Next 16.1.6 after the #74 frontend rewrite; closed with an evidence battery.

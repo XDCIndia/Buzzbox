@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { listGoogleLoginRequests, requireAdmin, reviewGoogleLoginRequest } from '@/lib/auth';
+import { logAudit } from '@/lib/audit';
 import { parseAndValidate } from '@/lib/api-validate';
 import { z } from 'zod';
 
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    requireAdmin(request);
+    const admin = requireAdmin(request);
     const parsed = await parseAndValidate(
       request,
       z.object({
@@ -43,6 +44,12 @@ export async function PATCH(request: Request) {
 
     const role = normalizeRole(body.role) ?? 'viewer';
     reviewGoogleLoginRequest(email, body.action, role);
+    logAudit({
+      actor: admin,
+      action: 'user.login_request.review',
+      target: `login-request:${email}`,
+      detail: { email, action: body.action, role },
+    });
     return NextResponse.json({ ok: true });
   } catch (err) {
     const msg = (err as Error).message;
