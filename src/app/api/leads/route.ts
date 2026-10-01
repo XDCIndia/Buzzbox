@@ -30,7 +30,10 @@ function asOptionalString(value: unknown, maxLen: number): string | undefined {
   if (typeof value !== 'string') return undefined;
   const v = value.trim();
   if (!v) return undefined;
-  return v.length > maxLen ? v.slice(0, maxLen) : v;
+  // Over-length is invalid, never silently sliced: callers answer 400 with a
+  // field error so no stored record is quietly truncated (#183).
+  if (v.length > maxLen) return undefined;
+  return v;
 }
 
 function asNullableString(value: unknown, maxLen: number): string | null | undefined {
@@ -146,18 +149,41 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid email' }, { status: 400 });
   }
 
+  // Text fields mirror the PATCH guards below: over-length values are
+  // rejected with a field error instead of silently truncated (#183).
+  const textFields = [
+    ['first_name', 80],
+    ['last_name', 80],
+    ['title', 120],
+    ['company', 160],
+    ['company_size', 40],
+    ['industry_segment', 120],
+    ['source', 120],
+    ['linkedin_url', 400],
+    ['notes', 20_000],
+  ] as const;
+  type TextField = (typeof textFields)[number][0];
+  const textValues = {} as Record<TextField, string | null | undefined>;
+  for (const [field, maxLen] of textFields) {
+    const parsed = asNullableString(body?.[field], maxLen);
+    if (body?.[field] !== undefined && parsed === undefined) {
+      return NextResponse.json({ error: `Invalid ${field}` }, { status: 400 });
+    }
+    textValues[field] = parsed;
+  }
+
   const id = makeLeadId();
   const lead = {
     id,
-    first_name: asNullableString(body?.first_name, 80) ?? null,
-    last_name: asNullableString(body?.last_name, 80) ?? null,
-    title: asNullableString(body?.title, 120) ?? null,
-    company: asNullableString(body?.company, 160) ?? null,
-    company_size: asNullableString(body?.company_size, 40) ?? null,
-    industry_segment: asNullableString(body?.industry_segment, 120) ?? null,
-    source: asNullableString(body?.source, 120) ?? null,
+    first_name: textValues.first_name ?? null,
+    last_name: textValues.last_name ?? null,
+    title: textValues.title ?? null,
+    company: textValues.company ?? null,
+    company_size: textValues.company_size ?? null,
+    industry_segment: textValues.industry_segment ?? null,
+    source: textValues.source ?? null,
     email: email ?? null,
-    linkedin_url: asNullableString(body?.linkedin_url, 400) ?? null,
+    linkedin_url: textValues.linkedin_url ?? null,
     status,
     score: score ?? null,
     tier: tier ?? null,
@@ -165,7 +191,7 @@ export async function POST(req: NextRequest) {
     next_action_at: nextActionAt ?? null,
     sequence_name: null as string | null,
     reply_type: null as string | null,
-    notes: asNullableString(body?.notes, 20_000) ?? null,
+    notes: textValues.notes ?? null,
     created_at: createdAt,
     pause_outreach: body?.pause_outreach ? 1 : 0,
   };
