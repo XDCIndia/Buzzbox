@@ -33,9 +33,21 @@ export function CampaignsTab({ brandId }: { brandId: string }) {
     load();
   }
 
-  async function remove(id: string) {
-    await fetch(`/api/brand/${brandId}/campaigns/${id}`, { method: 'DELETE' });
-    load();
+  async function remove(id: string, name: string) {
+    if (!confirm(`Delete campaign "${name}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/brand/${brandId}/campaigns/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          typeof data?.error === 'string' && data.error ? data.error : 'Failed to delete campaign.',
+        );
+      }
+      toast.success('Campaign deleted');
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete campaign.');
+    }
   }
 
   return (
@@ -68,7 +80,7 @@ export function CampaignsTab({ brandId }: { brandId: string }) {
                     <div className="text-sm font-medium">{c.name}</div>
                     <div className="text-xs text-muted-foreground">{c.keywords.join(', ') || 'No keywords'} · created {formatDate(c.created_at)}</div>
                   </div>
-                  <button onClick={() => remove(c.id)} className="text-muted-foreground hover:text-destructive">
+                  <button onClick={() => remove(c.id, c.name)} aria-label={`Delete campaign ${c.name}`} className="text-muted-foreground hover:text-destructive">
                     <Trash2 size={14} />
                   </button>
                 </div>

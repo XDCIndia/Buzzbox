@@ -35,9 +35,21 @@ export function AlertsTab({ brandId }: { brandId: string }) {
     load();
   }
 
-  async function remove(id: string) {
-    await fetch(`/api/brand/${brandId}/alerts/${id}`, { method: 'DELETE' });
-    load();
+  async function remove(id: string, name: string) {
+    if (!confirm(`Delete alert "${name}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/brand/${brandId}/alerts/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          typeof data?.error === 'string' && data.error ? data.error : 'Failed to delete alert.',
+        );
+      }
+      toast.success('Alert deleted');
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete alert.');
+    }
   }
 
   async function checkNow(id: string) {
@@ -90,7 +102,7 @@ export function AlertsTab({ brandId }: { brandId: string }) {
                   <button onClick={() => checkNow(a.id)} disabled={checking === a.id} className="btn btn-ghost btn-sm">
                     <RadioTower size={12} /> {checking === a.id ? 'Checking…' : 'Check now'}
                   </button>
-                  <button onClick={() => remove(a.id)} className="text-muted-foreground hover:text-destructive">
+                  <button onClick={() => remove(a.id, a.name)} aria-label={`Delete alert ${a.name}`} className="text-muted-foreground hover:text-destructive">
                     <Trash2 size={14} />
                   </button>
                 </div>
