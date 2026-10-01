@@ -159,6 +159,7 @@ export default function MemoryPage() {
             value={instanceId}
             onChange={(e) => setInstanceId(e.target.value)}
             disabled={instances.length === 0 && !instanceId}
+            aria-label="Select instance"
           >
             {instances.length === 0 ? (
               <option value={instanceId || 'default'}>{instanceId || 'Loading...'}</option>

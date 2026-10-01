@@ -69,6 +69,7 @@ export default function ContentPage() {
           className="px-3"
           value={filter}
           onChange={e => setFilter(e.target.value)}
+          aria-label="Filter by status"
         >
           <option value="">All statuses</option>
           <option value="draft">Draft</option>

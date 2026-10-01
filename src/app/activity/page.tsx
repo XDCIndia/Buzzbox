@@ -63,6 +63,7 @@ export default function ActivityPage() {
           <select
             value={filter}
             onChange={e => setFilter(e.target.value)}
+            aria-label="Filter by action"
           >
             {ACTION_FILTERS.map(f => (
               <option key={f.key} value={f.key}>{f.label}</option>

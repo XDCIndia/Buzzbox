@@ -29,5 +29,19 @@ test.describe('modal shell', () => {
 
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
+
+    // #171: filter dropdowns expose accessible names (same login session —
+    // the suite shares a 10/min login budget).
+    const filters: [string, string][] = [
+      ['/content', 'Filter by status'],
+      ['/research', 'Filter by signal type'],
+      ['/research', 'Filter by relevance'],
+      ['/activity', 'Filter by action'],
+      ['/memory', 'Select instance'],
+    ];
+    for (const [url, label] of filters) {
+      await page.goto(url);
+      await expect(page.getByLabel(label, { exact: true })).toBeVisible({ timeout: 15_000 });
+    }
   });
 });
