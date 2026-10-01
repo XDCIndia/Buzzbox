@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Trash2, Bell, RadioTower } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils';
 import { EmptyState } from '@/components/brand/empty-state';
+import { toast } from '@/components/ui/toast';
 import type { BrandAlert } from '@/types';
 
 export function AlertsTab({ brandId }: { brandId: string }) {
@@ -20,7 +21,10 @@ export function AlertsTab({ brandId }: { brandId: string }) {
 
   async function createAlert(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      toast.error('Alert name is required');
+      return;
+    }
     await fetch(`/api/brand/${brandId}/alerts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -54,7 +58,7 @@ export function AlertsTab({ brandId }: { brandId: string }) {
         <div className="panel-header"><h2 className="section-title">New Alert</h2></div>
         <div className="panel-body">
           <form onSubmit={createAlert} className="flex flex-wrap gap-2">
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="Alert name (e.g. Negative Sentiment)" className="flex-1 min-w-[200px]" />
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Alert name (e.g. Negative Sentiment)" aria-label="Alert name" className="flex-1 min-w-[200px]" />
             <select value={sentiment} onChange={e => setSentiment(e.target.value)}>
               <option value="">Any sentiment</option>
               <option value="positive">Positive</option>

@@ -1,0 +1,97 @@
+import { expect, test } from '@playwright/test';
+
+/* Regression tests for issue #174: the brand Alerts/Campaigns create forms
+ * silently ignored empty submits (early return, no feedback). Empty and
+ * whitespace-only names now toast an error and create nothing; valid names
+ * still create. */
+
+// Seeded default brand (src/lib/brand-constants.ts DEFAULT_BRAND_ID).
+const BRAND_ID = '97cdb115-2c90-42a8-b904-d14abce1d682';
+const ORIGIN = { origin: 'http://127.0.0.1:3010' };
+
+async function login(page: import('@playwright/test').Page) {
+  const res = await page.request.post('/api/auth/login', {
+    data: { username: 'admin_e2e', password: 'super-secure-pass' },
+  });
+  expect(res.status()).toBe(200);
+}
+
+async function apiList(page: import('@playwright/test').Page, kind: 'alerts' | 'campaigns') {
+  const res = await page.request.get(`/api/brand/${BRAND_ID}/${kind}`, {});
+  expect(res.status()).toBe(200);
+  return (await res.json()) as { id: string; name: string }[];
+}
+
+test.describe('brand create validation', () => {
+  test('empty alert submit toasts instead of silently doing nothing (#174)', async ({ page }) => {
+    await login(page);
+    const before = await apiList(page, 'alerts');
+
+    await page.goto(`/brand/${BRAND_ID}/create/alerts`);
+    const nameInput = page.getByLabel('Alert name');
+    await expect(nameInput).toBeVisible();
+
+    await nameInput.fill('   ');
+    await page.getByRole('button', { name: 'New Alert' }).click();
+    await expect(page.getByText('Alert name is required').first()).toBeVisible({ timeout: 10_000 });
+
+    await nameInput.fill('');
+    await page.getByRole('button', { name: 'New Alert' }).click();
+    await expect(page.getByText('Alert name is required').first()).toBeVisible({ timeout: 10_000 });
+
+    expect(await apiList(page, 'alerts')).toEqual(before);
+
+    // Server backstop: whitespace-only names are rejected API-side too.
+    const wsRes = await page.request.post(`/api/brand/${BRAND_ID}/alerts`, {
+      headers: { ...ORIGIN, 'content-type': 'application/json' },
+      data: { name: '   ' },
+    });
+    expect(wsRes.status()).toBe(400);
+
+    // Positive control: a real name still creates.
+    const alertName = `E2E Alert ${Date.now()}`;
+    await nameInput.fill(alertName);
+    await page.getByRole('button', { name: 'New Alert' }).click();
+    await expect(page.getByText(alertName)).toBeVisible({ timeout: 10_000 });
+
+    const created = (await apiList(page, 'alerts')).find((a) => a.name === alertName);
+    expect(created, 'alert must exist server-side').toBeTruthy();
+    await page.request.delete(`/api/brand/${BRAND_ID}/alerts/${created!.id}`, { headers: ORIGIN });
+  });
+
+  test('empty campaign submit toasts instead of silently doing nothing (#174)', async ({ page }) => {
+    await login(page);
+    const before = await apiList(page, 'campaigns');
+
+    await page.goto(`/brand/${BRAND_ID}/create/campaigns`);
+    const nameInput = page.getByLabel('Campaign name');
+    await expect(nameInput).toBeVisible();
+
+    await nameInput.fill('   ');
+    await page.getByRole('button', { name: 'Create Campaign' }).click();
+    await expect(page.getByText('Campaign name is required').first()).toBeVisible({ timeout: 10_000 });
+
+    await nameInput.fill('');
+    await page.getByRole('button', { name: 'Create Campaign' }).click();
+    await expect(page.getByText('Campaign name is required').first()).toBeVisible({ timeout: 10_000 });
+
+    expect(await apiList(page, 'campaigns')).toEqual(before);
+
+    // Server backstop: whitespace-only names are rejected API-side too.
+    const wsRes = await page.request.post(`/api/brand/${BRAND_ID}/campaigns`, {
+      headers: { ...ORIGIN, 'content-type': 'application/json' },
+      data: { name: '   ' },
+    });
+    expect(wsRes.status()).toBe(400);
+
+    // Positive control: a real name still creates.
+    const campaignName = `E2E Campaign ${Date.now()}`;
+    await nameInput.fill(campaignName);
+    await page.getByRole('button', { name: 'Create Campaign' }).click();
+    await expect(page.getByText(campaignName)).toBeVisible({ timeout: 10_000 });
+
+    const created = (await apiList(page, 'campaigns')).find((c) => c.name === campaignName);
+    expect(created, 'campaign must exist server-side').toBeTruthy();
+    await page.request.delete(`/api/brand/${BRAND_ID}/campaigns/${created!.id}`, { headers: ORIGIN });
+  });
+});

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Trash2, Megaphone } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { EmptyState } from '@/components/brand/empty-state';
+import { toast } from '@/components/ui/toast';
 import type { BrandCampaign } from '@/types';
 
 export function CampaignsTab({ brandId }: { brandId: string }) {
@@ -18,7 +19,10 @@ export function CampaignsTab({ brandId }: { brandId: string }) {
 
   async function createCampaign(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      toast.error('Campaign name is required');
+      return;
+    }
     await fetch(`/api/brand/${brandId}/campaigns`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -40,7 +44,7 @@ export function CampaignsTab({ brandId }: { brandId: string }) {
         <div className="panel-header"><h2 className="section-title">New Campaign</h2></div>
         <div className="panel-body">
           <form onSubmit={createCampaign} className="flex flex-wrap gap-2">
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="Campaign name" className="flex-1 min-w-[160px]" />
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Campaign name" aria-label="Campaign name" className="flex-1 min-w-[160px]" />
             <input value={keywords} onChange={e => setKeywords(e.target.value)} placeholder="Keywords, comma-separated" className="flex-1 min-w-[220px]" />
             <button type="submit" className="brand-btn-primary btn btn-sm"><Plus size={13} /> Create Campaign</button>
           </form>

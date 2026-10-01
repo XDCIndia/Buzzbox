@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
   const parsed = await parseAndValidate(
     req,
     z.object({
-      name: z.string().min(1),
+      name: z.string().trim().min(1),
       keywords: z.array(z.string()).optional(),
       starts_at: z.string().optional(),
       ends_at: z.string().optional(),
