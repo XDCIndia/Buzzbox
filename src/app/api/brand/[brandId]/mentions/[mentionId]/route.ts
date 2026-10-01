@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiEditor } from '@/lib/api-auth';
 import { getBrandMention, patchMention } from '@/lib/brand-queries';
+import { MENTION_EMOTIONS, MENTION_INTENTS, MENTION_SENTIMENTS } from '@/lib/brand-constants';
 import { parseAndValidate } from '@/lib/api-validate';
 import { z } from 'zod';
+
+/** String enum from a runtime list (single source of truth in
+ * brand-constants, shared with the edit UI). */
+function strEnum(values: string[]) {
+  return z.enum(values as [string, ...string[]]);
+}
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ brandId: string; mentionId: string }> }) {
   const auth = requireApiEditor(req as Request);
@@ -11,9 +18,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ br
   const parsed = await parseAndValidate(
     req,
     z.object({
-      sentiment: z.string().optional(),
-      emotion: z.string().optional(),
-      intent: z.string().optional(),
+      sentiment: strEnum(MENTION_SENTIMENTS).optional(),
+      emotion: strEnum(MENTION_EMOTIONS).optional(),
+      intent: strEnum(MENTION_INTENTS).optional(),
     }),
   );
   if (!parsed.ok) return parsed.response;
