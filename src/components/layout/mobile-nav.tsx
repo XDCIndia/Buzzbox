@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -11,6 +11,7 @@ import {
   CheckSquare, Plug, X,
 } from 'lucide-react';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
+import { useDismiss } from '@/hooks/use-dismiss';
 import { useDashboard } from '@/store';
 import { DEFAULT_BRAND_ID } from '@/lib/brand-constants';
 
@@ -119,16 +120,8 @@ export function MobileNav() {
   const moreActive = nonPriorityItems.some(i => isActive(pathname, i.href));
   const moreBadge = counts ? (counts.content + counts.total_pending) : 0;
 
-  useEffect(() => {
-    if (!sheetOpen) return;
-    const onClickOutside = (e: MouseEvent) => {
-      if (sheetRef.current && !sheetRef.current.contains(e.target as Node)) {
-        setSheetOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [sheetOpen]);
+  // Sheet dismisses on Escape and outside pointer-down (#175).
+  useDismiss(sheetOpen, sheetRef, () => setSheetOpen(false));
 
   return (
     <>

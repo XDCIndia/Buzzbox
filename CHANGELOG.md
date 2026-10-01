@@ -49,6 +49,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Agent-chat sends cap `content` at 4000 chars like buzz, `conversation_id` at 200, agent/`to` fields at 100, and allowlist chat `message_type` — oversize or unknown values answer 400 instead of bloating the DB or blowing up spawned child args (fixes #169).
 - Kanban drops onto clipped columns, gaps, and container padding dispatch at the board level (direct column hit, else nearest column at the drop height) instead of silently doing nothing; proven by a Playwright drag test that fails without the fix (fixes #173).
 - Brand Alerts/Campaigns create forms toast "name is required" on empty submits instead of silently ignoring the click; the APIs also trim names so whitespace-only values answer 400 (fixes #174).
+- Mobile nav sheet and header menus (quick-create, data-status, notifications) close on Escape via a shared `useDismiss` hook instead of ignoring it; outside-click dismissal is unchanged (fixes #175, fixes #176).
 
 ### Security
 - Facebook Page access token moved from URL query string to `Authorization: Bearer` header (#93, fixes #84); same fix applied to both Threads API call sites (#94).
