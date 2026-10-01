@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createUser, deleteUser, listUsers, requireAdmin, resetUserPassword, updateUserRole } from '@/lib/auth';
 import { getDb } from '@/lib/db';
+import { logAudit } from '@/lib/audit';
 import { parseAndValidate } from '@/lib/api-validate';
 import { z } from 'zod';
 
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    requireAdmin(request);
+    const admin = requireAdmin(request);
     const parsed = await parseAndValidate(
       request,
       z.object({
@@ -45,6 +46,12 @@ export async function POST(request: Request) {
     const body = parsed.data;
     const role: Role = normalizeRole(body.role) ?? 'editor';
     const user = createUser(body.username, body.password, role);
+    logAudit({
+      actor: admin,
+      action: 'user.create',
+      target: `user:${user.username}`,
+      detail: { id: user.id, username: user.username, role: user.role },
+    });
     return NextResponse.json({ user });
   } catch (err) {
     const msg = (err as Error).message;
@@ -60,7 +67,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    requireAdmin(request);
+    const admin = requireAdmin(request);
     const parsed = await parseAndValidate(
       request,
       z.object({
@@ -78,10 +85,22 @@ export async function PATCH(request: Request) {
       if (!normalizedRole) return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
       // Last-admin guard lives atomically inside updateUserRole (#165).
       updateUserRole(body.id, normalizedRole);
+      logAudit({
+        actor: admin,
+        action: 'user.update_role',
+        target: `user:${body.id}`,
+        detail: { id: body.id, role: normalizedRole },
+      });
     }
 
     if (body.password) {
       resetUserPassword(body.id, body.password);
+      logAudit({
+        actor: admin,
+        action: 'user.reset_password',
+        target: `user:${body.id}`,
+        detail: { id: body.id },
+      });
     }
 
     return NextResponse.json({ ok: true });
@@ -97,16 +116,22 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    requireAdmin(request);
+    const admin = requireAdmin(request);
     const parsed = await parseAndValidate(request, z.object({ id: z.number().int() }));
     if (!parsed.ok) return parsed.response;
     const body = parsed.data;
     if (!body.id) return NextResponse.json({ error: 'id required' }, { status: 400 });
     const db = getDb();
-    const row = db.prepare('SELECT role FROM users WHERE id = ?').get(body.id) as { role?: string } | undefined;
+    const row = db.prepare('SELECT username, role FROM users WHERE id = ?').get(body.id) as { username?: string; role?: string } | undefined;
     if (!row) return NextResponse.json({ error: 'User not found' }, { status: 404 });
     // Last-admin guard lives atomically inside deleteUser (#165).
     deleteUser(body.id);
+    logAudit({
+      actor: admin,
+      action: 'user.delete',
+      target: `user:${body.id}`,
+      detail: { id: body.id, username: row.username ?? null, role: row.role ?? null },
+    });
     return NextResponse.json({ ok: true });
   } catch (err) {
     const msg = (err as Error).message;
