@@ -9,6 +9,7 @@ import { MentionCard } from '@/components/brand/mention-card';
 import { StatCardSkeleton, ChartSkeleton } from '@/components/ui/loading-skeleton';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { EmptyState } from '@/components/brand/empty-state';
+import { toast } from '@/components/ui/toast';
 import type { BrandMention, BrandMentionStats } from '@/types';
 
 export function OverviewTab({ brandId, realOnly }: { brandId: string; realOnly: boolean }) {
@@ -48,13 +49,25 @@ export function OverviewTab({ brandId, realOnly }: { brandId: string; realOnly: 
     loadData();
   }
 
-  function onPatch(id: string, patch: Record<string, string>) {
+  async function onPatch(id: string, patch: Record<string, string>) {
     setMentions(prev => prev.map(m => (m.id === id ? { ...m, ...patch } as BrandMention : m)));
-    fetch(`/api/brand/${brandId}/mentions/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    });
+    try {
+      const res = await fetch(`/api/brand/${brandId}/mentions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          typeof data?.error === 'string' && data.error ? data.error : 'Failed to save edit.',
+        );
+      }
+    } catch (err) {
+      // Refresh to server truth so a failed edit never looks saved (#118, #181).
+      loadData();
+      toast.error(err instanceof Error ? err.message : 'Failed to save edit.');
+    }
   }
 
   if (loading) {

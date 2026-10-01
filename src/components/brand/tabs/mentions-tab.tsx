@@ -5,6 +5,7 @@ import { RefreshCw, Download, ExternalLink, AtSign } from 'lucide-react';
 import { MentionCard } from '@/components/brand/mention-card';
 import { FilterPanel } from '@/components/brand/filter-panel';
 import { MENTION_PLATFORMS, MENTION_SENTIMENTS } from '@/lib/brand-constants';
+import { toast } from '@/components/ui/toast';
 import { timeAgo } from '@/lib/utils';
 import { EmptyState } from '@/components/brand/empty-state';
 import { CardSkeletonList } from '@/components/ui/loading-skeleton';
@@ -54,13 +55,25 @@ export function MentionsTab({ brandId, realOnly, sourceType }: { brandId: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brandId, realOnly, sourceType, sort, platforms, sentiments, search]);
 
-  function onPatch(id: string, patch: Record<string, string>) {
+  async function onPatch(id: string, patch: Record<string, string>) {
     setMentions(prev => prev.map(m => (m.id === id ? { ...m, ...patch } as BrandMention : m)));
-    fetch(`/api/brand/${brandId}/mentions/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    });
+    try {
+      const res = await fetch(`/api/brand/${brandId}/mentions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          typeof data?.error === 'string' && data.error ? data.error : 'Failed to save edit.',
+        );
+      }
+    } catch (err) {
+      // Refresh to server truth so a failed edit never looks saved (#118, #181).
+      loadMentions();
+      toast.error(err instanceof Error ? err.message : 'Failed to save edit.');
+    }
   }
 
   async function syncNow() {

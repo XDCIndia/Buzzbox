@@ -169,5 +169,43 @@ test.describe('brand create validation', () => {
     await expect(page.getByText('Campaign deleted').first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(campaignName)).toBeHidden({ timeout: 10_000 });
     expect(await apiList(page, 'campaigns').then((l) => l.some((c) => c.name === campaignName))).toBe(false);
+
+    // #181: mention inline edits roll back with a toast on failure (mocked
+    // list + patch keep this deterministic with zero server state).
+    const mockMention = {
+      id: 'e2e-mention-1', brand_id: BRAND_ID, source_type: 'social', platform: 'x',
+      author_name: 'E2E Author', author_handle: '@e2e', author_avatar_url: null, author_reach: 10,
+      text: 'E2E mention text', url: null, likes: 0, comments: 0,
+      sentiment: 'neutral', emotion: 'neutral', intent: 'other',
+      is_crisis: false, is_high_impact: false,
+      published_at: '2026-10-01T00:00:00.000Z', created_at: '2026-10-01T00:00:00.000Z',
+    };
+    await page.route('**/api/brand/*/mentions?*', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([mockMention]) }),
+    );
+    await page.goto(`/brand/${BRAND_ID}/mentions/social`);
+    const sentimentChip = page.getByLabel('sentiment');
+    await expect(sentimentChip).toBeVisible({ timeout: 15_000 });
+
+    await page.route('**/api/brand/*/mentions/*', (route) =>
+      route.request().method() === 'PATCH'
+        ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'E2E patch failure' }) })
+        : route.continue(),
+    );
+    await sentimentChip.selectOption('negative');
+    await expect(page.getByText('E2E patch failure').first()).toBeVisible({ timeout: 10_000 });
+    await expect(sentimentChip).toHaveValue('neutral', { timeout: 10_000 });
+    await page.unroute('**/api/brand/*/mentions/*');
+
+    await page.route('**/api/brand/*/mentions/*', (route) =>
+      route.request().method() === 'PATCH'
+        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...mockMention, sentiment: 'positive' }) })
+        : route.continue(),
+    );
+    await sentimentChip.selectOption('positive');
+    await expect(sentimentChip).toHaveValue('positive', { timeout: 10_000 });
+    await expect(page.getByText('E2E patch failure')).toHaveCount(0);
+    await page.unroute('**/api/brand/*/mentions/*');
+    await page.unroute('**/api/brand/*/mentions?*');
   });
 });

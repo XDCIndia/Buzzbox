@@ -4,3 +4,5 @@ export const DEFAULT_BRAND_ID = '97cdb115-2c90-42a8-b904-d14abce1d682';
 
 export const MENTION_PLATFORMS = ['x', 'facebook', 'instagram', 'linkedin', 'reddit', 'tiktok', 'threads', 'youtube'];
 export const MENTION_SENTIMENTS = ['positive', 'negative', 'neutral'];
+export const MENTION_EMOTIONS = ['joy', 'sadness', 'anger', 'fear', 'surprise', 'neutral'];
+export const MENTION_INTENTS = ['news', 'question', 'promotion', 'praise', 'complaint', 'other'];

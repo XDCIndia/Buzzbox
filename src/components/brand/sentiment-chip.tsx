@@ -1,11 +1,12 @@
 'use client';
 
 import { ChevronDown } from 'lucide-react';
+import { MENTION_EMOTIONS, MENTION_INTENTS, MENTION_SENTIMENTS } from '@/lib/brand-constants';
 
 const OPTIONS: Record<string, string[]> = {
-  sentiment: ['positive', 'negative', 'neutral'],
-  emotion: ['joy', 'sadness', 'anger', 'fear', 'surprise', 'neutral'],
-  intent: ['news', 'question', 'promotion', 'praise', 'complaint', 'other'],
+  sentiment: MENTION_SENTIMENTS,
+  emotion: MENTION_EMOTIONS,
+  intent: MENTION_INTENTS,
 };
 
 function chipClass(kind: string, value: string | null): string {
