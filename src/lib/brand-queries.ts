@@ -284,6 +284,13 @@ export function getBrandDigest(id: string): BrandDigest | null {
   return (getDb().prepare('SELECT * FROM brand_digests WHERE id = ?').get(id) as BrandDigest) || null;
 }
 
+/** Brand-scoped digest delete (#180): only removes rows belonging to the URL
+ * brand, mirroring the cross-brand IDOR guard on the other child routes. */
+export function deleteBrandDigest(brand_id: string, id: string): boolean {
+  const result = getDb().prepare('DELETE FROM brand_digests WHERE id = ? AND brand_id = ?').run(id, brand_id);
+  return result.changes > 0;
+}
+
 /** Builds a templated auto-summary from real aggregate stats — not AI-generated. */
 export function createBrandDigest(brand_id: string, filters?: { excludeSeed?: boolean }): BrandDigest {
   const brand = getBrand(brand_id);

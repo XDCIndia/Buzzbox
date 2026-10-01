@@ -22,6 +22,12 @@ async function apiList(page: import('@playwright/test').Page, kind: 'alerts' | '
   return (await res.json()) as { id: string; name: string }[];
 }
 
+async function apiDigestList(page: import('@playwright/test').Page) {
+  const res = await page.request.get(`/api/brand/${BRAND_ID}/digests`, {});
+  expect(res.status()).toBe(200);
+  return (await res.json()) as { id: string; title: string }[];
+}
+
 test.describe('brand create validation', () => {
   test('empty alert submit toasts instead of silently doing nothing (#174)', async ({ page }) => {
     await login(page);
@@ -92,6 +98,34 @@ test.describe('brand create validation', () => {
     await expect(page.getByText('Alert deleted').first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(alertName)).toBeHidden({ timeout: 10_000 });
     expect(await apiList(page, 'alerts').then((l) => l.some((a) => a.name === alertName))).toBe(false);
+
+    // #180: digest flows share this login (suite login budget). Start clean.
+    for (const d of await apiDigestList(page)) {
+      await page.request.delete(`/api/brand/${BRAND_ID}/digests/${d.id}`, { headers: ORIGIN });
+    }
+
+    // #180: a failing generate surfaces the error banner, never a garbage card.
+    await page.goto(`/brand/${BRAND_ID}/create/digests`);
+    await page.route('**/api/brand/*/digests', (route) =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'E2E generate failure' }) })
+        : route.continue(),
+    );
+    await page.getByRole('button', { name: 'New', exact: true }).click();
+    await expect(page.getByText('E2E generate failure').first()).toBeVisible({ timeout: 10_000 });
+    expect(await apiDigestList(page)).toEqual([]);
+    await page.unroute('**/api/brand/*/digests');
+
+    // #180: real generate adds a digest; UI delete (confirm+toast) removes it.
+    await page.getByRole('button', { name: 'New', exact: true }).click();
+    await expect.poll(async () => (await apiDigestList(page)).length, { timeout: 10_000 }).toBe(1);
+    const fresh = (await apiDigestList(page))[0];
+    await expect(page.getByText(fresh.title).first()).toBeVisible({ timeout: 10_000 });
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: `Delete digest ${fresh.title}` }).click();
+    await expect(page.getByText('Digest deleted').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(fresh.title)).toBeHidden({ timeout: 10_000 });
+    expect(await apiDigestList(page)).toEqual([]);
   });
 
   test('empty campaign submit toasts instead of silently doing nothing (#174)', async ({ page }) => {

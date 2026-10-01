@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Sparkles, FileText } from 'lucide-react';
+import { Sparkles, FileText, Trash2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { EmptyState } from '@/components/brand/empty-state';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { CardSkeletonList } from '@/components/ui/loading-skeleton';
+import { toast } from '@/components/ui/toast';
 import type { BrandDigest } from '@/types';
 
 export function DigestsTab({ brandId }: { brandId: string }) {
@@ -41,13 +42,37 @@ export function DigestsTab({ brandId }: { brandId: string }) {
     setError(null);
     try {
       const res = await fetch(`/api/brand/${brandId}/digests`, { method: 'POST' });
-      const digest = await res.json();
-      setDigests(prev => [digest, ...prev]);
-      setActive(digest);
-    } catch {
-      setError('Failed to generate new digest');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || typeof data?.id !== 'string') {
+        throw new Error(
+          typeof data?.error === 'string' && data.error ? data.error : 'Failed to generate new digest',
+        );
+      }
+      setDigests(prev => [data, ...prev]);
+      setActive(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate new digest');
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function removeDigest(id: string, title: string | null) {
+    const label = title ?? 'untitled digest';
+    if (!confirm(`Delete digest "${label}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/brand/${brandId}/digests/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          typeof data?.error === 'string' && data.error ? data.error : 'Failed to delete digest.',
+        );
+      }
+      toast.success('Digest deleted');
+      setDigests(prev => prev.filter(d => d.id !== id));
+      setActive(prev => (prev?.id === id ? null : prev));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete digest.');
     }
   }
 
@@ -85,7 +110,17 @@ export function DigestsTab({ brandId }: { brandId: string }) {
       <section className="panel">
         {active ? (
           <div className="panel-body space-y-3">
-            <div className="text-xs text-muted-foreground uppercase tracking-wide">Auto-generated summary — not AI-written</div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide">Auto-generated summary — not AI-written</div>
+              <button
+                onClick={() => removeDigest(active.id, active.title)}
+                aria-label={`Delete digest ${active.title ?? 'untitled'}`}
+                title="Delete digest"
+                className="text-muted-foreground hover:text-destructive shrink-0"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
             <h1 className="text-xl font-semibold">{active.title}</h1>
             <p className="text-sm text-muted-foreground">{formatDate(active.created_at)}</p>
             <div className="whitespace-pre-line text-sm leading-relaxed pt-2">{active.body}</div>
