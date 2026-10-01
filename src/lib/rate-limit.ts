@@ -80,3 +80,21 @@ export function rateLimit(key: string, opts: RateLimitOptions): RateLimitResult 
 export function resetRateLimits(): void {
   buckets.clear();
 }
+
+/** Longest IP literal worth keeping: IPv6 maxes at 45 chars; anything
+ * longer is header junk and must not bloat bucket keys. */
+export const MAX_CLIENT_IP_LENGTH = 64;
+
+/** Best-effort client IP for rate-limit buckets: first X-Forwarded-For
+ * entry, else X-Real-IP, else 'unknown'.
+ *
+ * Forwarded headers are client-controlled and route handlers cannot see
+ * the connection peer, so a trusted-proxy allowlist cannot be enforced
+ * here — treat IP buckets as advisory. Sensitive routes must ALSO key a
+ * per-identity bucket (username/API key) so rotating this header alone
+ * cannot mint a fresh quota (#172). */
+export function getClientIp(request: Request): string {
+  const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  const realIp = request.headers.get('x-real-ip')?.trim();
+  return (forwarded || realIp || 'unknown').slice(0, MAX_CLIENT_IP_LENGTH);
+}

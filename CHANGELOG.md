@@ -67,6 +67,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Brand-child mutations (alert/campaign/competitor deletes, alert checks, mention reads/patches) are scoped to the URL `brandId` and answer 404 on mismatch, closing the cross-brand IDOR (fixes #101).
 - Last-admin demotions and deletes re-check the admin count inside the same IMMEDIATE transaction as the write, so concurrent requests cannot both pass the guard and leave zero admins (fixes #165).
 - Privileged user actions (create, role change, password reset, delete, OAuth login-request approve/deny) append actor/action/target rows to `audit_log`; failed mutations and password material are never recorded (fixes #170).
+- Rate limits no longer trust `X-Forwarded-For` alone: IP parsing is centralized and capped, and the paid-LLM routes (`buzz`, `dicompute-test`) add a per-user bucket beside the IP bucket, so rotating the header cannot mint fresh quota (fixes #172).
 
 ### Closed (superseded/stale)
 - #50 (Turbopack `/login` hang) — non-reproducible on Next 16.1.6 after the #74 frontend rewrite; closed with an evidence battery.

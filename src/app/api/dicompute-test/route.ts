@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { askDicompute, MissingConfigError, UpstreamProviderError } from '@/lib/dicompute';
 import { requireApiCapability } from '@/lib/api-auth';
-import { rateLimit } from '@/lib/rate-limit';
+import { getUserFromRequest } from '@/lib/auth';
+import { getClientIp, rateLimit } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest) {
   // Cost-bearing diagnostic with no UI callers: admin-only (#99). The edge
@@ -13,11 +14,15 @@ export async function GET(request: NextRequest) {
   // Manual diagnostic: cap calls per client IP so a stuck poller or curious
   // operator cannot burn LLM quota / hit upstream rate limits. Mirrors the
   // login brute-force protection (IP is header-aware behind a proxy).
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    'unknown';
-  const limit = rateLimit(`dicompute-test:ip:${ip}`, { max: 10, windowMs: 60_000 });
+  // The IP header alone is spoofable, so a per-user bucket backs it (#172).
+  const ip = getClientIp(request as unknown as Request);
+  const caller = getUserFromRequest(request as unknown as Request)?.username ?? 'unknown';
+  const window = { max: 10, windowMs: 60_000 };
+  const ipLimit = rateLimit(`dicompute-test:ip:${ip}`, window);
+  const userLimit = rateLimit(`dicompute-test:user:${caller}`, window);
+  const limit = !ipLimit.allowed || !userLimit.allowed
+    ? { allowed: false, retryAfterMs: Math.max(ipLimit.retryAfterMs, userLimit.retryAfterMs) }
+    : { allowed: true, retryAfterMs: 0 };
   if (!limit.allowed) {
     const retryAfterSec = Math.ceil(limit.retryAfterMs / 1000);
     return NextResponse.json(

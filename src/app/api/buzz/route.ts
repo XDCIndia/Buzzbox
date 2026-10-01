@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { askDicompute, MissingConfigError, UpstreamProviderError } from '@/lib/dicompute';
 import { sendOrchestratorMessage } from '@/lib/command';
 import { requireApiAdmin } from '@/lib/api-auth';
-import { rateLimit } from '@/lib/rate-limit';
+import { getUserFromRequest } from '@/lib/auth';
+import { getClientIp, rateLimit } from '@/lib/rate-limit';
 import { getOverviewStats, getAlerts, getPendingApprovals, getLeadFunnel, getDailyMetrics, createBuzzContentDraft } from '@/lib/queries';
 import { computeSocialAnalytics } from '@/lib/analytics';
 import { parseAndValidate } from '@/lib/api-validate';
@@ -274,11 +275,16 @@ export async function POST(request: NextRequest) {
   // Each request fans out into 2-3 paid LLM calls plus a subprocess, so an
   // unbounded message is a cost-amplification primitive: cap input length
   // and throttle callers per IP like the login and dicompute-test routes.
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    'unknown';
-  const limit = rateLimit(`buzz:ip:${ip}`, { max: 20, windowMs: 60_000 });
+  // The IP header alone is spoofable, so a per-user bucket backs it: header
+  // rotation mints fresh IP buckets but the user bucket still binds (#172).
+  const ip = getClientIp(request as Request);
+  const caller = getUserFromRequest(request as Request)?.username ?? 'unknown';
+  const window = { max: 20, windowMs: 60_000 };
+  const ipLimit = rateLimit(`buzz:ip:${ip}`, window);
+  const userLimit = rateLimit(`buzz:user:${caller}`, window);
+  const limit = !ipLimit.allowed || !userLimit.allowed
+    ? { allowed: false, retryAfterMs: Math.max(ipLimit.retryAfterMs, userLimit.retryAfterMs) }
+    : { allowed: true, retryAfterMs: 0 };
   if (!limit.allowed) {
     const retryAfterSec = Math.ceil(limit.retryAfterMs / 1000);
     return NextResponse.json(
