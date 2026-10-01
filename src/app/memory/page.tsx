@@ -201,6 +201,8 @@ export default function MemoryPage() {
             <div className="text-sm text-warning">{alerts.error.message}</div>
           ) : !alerts.data ? (
             <div className="text-sm text-muted-foreground">No alert data.</div>
+          ) : alerts.data.configured === false ? (
+            <div className="text-sm text-muted-foreground">No memory alerts report generated yet. Configure the alert policy in <Link className="text-primary hover:underline" href="/settings">Settings</Link> to start generating them.</div>
           ) : alerts.data.active.length === 0 ? (
             <div className="text-sm text-muted-foreground">No active alerts.</div>
           ) : (
