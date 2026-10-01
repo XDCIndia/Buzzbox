@@ -15,7 +15,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ bra
   const auth = requireApiEditor(req as Request);
   if (auth) return auth;
   const { brandId } = await params;
-  const parsed = await parseAndValidate(req, z.object({ name: z.string().min(1) }));
+  const parsed = await parseAndValidate(req, z.object({ name: z.string().trim().min(1) }));
   if (!parsed.ok) return parsed.response;
   const body = parsed.data;
   if (!body.name) return NextResponse.json({ error: 'name is required' }, { status: 400 });

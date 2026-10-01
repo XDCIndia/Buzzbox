@@ -207,5 +207,63 @@ test.describe('brand create validation', () => {
     await expect(page.getByText('E2E patch failure')).toHaveCount(0);
     await page.unroute('**/api/brand/*/mentions/*');
     await page.unroute('**/api/brand/*/mentions?*');
+
+    // #182: competitor add/delete flows share this login (suite login budget).
+    const apiCompetitors = async () => {
+      const res = await page.request.get(`/api/brand/${BRAND_ID}/competitors`, {});
+      expect(res.status()).toBe(200);
+      return (await res.json()) as { id: string; name: string }[];
+    };
+    await page.goto(`/brand/${BRAND_ID}/analyze/social`);
+    const competitorInput = page.getByLabel('Competitor name');
+    await expect(competitorInput).toBeVisible({ timeout: 15_000 });
+    const competitorsBefore = await apiCompetitors();
+
+    await competitorInput.fill('   ');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(page.getByText('Competitor name is required').first()).toBeVisible({ timeout: 10_000 });
+    expect(await apiCompetitors()).toEqual(competitorsBefore);
+
+    // Failed add keeps the draft and toasts instead of clearing silently.
+    await page.route('**/api/brand/*/competitors', (route) =>
+      route.request().method() === 'POST'
+        ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'E2E add failure' }) })
+        : route.continue(),
+    );
+    await competitorInput.fill('E2E Rival');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(page.getByText('E2E add failure').first()).toBeVisible({ timeout: 10_000 });
+    await expect(competitorInput).toHaveValue('E2E Rival');
+    expect(await apiCompetitors()).toEqual(competitorsBefore);
+    await page.unroute('**/api/brand/*/competitors');
+
+    // Real add works; dismissing the delete confirm keeps the row.
+    await competitorInput.fill('E2E Rival');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(page.getByText('Competitor added').first()).toBeVisible({ timeout: 10_000 });
+    const rivalRow = page.locator('.brand-stat-tile', { hasText: 'E2E Rival' });
+    await expect(rivalRow).toBeVisible({ timeout: 10_000 });
+    page.once('dialog', (d) => d.dismiss());
+    await rivalRow.getByRole('button', { name: 'Remove competitor E2E Rival' }).click();
+    expect(await apiCompetitors().then((l) => l.some((c) => c.name === 'E2E Rival'))).toBe(true);
+
+    // Failed delete toasts and keeps the row.
+    await page.route('**/api/brand/*/competitors/*', (route) =>
+      route.request().method() === 'DELETE'
+        ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'E2E remove failure' }) })
+        : route.continue(),
+    );
+    page.once('dialog', (d) => d.accept());
+    await rivalRow.getByRole('button', { name: 'Remove competitor E2E Rival' }).click();
+    await expect(page.getByText('E2E remove failure').first()).toBeVisible({ timeout: 10_000 });
+    expect(await apiCompetitors().then((l) => l.some((c) => c.name === 'E2E Rival'))).toBe(true);
+    await page.unroute('**/api/brand/*/competitors/*');
+
+    // Accepting the confirm removes with a toast (also the cleanup).
+    page.once('dialog', (d) => d.accept());
+    await rivalRow.getByRole('button', { name: 'Remove competitor E2E Rival' }).click();
+    await expect(page.getByText('Competitor removed').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('E2E Rival')).toBeHidden({ timeout: 10_000 });
+    expect(await apiCompetitors()).toEqual(competitorsBefore);
   });
 });
