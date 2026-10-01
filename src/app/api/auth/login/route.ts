@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authenticate, createSession, destroySession, safeDecodeURIComponent, seedAdmin } from '@/lib/auth';
-import { rateLimit } from '@/lib/rate-limit';
+import { getClientIp, rateLimit } from '@/lib/rate-limit';
 import { parseAndValidate } from '@/lib/api-validate';
 import { z } from 'zod';
 
@@ -45,10 +45,9 @@ export async function POST(request: Request) {
 
   // Brute-force protection: cap attempts per client IP and per username.
   // IP is header-aware because the standalone deployment sits behind a proxy.
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    'unknown';
+  // The header alone is spoofable, so the per-username bucket is the real
+  // backstop here (#172).
+  const ip = getClientIp(request);
   const loginWindow = { max: 10, windowMs: 60_000 };
   const ipLimit = rateLimit(`login:ip:${ip}`, loginWindow);
   const userLimit = rateLimit(`login:user:${String(username).toLowerCase()}`, loginWindow);
