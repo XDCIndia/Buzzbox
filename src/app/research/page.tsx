@@ -55,6 +55,7 @@ export default function ResearchPage() {
           <select
             value={typeFilter}
             onChange={e => setTypeFilter(e.target.value)}
+            aria-label="Filter by signal type"
           >
             {SIGNAL_TYPES.map(t => (
               <option key={t.key} value={t.key}>{t.label}</option>
@@ -63,6 +64,7 @@ export default function ResearchPage() {
           <select
             value={relevanceFilter}
             onChange={e => setRelevanceFilter(e.target.value)}
+            aria-label="Filter by relevance"
           >
             <option value="">All Relevance</option>
             <option value="high">High</option>

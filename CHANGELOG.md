@@ -55,6 +55,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Mention inline edits await the PATCH and refresh to server truth with an error toast on failure instead of silently reverting later; sentiment/emotion/intent are enum-validated server-side against the edit UI's domain (fixes #181).
 - Competitor add validates empty names with a toast, keeps the draft and toasts on API failure, and confirms deletes with outcome toasts; whitespace-only API names answer 400 (fixes #182).
 - Lead text fields are rejected with a field 400 past their caps instead of silently truncated, and the CRM forms carry matching `maxLength`s (fixes #183).
+- Filter dropdowns on Content, Research, Activity, and Memory expose accessible names instead of nameless comboboxes (fixes #171).
 - Mobile nav sheet and header menus (quick-create, data-status, notifications) close on Escape via a shared `useDismiss` hook instead of ignoring it; outside-click dismissal is unchanged (fixes #175, fixes #176).
 - Missing memory-alerts reports answer 200 with an empty `configured: false` payload (like the sibling memory routes) instead of a permanent 404 the page polls every minute; the section renders an actionable empty state (fixes #177).
 
