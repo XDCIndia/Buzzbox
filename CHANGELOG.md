@@ -47,6 +47,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - CSRF origin check treats `127.0.0.1` and `localhost` as equivalent at the same scheme+port; cross-site, other ports, and scheme changes still rejected (#92, fixes #86).
 - Mission-control sends check the cooldown/cap and record the send in one IMMEDIATE transaction, so concurrent requests serialize (losers get 429) instead of each spawning a 120-second agent child (fixes #168).
 - Agent-chat sends cap `content` at 4000 chars like buzz, `conversation_id` at 200, agent/`to` fields at 100, and allowlist chat `message_type` — oversize or unknown values answer 400 instead of bloating the DB or blowing up spawned child args (fixes #169).
+- Kanban drops onto clipped columns, gaps, and container padding dispatch at the board level (direct column hit, else nearest column at the drop height) instead of silently doing nothing; proven by a Playwright drag test that fails without the fix (fixes #173).
 
 ### Security
 - Facebook Page access token moved from URL query string to `Authorization: Bearer` header (#93, fixes #84); same fix applied to both Threads API call sites (#94).

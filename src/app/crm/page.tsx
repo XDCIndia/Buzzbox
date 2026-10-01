@@ -695,6 +695,36 @@ export default function CrmPage() {
 
 /* ─── Kanban Board ─────────────────────────────────────── */
 
+/** Resolve a drop point to a kanban stage. Drops onto clipped columns, gaps,
+ * and container padding never reach a column's own onDrop (the browser
+ * hit-tests the scroll container instead), so the board dispatches drops
+ * itself: direct column hit first, else the nearest column overlapping the
+ * drop height. Points outside the board resolve to null (ignored, as before).
+ * (#173) */
+function resolveKanbanDropStage(
+  container: HTMLDivElement | null,
+  clientX: number,
+  clientY: number,
+): string | null {
+  if (!container || typeof document === 'undefined') return null;
+  const el = document.elementFromPoint(clientX, clientY);
+  if (!el || !container.contains(el)) return null;
+  const direct = (el as Element).closest?.('[data-kanban-stage]')?.getAttribute('data-kanban-stage');
+  if (direct) return direct;
+  let best: string | null = null;
+  let bestDx = Infinity;
+  for (const node of container.querySelectorAll('[data-kanban-stage]')) {
+    const rect = (node as Element).getBoundingClientRect();
+    if (clientY < rect.top - 8 || clientY > rect.bottom + 8) continue;
+    const dx = Math.abs(clientX - (rect.left + rect.width / 2));
+    if (dx < bestDx) {
+      bestDx = dx;
+      best = (node as Element).getAttribute('data-kanban-stage');
+    }
+  }
+  return best;
+}
+
 function KanbanBoard({
   leads,
   selectedLead,
@@ -745,6 +775,17 @@ function KanbanBoard({
             selectedLead ? 'flex-1' : 'w-full'
           }`}
           style={{ scrollbarWidth: 'thin' }}
+          onDragOver={canEdit ? (e) => {
+            e.preventDefault();
+          } : undefined}
+          onDrop={canEdit ? (e) => {
+            e.preventDefault();
+            setDragOverStage(null);
+            const leadId = e.dataTransfer.getData('text/plain');
+            if (!leadId) return;
+            const stage = resolveKanbanDropStage(scrollRef.current, e.clientX, e.clientY);
+            if (stage) onDropLead(leadId, stage);
+          } : undefined}
         >
           {STAGES.map(stage => {
             const count = stageLeads[stage]?.length || 0;
@@ -771,13 +812,6 @@ function KanbanBoard({
                   setDragOverStage(stage);
                 }}
                 onDragLeave={() => setDragOverStage(null)}
-                onDrop={(e) => {
-                  if (!canEdit) return;
-                  e.preventDefault();
-                  setDragOverStage(null);
-                  const leadId = e.dataTransfer.getData('text/plain');
-                  if (leadId) onDropLead(leadId, stage);
-                }}
               />
             );
           })}
@@ -803,13 +837,6 @@ function KanbanBoard({
                 setDragOverStage('rejected');
               }}
               onDragLeave={() => setDragOverStage(null)}
-              onDrop={(e) => {
-                if (!canEdit) return;
-                e.preventDefault();
-                setDragOverStage(null);
-                const leadId = e.dataTransfer.getData('text/plain');
-                if (leadId) onDropLead(leadId, 'rejected');
-              }}
             />
           )}
 
@@ -834,13 +861,6 @@ function KanbanBoard({
                 setDragOverStage('disqualified');
               }}
               onDragLeave={() => setDragOverStage(null)}
-              onDrop={(e) => {
-                if (!canEdit) return;
-                e.preventDefault();
-                setDragOverStage(null);
-                const leadId = e.dataTransfer.getData('text/plain');
-                if (leadId) onDropLead(leadId, 'disqualified');
-              }}
             />
           )}
         </div>
@@ -898,7 +918,6 @@ function KanbanColumn({
   onMoveLead,
   onDragOver,
   onDragLeave,
-  onDrop,
 }: {
   stage: string;
   icon: typeof Send;
@@ -914,16 +933,15 @@ function KanbanColumn({
   onMoveLead: (leadId: string, stage: string) => void;
   onDragOver: (e: DragEvent) => void;
   onDragLeave: () => void;
-  onDrop: (e: DragEvent) => void;
 }) {
   return (
     <div
+      data-kanban-stage={stage}
       className={`min-w-[200px] w-[200px] shrink-0 snap-start transition-colors rounded-xl ${
         isDragOver ? 'bg-primary/10 ring-1 ring-primary/30' : ''
       }`}
       onDragOver={canEdit ? onDragOver : undefined}
       onDragLeave={onDragLeave}
-      onDrop={canEdit ? onDrop : undefined}
     >
       {/* Column header */}
       <div className="flex items-center gap-2 px-2 py-2 mb-2">
