@@ -22,6 +22,11 @@ test.describe('modal shell', () => {
     // The old backdrop was a focusable button named exactly "Close".
     await expect(page.locator('button[aria-label="Close"]')).toHaveCount(0);
 
+    // #183: inputs carry the server caps so over-length can never be typed.
+    await expect(dialog.getByLabel('First name', { exact: true })).toHaveAttribute('maxlength', '80');
+    await expect(dialog.getByLabel('Company', { exact: true })).toHaveAttribute('maxlength', '160');
+    await expect(dialog.getByLabel('Notes', { exact: true })).toHaveAttribute('maxlength', '20000');
+
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
   });

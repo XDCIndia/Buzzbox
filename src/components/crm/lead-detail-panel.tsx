@@ -335,15 +335,15 @@ export function LeadDetailPanel({
           {editingProfile ? (
             <div className="space-y-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input name="first_name" aria-label="First name" autoComplete="given-name" className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="First name" value={profileDraft.first_name} onChange={(e) => setProfileDraft(v => ({ ...v, first_name: e.target.value }))} />
-                <input name="last_name" aria-label="Last name" autoComplete="family-name" className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Last name" value={profileDraft.last_name} onChange={(e) => setProfileDraft(v => ({ ...v, last_name: e.target.value }))} />
-                <input name="title" aria-label="Title" autoComplete="organization-title" className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Title" value={profileDraft.title} onChange={(e) => setProfileDraft(v => ({ ...v, title: e.target.value }))} />
-                <input name="company" aria-label="Company" autoComplete="organization" className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Company" value={profileDraft.company} onChange={(e) => setProfileDraft(v => ({ ...v, company: e.target.value }))} />
-                <input name="email" aria-label="Email" autoComplete="email" type="email" className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Email" value={profileDraft.email} onChange={(e) => setProfileDraft(v => ({ ...v, email: e.target.value }))} />
-                <input name="linkedin_url" aria-label="LinkedIn URL" autoComplete="url" type="url" className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="LinkedIn URL" value={profileDraft.linkedin_url} onChange={(e) => setProfileDraft(v => ({ ...v, linkedin_url: e.target.value }))} />
-                <input name="source" aria-label="Source" autoComplete="off" className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Source" value={profileDraft.source} onChange={(e) => setProfileDraft(v => ({ ...v, source: e.target.value }))} />
-                <input name="industry_segment" aria-label="Industry segment" autoComplete="off" className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Industry segment" value={profileDraft.industry_segment} onChange={(e) => setProfileDraft(v => ({ ...v, industry_segment: e.target.value }))} />
-                <input name="company_size" aria-label="Company size" autoComplete="off" className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Company size" value={profileDraft.company_size} onChange={(e) => setProfileDraft(v => ({ ...v, company_size: e.target.value }))} />
+                <input name="first_name" aria-label="First name" autoComplete="given-name" maxLength={80} className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="First name" value={profileDraft.first_name} onChange={(e) => setProfileDraft(v => ({ ...v, first_name: e.target.value }))} />
+                <input name="last_name" aria-label="Last name" autoComplete="family-name" maxLength={80} className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Last name" value={profileDraft.last_name} onChange={(e) => setProfileDraft(v => ({ ...v, last_name: e.target.value }))} />
+                <input name="title" aria-label="Title" autoComplete="organization-title" maxLength={120} className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Title" value={profileDraft.title} onChange={(e) => setProfileDraft(v => ({ ...v, title: e.target.value }))} />
+                <input name="company" aria-label="Company" autoComplete="organization" maxLength={160} className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Company" value={profileDraft.company} onChange={(e) => setProfileDraft(v => ({ ...v, company: e.target.value }))} />
+                <input name="email" aria-label="Email" autoComplete="email" type="email" maxLength={254} className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Email" value={profileDraft.email} onChange={(e) => setProfileDraft(v => ({ ...v, email: e.target.value }))} />
+                <input name="linkedin_url" aria-label="LinkedIn URL" autoComplete="url" type="url" maxLength={400} className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="LinkedIn URL" value={profileDraft.linkedin_url} onChange={(e) => setProfileDraft(v => ({ ...v, linkedin_url: e.target.value }))} />
+                <input name="source" aria-label="Source" autoComplete="off" maxLength={120} className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Source" value={profileDraft.source} onChange={(e) => setProfileDraft(v => ({ ...v, source: e.target.value }))} />
+                <input name="industry_segment" aria-label="Industry segment" autoComplete="off" maxLength={120} className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Industry segment" value={profileDraft.industry_segment} onChange={(e) => setProfileDraft(v => ({ ...v, industry_segment: e.target.value }))} />
+                <input name="company_size" aria-label="Company size" autoComplete="off" maxLength={40} className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Company size" value={profileDraft.company_size} onChange={(e) => setProfileDraft(v => ({ ...v, company_size: e.target.value }))} />
                 <input name="score" aria-label="Score" inputMode="numeric" type="number" min={0} max={100} className="px-2 py-1 rounded-md border border-border bg-background text-xs" placeholder="Score (0-100)" value={profileDraft.score} onChange={(e) => setProfileDraft(v => ({ ...v, score: e.target.value }))} />
               </div>
               <div className="flex items-center justify-end gap-2">
@@ -496,13 +496,14 @@ export function LeadDetailPanel({
           </div>
           {editingNotes ? (
             <div className="space-y-2">
-              <textarea
-                value={notesValue}
-                onChange={e => setNotesValue(e.target.value)}
-                placeholder="Add notes about this lead..."
-                rows={3}
-                className="w-full text-xs resize-none"
-              />
+                <textarea
+                  value={notesValue}
+                  onChange={e => setNotesValue(e.target.value)}
+                  placeholder="Add notes about this lead..."
+                  rows={3}
+                  maxLength={20000}
+                  className="w-full text-xs resize-none"
+                />
               <div className="flex items-center gap-2 justify-end">
                 <button onClick={() => setEditingNotes(false)} className="btn btn-ghost btn-sm text-xs" type="button">Cancel</button>
                 <button

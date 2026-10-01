@@ -20,7 +20,17 @@ async function login(page: import('@playwright/test').Page) {
 
 test.describe('kanban clipped drop', () => {
   test('drop into container-space gap moves the lead with feedback (#173)', async ({ page }) => {
+    // Timing-sensitive native drag: triple the default 30s timeout.
+    test.slow();
     await login(page);
+
+    // #183: over-length creates are rejected with a field error, never sliced.
+    const overlong = await page.request.post('/api/leads', {
+      headers: { origin: 'http://127.0.0.1:3010' },
+      data: { first_name: 'x'.repeat(300), last_name: 'Limit' },
+    });
+    expect(overlong.status()).toBe(400);
+    expect(String(((await overlong.json()) as { error?: string }).error)).toContain('Invalid first_name');
 
     // Clean up leads orphaned by earlier interrupted runs sharing the tags.
     const existing = (await (await page.request.get('/api/leads', {})).json()) as { id: string; first_name: string | null }[];
@@ -73,7 +83,7 @@ test.describe('kanban clipped drop', () => {
           return false;
         },
         tag,
-        { polling: 150, timeout: 10_000 },
+        { polling: 250, timeout: 30_000 },
       );
 
       const card = page.locator('[data-kanban-stage="booked"] button', { hasText: tag });

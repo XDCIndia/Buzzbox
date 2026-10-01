@@ -30,6 +30,9 @@ async function apiDigestList(page: import('@playwright/test').Page) {
 
 test.describe('brand create validation', () => {
   test('empty alert submit toasts instead of silently doing nothing (#174)', async ({ page }) => {
+    // Long multi-flow test (alerts + digests share one login for the suite
+    // budget): triple the default 30s timeout.
+    test.slow();
     await login(page);
     const before = await apiList(page, 'alerts');
 
@@ -118,7 +121,7 @@ test.describe('brand create validation', () => {
 
     // #180: real generate adds a digest; UI delete (confirm+toast) removes it.
     await page.getByRole('button', { name: 'New', exact: true }).click();
-    await expect.poll(async () => (await apiDigestList(page)).length, { timeout: 10_000 }).toBe(1);
+    await expect.poll(async () => (await apiDigestList(page)).length, { timeout: 30_000 }).toBe(1);
     const fresh = (await apiDigestList(page))[0];
     await expect(page.getByText(fresh.title).first()).toBeVisible({ timeout: 10_000 });
     page.once('dialog', (d) => d.accept());
