@@ -6,9 +6,10 @@ import {
   ChevronDown, RefreshCw, RefreshCwOff, AlertTriangle,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDashboard } from '@/store';
+import { useDismiss } from '@/hooks/use-dismiss';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { timeAgo } from '@/lib/utils';
 import type { SyncHealth } from '@/lib/sync';
@@ -98,14 +99,8 @@ function QuickCreateMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  // Menu dismisses on Escape and outside pointer-down (#176).
+  useDismiss(open, ref, () => setOpen(false));
 
   return (
     <div className="relative" ref={ref}>
@@ -175,14 +170,8 @@ function DataStatusToggle({ active, onToggle }: { active: boolean; onToggle: () 
   );
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  // Same shared dismiss behavior as the quick-create menu (#176).
+  useDismiss(open, ref, () => setOpen(false));
 
   return (
     <div className="relative" ref={ref}>
@@ -302,14 +291,8 @@ function NotificationBell() {
 
   const unreadCount = notifications?.filter(n => !n.read).length ?? 0;
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  // Same shared dismiss behavior as the quick-create menu (#176).
+  useDismiss(open, ref, () => setOpen(false));
 
   async function markRead(id: number) {
     await fetch('/api/notifications', {
