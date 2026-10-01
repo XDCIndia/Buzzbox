@@ -71,7 +71,27 @@ test.describe('brand create validation', () => {
     await row.getByRole('button', { name: 'Check now' }).click();
     await expect(row.getByText('0 matches')).toBeVisible({ timeout: 10_000 });
 
-    await page.request.delete(`/api/brand/${BRAND_ID}/alerts/${created!.id}`, { headers: ORIGIN });
+    // #179: dismissing the confirm deletes nothing and toasts nothing.
+    page.once('dialog', (d) => d.dismiss());
+    await row.getByRole('button', { name: `Delete alert ${alertName}` }).click();
+    expect(await apiList(page, 'alerts').then((l) => l.some((a) => a.name === alertName))).toBe(true);
+
+    // #179: a failing delete surfaces the error and keeps the alert.
+    await page.route(`**/api/brand/${BRAND_ID}/alerts/${created!.id}`, (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'E2E delete failure' }) }),
+    );
+    page.once('dialog', (d) => d.accept());
+    await row.getByRole('button', { name: `Delete alert ${alertName}` }).click();
+    await expect(page.getByText('E2E delete failure').first()).toBeVisible({ timeout: 10_000 });
+    expect(await apiList(page, 'alerts').then((l) => l.some((a) => a.name === alertName))).toBe(true);
+    await page.unroute(`**/api/brand/${BRAND_ID}/alerts/${created!.id}`);
+
+    // #179: accepting the confirm deletes with a success toast (also the cleanup).
+    page.once('dialog', (d) => d.accept());
+    await row.getByRole('button', { name: `Delete alert ${alertName}` }).click();
+    await expect(page.getByText('Alert deleted').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(alertName)).toBeHidden({ timeout: 10_000 });
+    expect(await apiList(page, 'alerts').then((l) => l.some((a) => a.name === alertName))).toBe(false);
   });
 
   test('empty campaign submit toasts instead of silently doing nothing (#174)', async ({ page }) => {
@@ -107,6 +127,13 @@ test.describe('brand create validation', () => {
 
     const created = (await apiList(page, 'campaigns')).find((c) => c.name === campaignName);
     expect(created, 'campaign must exist server-side').toBeTruthy();
-    await page.request.delete(`/api/brand/${BRAND_ID}/campaigns/${created!.id}`, { headers: ORIGIN });
+
+    // #179 (same pattern): accepting the confirm deletes with a toast (also the cleanup).
+    const campaignRow = page.locator('.brand-stat-tile', { hasText: campaignName });
+    page.once('dialog', (d) => d.accept());
+    await campaignRow.getByRole('button', { name: `Delete campaign ${campaignName}` }).click();
+    await expect(page.getByText('Campaign deleted').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(campaignName)).toBeHidden({ timeout: 10_000 });
+    expect(await apiList(page, 'campaigns').then((l) => l.some((c) => c.name === campaignName))).toBe(false);
   });
 });

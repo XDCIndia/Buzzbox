@@ -50,6 +50,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Kanban drops onto clipped columns, gaps, and container padding dispatch at the board level (direct column hit, else nearest column at the drop height) instead of silently doing nothing; proven by a Playwright drag test that fails without the fix (fixes #173).
 - Brand Alerts/Campaigns create forms toast "name is required" on empty submits instead of silently ignoring the click; the APIs also trim names so whitespace-only values answer 400 (fixes #174).
 - Brand alert "Check now" surfaces the API error (or a generic failure line) instead of rendering "undefined matches" when the check fails (fixes #178).
+- Brand alert/campaign deletes ask for confirmation, toast the outcome, and label their icon-only buttons; failures no longer silently no-op (fixes #179).
 - Mobile nav sheet and header menus (quick-create, data-status, notifications) close on Escape via a shared `useDismiss` hook instead of ignoring it; outside-click dismissal is unchanged (fixes #175, fixes #176).
 - Missing memory-alerts reports answer 200 with an empty `configured: false` payload (like the sibling memory routes) instead of a permanent 404 the page polls every minute; the section renders an actionable empty state (fixes #177).
 
