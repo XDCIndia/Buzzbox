@@ -24,7 +24,15 @@ export async function GET(request: Request) {
     const alertsJson = path.join(healthDir, 'memory-alerts.json');
 
     if (!fs.existsSync(alertsJson)) {
-      return NextResponse.json({ error: 'Memory alerts report not found' }, { status: 404 });
+      // Degrade gracefully like the sibling memory routes: no report yet is
+      // a normal empty state, not an error — the page polls this endpoint
+      // every minute, so a 404 here is permanent console/network spam (#177).
+      return NextResponse.json({
+        active: [],
+        new: [],
+        thresholds: { contradictions: 0, duplicates: 0, weak_agents: 0, never_ratio: 0 },
+        configured: false,
+      });
     }
 
     const raw = fs.readFileSync(alertsJson, 'utf-8');

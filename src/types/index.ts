@@ -363,6 +363,8 @@ export interface MemoryAlertsPayload {
     weak_agents: number;
     never_ratio: number;
   };
+  /** False when no report file exists yet (degraded empty payload, #177). */
+  configured?: boolean;
 }
 
 export interface FunnelStep {
