@@ -9,6 +9,7 @@ import { PlatformBadge } from '@/components/brand/platform-badge';
 import { EmptyState } from '@/components/brand/empty-state';
 import { StatCardSkeleton, ChartSkeleton } from '@/components/ui/loading-skeleton';
 import { ErrorBanner } from '@/components/ui/error-banner';
+import { toast } from '@/components/ui/toast';
 import { formatNumber } from '@/lib/utils';
 import type { BrandMentionStats, BrandCreator, BrandCompetitor } from '@/types';
 
@@ -59,19 +60,45 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
 
   async function addCompetitor(e: React.FormEvent) {
     e.preventDefault();
-    if (!competitorName.trim()) return;
-    await fetch(`/api/brand/${brandId}/competitors`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: competitorName.trim() }),
-    });
-    setCompetitorName('');
-    loadCompetitors();
+    if (!competitorName.trim()) {
+      toast.error('Competitor name is required');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/brand/${brandId}/competitors`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: competitorName.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          typeof data?.error === 'string' && data.error ? data.error : 'Failed to add competitor.',
+        );
+      }
+      toast.success('Competitor added');
+      setCompetitorName('');
+      loadCompetitors();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to add competitor.');
+    }
   }
 
-  async function removeCompetitor(id: string) {
-    await fetch(`/api/brand/${brandId}/competitors/${id}`, { method: 'DELETE' });
-    loadCompetitors();
+  async function removeCompetitor(id: string, name: string) {
+    if (!confirm(`Remove competitor "${name}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/brand/${brandId}/competitors/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          typeof data?.error === 'string' && data.error ? data.error : 'Failed to remove competitor.',
+        );
+      }
+      toast.success('Competitor removed');
+      loadCompetitors();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to remove competitor.');
+    }
   }
 
   if (loading) {
@@ -179,7 +206,7 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
         <div className="panel-header"><h2 className="section-title">Tracked Competitors ({competitors.length})</h2></div>
         <div className="panel-body space-y-3">
           <form onSubmit={addCompetitor} className="flex gap-2">
-            <input value={competitorName} onChange={e => setCompetitorName(e.target.value)} placeholder="Competitor name" className="flex-1 max-w-xs" />
+            <input value={competitorName} onChange={e => setCompetitorName(e.target.value)} placeholder="Competitor name" aria-label="Competitor name" className="flex-1 max-w-xs" />
             <button type="submit" className="brand-btn-primary btn btn-sm"><Plus size={13} /> Add</button>
           </form>
           {competitors.length === 0 ? (
@@ -189,7 +216,7 @@ export function AnalyticsTab({ brandId, realOnly }: { brandId: string; realOnly:
               {competitors.map(c => (
                 <div key={c.id} className="brand-stat-tile flex items-center justify-between">
                   <span className="text-sm font-medium">{c.name}</span>
-                  <button onClick={() => removeCompetitor(c.id)} className="text-muted-foreground hover:text-destructive">
+                  <button onClick={() => removeCompetitor(c.id, c.name)} aria-label={`Remove competitor ${c.name}`} className="text-muted-foreground hover:text-destructive">
                     <Trash2 size={14} />
                   </button>
                 </div>
