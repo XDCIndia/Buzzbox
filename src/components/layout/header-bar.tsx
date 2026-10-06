@@ -90,7 +90,9 @@ export function HeaderBar() {
 }
 
 const QUICK_CREATE_ITEMS = [
-  { label: 'New content draft', hint: 'Write a post for any platform', href: '/content', icon: PenLine },
+  // Manual composer route (drafts need no AI; the record enters the normal
+  // approval pipeline with status 'draft').
+  { label: 'New content draft', hint: 'Write a post for any platform', href: '/content/new', icon: PenLine },
   { label: 'Add CRM lead', hint: 'Track a new contact', href: '/crm', icon: Contact },
   { label: 'Ask Buzz', hint: 'Draft, summarize, or plan with AI', buzzPrompt: 'Help me draft a post for today.', icon: Sparkles },
 ] as const;
