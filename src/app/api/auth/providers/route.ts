@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isXOAuthConfigured } from '@/lib/x-oauth';
 
 function isGoogleEnabled(): boolean {
   return Boolean(
@@ -11,6 +12,7 @@ function isGoogleEnabled(): boolean {
 export async function GET() {
   return NextResponse.json({
     google: isGoogleEnabled(),
+    x: isXOAuthConfigured(),
   });
 }
 

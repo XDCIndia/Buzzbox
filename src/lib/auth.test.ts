@@ -143,6 +143,29 @@ test('malformed session cookies decode to absent instead of throwing (#149)', ()
   assert.throws(() => requireUser(request), /unauthorized/);
 });
 
+test('login session cookie is Lax so OAuth return navigations carry it', async () => {
+  // SameSite=Strict withholds the session on the cross-site top-level GET
+  // that returns from an external OAuth provider (X authorize -> callback),
+  // so the callback sees no session and the flow loops back to /login.
+  // Lax still withholds the cookie on all cross-site unsafe requests.
+  seedAdmin();
+  const { POST } = await import('../app/api/auth/login/route');
+  const res = await POST(
+    new Request('http://localhost/api/auth/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'admin_test', password: 'super-secure-pass' }),
+    }) as never,
+  );
+  assert.equal(res.status, 200);
+  const setCookie = res.headers.get('set-cookie') ?? '';
+  assert.match(setCookie, /hermes-session=/);
+  assert.match(setCookie, /Path=\//);
+  assert.match(setCookie, /HttpOnly/i);
+  assert.match(setCookie, /SameSite=Lax/i);
+  assert.ok(!/SameSite=Strict/i.test(setCookie), 'must not be Strict');
+});
+
 test('login still succeeds with a malformed session cookie present (#149)', async () => {
   seedAdmin();
   const { POST } = await import('../app/api/auth/login/route');

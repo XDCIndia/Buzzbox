@@ -22,9 +22,24 @@ const UPSTREAM_HTML = `<!DOCTYPE html><html><body><h1>cloudflare</h1>...big erro
 
 // Mutable so each test can pick the upstream failure mode; askDicompute
 // always POSTs to the fixed /chat/completions path.
-let mode: 'html-502' | 'plain-521' = 'html-502';
+let mode: 'html-502' | 'plain-521' | 'ok-capture' = 'html-502';
+let lastRequestBody: unknown = null;
 
 const server = http.createServer((req, res) => {
+  if (mode === 'ok-capture') {
+    let raw = '';
+    req.on('data', (chunk) => { raw += chunk; });
+    req.on('end', () => {
+      try {
+        lastRequestBody = JSON.parse(raw);
+      } catch {
+        lastRequestBody = null;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: '{"action":"respond","message":"hi"}' } }] }));
+    });
+    return;
+  }
   if (mode === 'html-502') {
     res.writeHead(502, { 'Content-Type': 'text/html' });
     res.end(UPSTREAM_HTML);
@@ -81,4 +96,16 @@ test('unknown upstream statuses map to a generic HTTP status message', async () 
       return true;
     },
   );
+});
+
+test('outgoing completions request caps max_tokens for small context windows', async () => {
+  mode = 'ok-capture';
+  lastRequestBody = null;
+  const out = await dicompute.askDicompute(messages);
+  assert.equal(out.content, '{"action":"respond","message":"hi"}');
+  const body = lastRequestBody as { max_tokens?: unknown; stream?: unknown; model?: unknown } | null;
+  assert.ok(body, 'upstream must receive a JSON body');
+  assert.equal(body.max_tokens, 256);
+  assert.equal(body.stream, false);
+  assert.ok(typeof body.model === 'string' && body.model.length > 0);
 });

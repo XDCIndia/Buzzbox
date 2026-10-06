@@ -4,6 +4,7 @@ import path from 'node:path';
 import { getDb } from '@/lib/db';
 import { getHermesStateDir } from '@/lib/hermes-state';
 import { requireApiEditor, requireApiUser } from '@/lib/api-auth';
+import { getUserFromRequest } from '@/lib/auth';
 import { maybePublishToX } from '@/lib/publish-to-x';
 import { parseAndValidate } from '@/lib/api-validate';
 import { z } from 'zod';
@@ -214,12 +215,16 @@ export async function PATCH(req: NextRequest) {
 
     // Approving/publishing a queued X item is the moment it actually needs
     // to go out -- wire the real post here rather than just flipping a status flag.
+    // Strict per-user isolation: the actor's OWN X account (or the shared
+    // env sender), never another user's connection.
+    const actor = getUserFromRequest(req as unknown as Request);
     const publishResult = await maybePublishToX({
       contentId: id,
       platform,
       previousStatus: (current.status as string | undefined) ?? null,
       nextStatus: status,
       text: parsed.full || parsed.preview,
+      userId: actor && actor.id !== 0 ? actor.id : null,
     });
     if (publishResult.attempted && !publishResult.ok) {
       return NextResponse.json({ error: publishResult.error }, { status: publishResult.status });

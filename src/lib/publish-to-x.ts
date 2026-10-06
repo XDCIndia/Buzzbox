@@ -1,6 +1,7 @@
 import { postXTweet } from '@/lib/x-api';
 import { getXBudget, recordXPost } from '@/lib/x-budget';
 import { getDb } from '@/lib/db';
+import { resolveXPostingCredential } from '@/lib/x-connections';
 
 export const X_DAILY_POST_LIMIT = 5;
 
@@ -11,7 +12,7 @@ export const X_CLAIM_STALE_MS = 5 * 60 * 1000;
 
 export type PublishToXResult =
   | { attempted: false }
-  | { attempted: true; ok: true; tweetId: string; duplicate: boolean }
+  | { attempted: true; ok: true; tweetId: string; duplicate: boolean; xUserId?: string | null; xUsername?: string | null }
   | { attempted: true; ok: false; status: number; error: string };
 
 export type PublishClaim =
@@ -81,8 +82,12 @@ function withPublishMutex<T>(fn: () => Promise<T>): Promise<T> {
  * re-saving an already-approved/published item never reposts it).
  *
  * Enforces the daily_post_limit (5) by checking the current budget before
- * posting, and requires X_ACCESS_TOKEN (an OAuth user-context token with
- * tweet.write scope -- NOT the read-only X_BEARER_TOKEN) to be configured.
+ * posting.
+ *
+ * Credential resolution (strict per-user isolation):
+ *   1. the approving user's OWN connected X account (Connect X OAuth),
+ *   2. the explicitly shared/admin-configured legacy X_ACCESS_TOKEN env var.
+ * There is no fallback to another user's connection.
  *
  * Returns { attempted: false } when no posting action applies (nothing to
  * do, caller should proceed with its normal status update).
@@ -93,6 +98,8 @@ export async function maybePublishToX(opts: {
   previousStatus: string | null | undefined;
   nextStatus: string | null | undefined;
   text: string | null | undefined;
+  /** Buzzbox user id of the approver — selects their connected X account first. */
+  userId?: number | null;
 }): Promise<PublishToXResult> {
   const isFreshXApproval =
     opts.platform === 'x' &&
@@ -121,7 +128,8 @@ export async function maybePublishToX(opts: {
     }
   }
 
-  const accessToken = process.env.X_ACCESS_TOKEN;
+  const credential = await resolveXPostingCredential(opts.userId ?? null);
+  const accessToken = credential?.accessToken;
   if (!accessToken) {
     if (opts.contentId) releaseXPublish(opts.contentId);
     return {
@@ -129,7 +137,7 @@ export async function maybePublishToX(opts: {
       ok: false,
       status: 412,
       error:
-        'X_ACCESS_TOKEN is not configured. Posting requires an OAuth user-context access token with the tweet.write scope (distinct from the read-only X_BEARER_TOKEN) -- add it to .env.local to enable posting to X.',
+        'No X account is connected for your user. Connect X in Integrations to post from your own X account, or ask an admin to configure the shared X_ACCESS_TOKEN sender.',
     };
   }
 
@@ -155,7 +163,14 @@ export async function maybePublishToX(opts: {
       const posted = await postXTweet({ accessToken, text });
       recordXPost(posted.id);
       if (opts.contentId) completeXPublish(opts.contentId, posted.id);
-      return { attempted: true, ok: true, tweetId: posted.id, duplicate: false };
+      return {
+        attempted: true,
+        ok: true,
+        tweetId: posted.id,
+        duplicate: false,
+        xUserId: credential.xUserId,
+        xUsername: credential.username,
+      };
     } catch (err) {
       if (opts.contentId) releaseXPublish(opts.contentId);
       return { attempted: true, ok: false, status: 502, error: (err as Error).message };

@@ -8,6 +8,22 @@ const DICOMPUTE_MODEL =
 
 const DICOMPUTE_API_KEY = process.env.DICOMPUTE_API_KEY;
 
+/**
+ * Output cap. Buzz's decision calls emit <60-token JSON and its summaries fit
+ * comfortably in a few hundred tokens, so 256 keeps prompt+output inside
+ * small-context models (e.g. the 1024-token window currently serving
+ * qwen2.5-3b-instruct: our ~3.9KB decision prompt already consumes most of
+ * it, and an uncapped provider-default output budget overflows it).
+ * Overridable without a code change if the serving model window changes.
+ */
+function parseMaxTokens(): number {
+  const raw = Number.parseInt(process.env.DICOMPUTE_MAX_TOKENS ?? '', 10);
+  if (Number.isFinite(raw) && raw > 0 && raw <= 4096) return raw;
+  return 256;
+}
+
+const DICOMPUTE_MAX_TOKENS = parseMaxTokens();
+
 /** Thrown when the Dicompute connector lacks configuration (e.g. no API key).
  * Route handlers catch this to answer 4xx "precondition failed" instead of
  * masking a configuration state as a 500 server error (#88). */
@@ -73,6 +89,7 @@ export async function askDicompute(
         model: DICOMPUTE_MODEL,
         messages,
         temperature: 0.3,
+        max_tokens: DICOMPUTE_MAX_TOKENS,
         stream: false,
       }),
     },

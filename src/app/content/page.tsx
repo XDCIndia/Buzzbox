@@ -47,7 +47,13 @@ export default function ContentPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(String(data?.error || `Request failed (${res.status})`));
       }
-      toast.success(status === 'ready' ? 'Content approved' : 'Content rejected');
+      toast.success(
+        status === 'ready'
+          ? 'Content approved'
+          : status === 'pending_approval'
+            ? 'Submitted for approval'
+            : 'Content rejected',
+      );
       load();
     } catch {
       toast.error('Failed to update content status');
@@ -139,6 +145,16 @@ export default function ContentPage() {
                     </button>
                     <button className="btn btn-destructive btn-sm" onClick={() => updateStatus(r.id, 'rejected')}>
                       <X size={12} />
+                    </button>
+                  </div>
+                ) : r.status === 'draft' ? (
+                  <div className="flex gap-1">
+                    <button
+                      className="btn btn-sm bg-primary/15 text-primary hover:bg-primary/25"
+                      onClick={() => updateStatus(r.id, 'pending_approval')}
+                      title="Submit for approval"
+                    >
+                      Submit for Approval
                     </button>
                   </div>
                 ) : null

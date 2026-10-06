@@ -23,16 +23,22 @@ function useSetupStatus(): SetupStatus | null {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [settings, brand, content, overview] = await Promise.all([
+      const [settings, brand, content, overview, xStatus] = await Promise.all([
         fetch('/api/settings').then(r => r.json()).catch(() => null),
         fetch(`/api/brand/${DEFAULT_BRAND_ID}`).then(r => (r.ok ? r.json() : null)).catch(() => null),
         fetch('/api/content').then(r => r.json()).catch(() => null),
         fetch('/api/overview').then(r => r.json()).catch(() => null),
+        // Authoritative per-user X status: same source the Integrations page
+        // reports (the viewer's own x_connections row). The legacy signals
+        // below can never be true on their own (NEXT_PUBLIC_X_USERNAME is
+        // unset; /api/settings has no `integrations` field) and are kept
+        // only as a fallback.
+        fetch('/api/integrations/x').then(r => (r.ok ? r.json() : null)).catch(() => null),
       ]);
       if (cancelled) return;
       const xUser = process.env.NEXT_PUBLIC_X_USERNAME;
       setStatus({
-        xConnected: Boolean(xUser) || Boolean(settings?.integrations?.x),
+        xConnected: Boolean((xStatus as { connected?: boolean } | null)?.connected) || Boolean(xUser) || Boolean(settings?.integrations?.x),
         brandKeywords: Array.isArray(brand?.keywords) ? brand.keywords.length > 0 : false,
         hasContent: Number(content?.items?.length ?? content?.length ?? 0) > 0,
         agentActive: (overview?.agents ?? []).some((a: { status: string }) => a.status === 'active'),

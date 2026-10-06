@@ -31,7 +31,8 @@ export async function POST(request: Request) {
   response.cookies.set(SESSION_COOKIE, '', {
     httpOnly: true,
     secure,
-    sameSite: 'strict',
+    // Matches the login cookie attributes.
+    sameSite: 'lax',
     maxAge: 0,
     path: '/',
   });

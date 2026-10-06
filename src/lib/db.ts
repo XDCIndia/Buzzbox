@@ -386,6 +386,32 @@ function migrate(db: Database.Database) {
     db.pragma('user_version = 4');
   }
 
+  // v5: per-user X OAuth connections. One row per Buzzbox user holds the
+  // X account's user-context tokens (access + refresh) from the Connect X
+  // flow; tokens are server-side only and never exposed via API routes.
+  if (getSchemaVersion(db) < 5) {
+    runInTransaction(db, () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS x_connections (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          x_user_id TEXT NOT NULL,
+          x_username TEXT NOT NULL,
+          x_name TEXT,
+          access_token TEXT NOT NULL,
+          refresh_token TEXT,
+          scope TEXT,
+          token_type TEXT,
+          expires_at INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_x_connections_user ON x_connections(user_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_x_connections_x_user ON x_connections(x_user_id);
+      `);
+    });
+    db.pragma('user_version = 5');
+  }
   // Data-level guarantee (runs every boot, deliberately NOT version-gated):
   // the default brand row must exist because brand-scoped API routes and
   // FK-constrained inserts (brand_mentions, brand_digests, etc.) assume
@@ -395,7 +421,7 @@ function migrate(db: Database.Database) {
   ).run(DEFAULT_BRAND_ID, 'My Brand', '[]', '[]');
 }
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 export function getSchemaVersion(db: Database.Database): number {
   return db.pragma('user_version', { simple: true }) as number;

@@ -7,6 +7,9 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 ## [Unreleased] - 2026-09-23
 
 ### Added
+- X OAuth 2.0 "Connect X" (Authorization Code + PKCE): per-user `x_connections` storage (schema v5) with token refresh, user-bound state cookie, and a token-free `/api/integrations/x` status endpoint surfaced on the Integrations page.
+- Manual content composer (`/content/new`) and `POST /api/content`: drafts enter the normal Draft -> Approval -> Publish pipeline without any LLM provider; draft rows gain Submit for Approval (`draft` -> `pending_approval`, never publishes directly).
+- Dashboard setup checklist reads the authoritative per-user X connection status instead of unset env/nonexistent settings fields.
 - X analytics now include impressions (`non_public_metrics.impression_count`) when a user-context `X_ACCESS_TOKEN` is set and the range is ≤ 7 days; graceful `null` plus a UI hint otherwise (#91).
 - Real sync health: `syncAll()` records status/timestamp/duration (last success survives failures), exposed via `/api/settings` and rendered as "synced Xs ago" in the header (#95, fixes #69).
 - Demo-brand protection: `brands.is_demo` flag (schema v3 with backfill), "This is demo data" banner on brand pages, auto-cleared on rename (#90, fixes #89).
@@ -26,6 +29,9 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Bare `pnpm lint` ignores nested build output and runtime/test artifacts (`.tmp/`, `test-results/`, `playwright-report/`, `state/`, `coverage/`, `**/.next/`), so stray worktree builds no longer fail the contributor gate (fixes #116).
 
 ### Fixed
+- X posting/analytics resolve the acting user's own OAuth connection, then the shared `X_ACCESS_TOKEN` env sender, then 412 -- never another user's account; revoked refresh tokens invalidate only their own connection; a second user connecting the same X account gets a clear conflict error.
+- `HERMES_HOST_LOCK=local` also accepts the operator-declared `PUBLIC_BASE_URL` host for tunnel development; session cookie is `SameSite=Lax` so cross-site OAuth return navigations carry the session.
+- Dicompute requests cap `max_tokens` (default 256, `DICOMPUTE_MAX_TOKENS` override) and the Buzz decision prompt is compacted ~3868 to ~1620 chars so prompt+output fits small context windows.
 - Agent-sessions cards link to the real `/agents/comms?conv=` route; dashboard uses the default brand id instead of a hardcoded UUID (#95, fixes #67).
 - `PATCH /api/content` answers 404 for unknown ids instead of reporting success (fixes #135).
 - `PATCH /api/content-item` validates status against the content enum, caps payloads at 128k, and writes the queue file atomically (fixes #134).

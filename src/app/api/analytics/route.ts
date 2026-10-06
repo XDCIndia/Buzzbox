@@ -211,11 +211,32 @@ export async function GET(req: NextRequest) {
   // Social native connectors.
   let x: ProviderState = { provider: "x", configured: false };
   const xBearer = process.env.X_BEARER_TOKEN || process.env.X_API_BEARER_TOKEN || null;
-  const xUsername = process.env.X_USERNAME || null;
+  // The viewer's OWN connected X account enriches reads (username fallback +
+  // user-context token for impressions); the legacy manual env vars still
+  // work. Deliberately no "any user's connection" fallback: using another
+  // user's OAuth token — even for reads, which can trigger a refresh of
+  // their connection — would be a cross-user isolation violation.
+  let xUsername = process.env.X_USERNAME || null;
+  let xUserToken = process.env.X_ACCESS_TOKEN || null;
+  if (!xUsername || !xUserToken) {
+    try {
+      const { getUserFromRequest } = await import("@/lib/auth");
+      const viewer = getUserFromRequest(req as Request);
+      if (viewer && viewer.id !== 0) {
+        const { getValidXAccessTokenForUser, getXConnectionByUserId } = await import("@/lib/x-connections");
+        const oauth = await getValidXAccessTokenForUser(viewer.id);
+        if (oauth) {
+          if (!xUserToken) xUserToken = oauth.accessToken;
+          if (!xUsername) xUsername = getXConnectionByUserId(viewer.id)?.x_username ?? oauth.username;
+        }
+      }
+    } catch {
+      // Best-effort enrichment only — env config alone still works.
+    }
+  }
   if (xBearer && xUsername) {
     // Same user-context credential posting uses (maybePublishToX); when set,
     // the X provider can also read non_public_metrics (impressions).
-    const xUserToken = process.env.X_ACCESS_TOKEN || null;
     const xRun = await runProviderWithRetry(() => fetchXAccountAnalytics({ bearerToken: xBearer, username: xUsername, days, userAccessToken: xUserToken }));
     if (xRun.ok) {
       const out = xRun.data;

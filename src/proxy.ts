@@ -57,6 +57,18 @@ function parseHostName(host: string): string {
   return colon === -1 ? raw : raw.slice(0, colon);
 }
 
+/** Bare lowercase hostname declared via PUBLIC_BASE_URL ('' when unset or
+ * malformed -- a config typo must fail closed, never crash the proxy). */
+function publicBaseHostName(): string {
+  const raw = (process.env.PUBLIC_BASE_URL || '').trim();
+  if (!raw) return '';
+  try {
+    return parseHostName(new URL(raw).hostname);
+  } catch {
+    return '';
+  }
+}
+
 function isHostAllowedByLock(hostName: string): boolean {
   const mode = (process.env.HERMES_HOST_LOCK || 'local').trim().toLowerCase();
   if (mode === 'off' || mode === 'disabled' || mode === 'false' || mode === '0') {
@@ -70,7 +82,17 @@ function isHostAllowedByLock(hostName: string): boolean {
     // rules -- see "Deployment safety" in the README (#100).
     const isLocalhost = hostName === 'localhost' || hostName === '127.0.0.1' || hostName === '::1';
     const isTailscale = hostName.startsWith('100.') || hostName.endsWith('.ts.net');
-    return isLocalhost || isTailscale;
+    if (isLocalhost || isTailscale) return true;
+    // Development tunnels (e.g. a Cloudflare Quick Tunnel used to receive
+    // X OAuth callbacks locally): accept the operator-declared public
+    // hostname from PUBLIC_BASE_URL. This is not a weakening: the Host
+    // header is fully client-controlled (any remote peer can already claim
+    // `localhost`), so the accepted set gains only the operator's own
+    // declared name -- authentication, CSRF, and session checks below are
+    // unchanged, and the real boundary stays the listen address + firewall.
+    const publicHost = publicBaseHostName();
+    if (publicHost && hostName === publicHost) return true;
+    return false;
   }
 
   // allowlist mode (comma-separated hostnames)

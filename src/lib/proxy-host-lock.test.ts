@@ -29,16 +29,23 @@ process.env.API_KEY = 'test-api-key';
 
 let proxy: typeof import('../proxy')['proxy'];
 let savedHostLock: string | undefined;
+let savedPublicBaseUrl: string | undefined;
+let savedNodeEnv: string | undefined;
 
 before(async () => {
   await import('./db');
   proxy = (await import('../proxy')).proxy;
   savedHostLock = process.env.HERMES_HOST_LOCK;
+  savedPublicBaseUrl = process.env.PUBLIC_BASE_URL;
+  savedNodeEnv = process.env.NODE_ENV;
 });
 
 after(() => {
   if (savedHostLock === undefined) delete process.env.HERMES_HOST_LOCK;
   else process.env.HERMES_HOST_LOCK = savedHostLock;
+  if (savedPublicBaseUrl === undefined) delete process.env.PUBLIC_BASE_URL;
+  else process.env.PUBLIC_BASE_URL = savedPublicBaseUrl;
+  setNodeEnv(savedNodeEnv);
   rmSync(tempDir, { recursive: true, force: true });
 });
 
@@ -49,6 +56,13 @@ function apiGet(host: string): number {
     }),
   );
   return res.status;
+}
+
+/** NODE_ENV is readonly-typed in @types/node; mutate through a cast. */
+function setNodeEnv(value: string | undefined): void {
+  const env = process.env as Record<string, string | undefined>;
+  if (value === undefined) delete env.NODE_ENV;
+  else env.NODE_ENV = value;
 }
 
 test('local mode accepts localhost and 127.0.0.1 (#100)', () => {
@@ -92,4 +106,47 @@ test('allowlist mode is case-insensitive and strips ports (#100)', () => {
 test('off mode disables the lock (#100)', () => {
   process.env.HERMES_HOST_LOCK = 'off';
   assert.equal(apiGet('evil.example'), 401);
+});
+
+test('local mode accepts the PUBLIC_BASE_URL host outside production (dev tunnels)', () => {
+  process.env.HERMES_HOST_LOCK = 'local';
+  process.env.PUBLIC_BASE_URL = 'https://forestry-anatomy-consoles-the.trycloudflare.com';
+  setNodeEnv('test');
+  try {
+    // Lock passes (401 = stopped later by the API auth gate), unrelated hosts still 403.
+    assert.equal(apiGet('forestry-anatomy-consoles-the.trycloudflare.com'), 401);
+    assert.equal(apiGet('other-tunnel.trycloudflare.com'), 403);
+    assert.equal(apiGet('localhost:3010'), 401);
+  } finally {
+    setNodeEnv(savedNodeEnv);
+  }
+});
+
+test('local mode rejects tunnel hosts when PUBLIC_BASE_URL is unset', () => {
+  process.env.HERMES_HOST_LOCK = 'local';
+  delete process.env.PUBLIC_BASE_URL;
+  assert.equal(apiGet('forestry-anatomy-consoles-the.trycloudflare.com'), 403);
+});
+
+test('malformed PUBLIC_BASE_URL fails closed without crashing', () => {
+  process.env.HERMES_HOST_LOCK = 'local';
+  process.env.PUBLIC_BASE_URL = ':::not-a-url:::';
+  assert.equal(apiGet('forestry-anatomy-consoles-the.trycloudflare.com'), 403);
+  assert.equal(apiGet('localhost:3010'), 401);
+});
+
+test('PUBLIC_BASE_URL host accepted in every environment, including production', () => {
+  // The Host header is client-controlled (any peer can already claim
+  // localhost), so accepting the operator's own declared public name is not
+  // a weakening -- it must also hold for prod-mode tunnel deployments.
+  process.env.HERMES_HOST_LOCK = 'local';
+  process.env.PUBLIC_BASE_URL = 'https://forestry-anatomy-consoles-the.trycloudflare.com';
+  setNodeEnv('production');
+  try {
+    assert.equal(apiGet('forestry-anatomy-consoles-the.trycloudflare.com'), 401);
+    assert.equal(apiGet('other-tunnel.trycloudflare.com'), 403);
+    assert.equal(apiGet('localhost:3010'), 401);
+  } finally {
+    setNodeEnv(savedNodeEnv);
+  }
 });
