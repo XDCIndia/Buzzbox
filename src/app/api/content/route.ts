@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { getContentPostById, getContentPosts, markContentPublished, updateContentStatus } from '@/lib/queries';
+import { getContentPostById, getContentPosts, createBuzzContentDraft, markContentPublished, updateContentStatus } from '@/lib/queries';
 import { writebackContentStatus } from '@/lib/writeback';
 import { requireApiEditor, requireApiUser } from '@/lib/api-auth';
 import { requireUser } from '@/lib/auth';
@@ -50,6 +50,9 @@ export async function PATCH(req: NextRequest) {
     previousStatus: current.status,
     nextStatus: status,
     text: current.full_content || current.text_preview,
+    // Strict per-user isolation: the approver's OWN X account, or the
+    // explicitly shared X_ACCESS_TOKEN env sender. Never another user's account.
+    userId: actor.id === 0 ? null : actor.id,
   });
   if (publishResult.attempted && !publishResult.ok) {
     return NextResponse.json({ error: publishResult.error }, { status: publishResult.status });
@@ -68,7 +71,15 @@ export async function PATCH(req: NextRequest) {
     target: `content:${id}`,
     detail: {
       status: finalStatus,
-      ...(publishResult.attempted && publishResult.ok ? { x_post_id: publishResult.tweetId } : {}),
+      // Attribution: which X account actually posted (null when the shared
+      // env sender was used, or when the post was a de-duplicated replay).
+      ...(publishResult.attempted && publishResult.ok
+        ? {
+            x_post_id: publishResult.tweetId,
+            x_user_id: publishResult.xUserId ?? null,
+            x_username: publishResult.xUsername ?? null,
+          }
+        : {}),
     },
   });
 
@@ -89,4 +100,38 @@ export async function PATCH(req: NextRequest) {
     status: finalStatus,
     ...(publishResult.attempted && publishResult.ok ? { x_post_id: publishResult.tweetId } : {}),
   });
+}
+
+/**
+ * POST /api/content — create a manual content draft (no LLM/Buzz required).
+ * Uses the same createBuzzContentDraft() backend the Buzz flow uses, so the
+ * record enters the normal Draft -> Approval -> Publish pipeline with
+ * status 'draft'. Never publishes: publishing happens only through the
+ * existing PATCH approval transition.
+ */
+export async function POST(req: NextRequest) {
+  const auth = requireApiEditor(req as Request);
+  if (auth) return auth;
+  const actor = requireUser(req as Request);
+  const parsed = await parseAndValidate(
+    req,
+    z.object({
+      text: z.string().trim().min(1, 'Post text is required').max(5000, 'Post text is too long'),
+      platform: z.enum(['x', 'linkedin', 'blog']),
+    }),
+  );
+  if (!parsed.ok) return parsed.response;
+  const { text, platform } = parsed.data;
+
+  const draft = createBuzzContentDraft({ platform, content: text }) as { id: string; platform: string; status: string } | undefined;
+  if (!draft) {
+    return NextResponse.json({ error: 'Could not create the content draft' }, { status: 500 });
+  }
+  logAudit({
+    actor,
+    action: 'content.create_draft',
+    target: `content:${draft.id}`,
+    detail: { platform: draft.platform, status: draft.status },
+  });
+  return NextResponse.json({ ok: true, draft }, { status: 201 });
 }

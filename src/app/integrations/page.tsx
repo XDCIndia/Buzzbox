@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
 import { FileText, Mail } from 'lucide-react';
 import { useSmartPoll } from '@/hooks/use-smart-poll';
 import { PageHeader } from '@/components/ui/page-header';
@@ -38,6 +39,14 @@ interface HeliusStatus extends IntegrationCard {
   slot?: number | null;
 }
 
+interface XStatus {
+  connected: boolean;
+  username?: string;
+  name?: string | null;
+  configured?: boolean;
+  scopes?: string[];
+}
+
 function StatusPill({ ok }: { ok?: boolean }) {
   return (
     <span className={ok ? 'status-pill status-ok' : 'status-pill status-warn'}>
@@ -52,6 +61,39 @@ export default function IntegrationsPage() {
   const { data: mailchimp } = useSmartPoll<MailchimpStatus>(() => fetch('/api/integrations/mailchimp').then(r => r.json()), { interval: 60_000 });
   const { data: gmail } = useSmartPoll<GmailStatus>(() => fetch('/api/integrations/gmail').then(r => r.json()), { interval: 60_000 });
   const { data: helius } = useSmartPoll<HeliusStatus>(() => fetch('/api/integrations/helius').then(r => r.json()), { interval: 60_000 });
+  const { data: xStatus, refetch: refreshX } = useSmartPoll<XStatus>(() => fetch('/api/integrations/x').then(r => r.json()), { interval: 60_000 });
+  const [xNotice, setXNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [xBusy, setXBusy] = useState(false);
+
+  // Surface the OAuth callback outcome (?x=connected / ?x_error=...) once,
+  // then drop the query string so refreshes stay clean.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ok = params.get('x');
+    const err = params.get('x_error');
+    if (ok === 'connected') setXNotice({ kind: 'ok', text: 'X account connected.' });
+    else if (err) setXNotice({ kind: 'error', text: err });
+    else return;
+    params.delete('x');
+    params.delete('x_error');
+    const clean = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+    window.history.replaceState(null, '', clean);
+    refreshX();
+  }, [refreshX]);
+
+  const disconnectX = useCallback(async () => {
+    setXBusy(true);
+    try {
+      const res = await fetch('/api/integrations/x', { method: 'DELETE' });
+      if (!res.ok) throw new Error('Disconnect failed');
+      setXNotice({ kind: 'ok', text: 'X account disconnected.' });
+      refreshX();
+    } catch {
+      setXNotice({ kind: 'error', text: 'Could not disconnect X. Please try again.' });
+    } finally {
+      setXBusy(false);
+    }
+  }, [refreshX]);
 
   return (
     <div className="space-y-6 animate-in">
@@ -125,6 +167,44 @@ export default function IntegrationsPage() {
           </div>
           {helius?.error && <div className="text-[11px] text-destructive">{helius.error}</div>}
           <div className="text-[10px] text-muted-foreground">Health: {helius?.health ?? '—'}</div>
+        </div>
+
+        <div className="panel p-4 space-y-2">
+          <div className="text-xs text-muted-foreground">X (Twitter)</div>
+          {xNotice && (
+            <div className={`text-[11px] ${xNotice.kind === 'ok' ? 'text-emerald-500' : 'text-destructive'}`}>{xNotice.text}</div>
+          )}
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium">{xStatus?.connected ? 'Connected' : 'Not connected'}</div>
+              <div className="text-[11px] text-muted-foreground">
+                {xStatus?.connected ? `X account: @${xStatus.username}` : 'Post, analytics & mentions need a linked X account'}
+              </div>
+            </div>
+            <StatusPill ok={xStatus?.connected} />
+          </div>
+          {xStatus?.connected ? (
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={disconnectX}
+                disabled={xBusy}
+                className="btn btn-sm btn-ghost"
+              >
+                {xBusy ? 'Disconnecting…' : 'Disconnect'}
+              </button>
+            </div>
+          ) : xStatus && !xStatus.configured ? (
+            <div className="text-[11px] text-muted-foreground pt-1">
+              Connect X is not configured. Set X_CLIENT_ID, X_CLIENT_SECRET, and X_REDIRECT_URI to enable it.
+            </div>
+          ) : (
+            <div className="pt-1">
+              <a href="/api/auth/x/start?from=/integrations" className="btn btn-primary btn-sm">
+                Connect X
+              </a>
+            </div>
+          )}
         </div>
       </div>
 
