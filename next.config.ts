@@ -1,12 +1,26 @@
 import path from 'path';
 import type { NextConfig } from 'next';
 
+// Optional extra origins for the Next.js dev server's /_next/* + HMR
+// cross-origin protection (comma-separated, no scheme). This is NOT the
+// gate for page/API routes -- that is HERMES_HOST_LOCK in src/proxy.ts.
+// Leave HERMES_DEV_ORIGINS unset unless the dev server logs
+// "Blocked cross-origin request": unset keeps Next's default warn-only
+// behavior, while setting it switches that protection to block mode for
+// anything not listed. Never put a rotating Quick Tunnel hostname here
+// permanently; set it per tunnel session if needed at all.
+const devOrigins = (process.env.HERMES_DEV_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, ''))
+  .filter(Boolean);
+
 const nextConfig: NextConfig = {
   output: 'standalone',
   serverExternalPackages: ['better-sqlite3'],
   // Prevent Next.js from inferring a parent workspace root from monorepo traversal, which
   // changes the standalone output path layout and breaks systemd start paths.
   outputFileTracingRoot: path.join(__dirname),
+  ...(devOrigins.length > 0 ? { allowedDevOrigins: devOrigins } : {}),
   async redirects() {
     return [
       {

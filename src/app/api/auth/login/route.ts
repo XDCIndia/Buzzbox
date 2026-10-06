@@ -79,7 +79,14 @@ export async function POST(request: Request) {
   response.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure,
-    sameSite: 'strict',
+    // Lax (not Strict): the session must ride along on the cross-site
+    // top-level GET that returns from an external OAuth provider (e.g. X
+    // authorize -> /api/auth/x/callback). Strict withholds the cookie there,
+    // so the callback sees no session and the flow loops back to /login.
+    // CSRF posture is unchanged: browsers still withhold Lax cookies on all
+    // cross-site unsafe requests, and mutating API routes keep their own
+    // Origin/Referer check in src/proxy.ts.
+    sameSite: 'lax',
     maxAge: SESSION_MAX_AGE,
     path: '/',
   });
