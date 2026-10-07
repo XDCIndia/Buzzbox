@@ -287,6 +287,19 @@ test("TEST 6: invalid_grant invalidates only the publisher's connection", async 
   assert.equal(conn.getXConnectionByUserId(bobId), null);
   assert.deepEqual(snapshot(aliceId), aliceBefore);
   assert.ok(conn.getXConnectionByUserId(aliceId), "A's connection must survive B's revocation");
+
+  // The silent cleanup must leave an audit trail (identity only, no tokens).
+  const audits = dbm.getDb().prepare(
+    "SELECT target, detail FROM audit_log WHERE action = 'x.disconnect' ORDER BY id DESC",
+  ).all() as { target: string; detail: string }[];
+  const entry = audits.find((a) => a.target === 'x:xuid-bob');
+  assert.ok(entry, 'expected an x.disconnect audit entry for the cleanup');
+  const detail = JSON.parse(entry.detail) as Record<string, unknown>;
+  assert.equal(detail.reason, 'invalid_grant_cleanup');
+  assert.equal(detail.x_username, 'bob_x');
+  const detailJson = entry.detail;
+  assert.ok(!detailJson.includes('rt-bob-dead'), 'audit must never contain refresh tokens');
+  assert.ok(!detailJson.includes('oauth-token-bob-stale'), 'audit must never contain access tokens');
 });
 
 // ─── TEST 7: same X account cannot be taken by a second user ───
@@ -378,4 +391,39 @@ test("TEST 8: OAuth started by A cannot complete as B after a session switch", a
   assert.ok(!backTo.includes('x=connected'), 'must not report success');
   const count = (dbm.getDb().prepare('SELECT COUNT(*) AS c FROM x_connections').get() as { c: number }).c;
   assert.equal(count, 0, 'no connection may be created for either user');
+});
+
+// ─── TEST 9: API disconnect audits identity without tokens ───
+
+test('TEST 9: DELETE /api/integrations/x removes the row and audits it', async () => {
+  clearConnections();
+  resetMocks();
+  conn.upsertXConnection(aliceId, {
+    xUserId: 'xuid-alice',
+    username: 'alice_x',
+    accessToken: 'oauth-token-alice',
+    refreshToken: 'rt-alice',
+    expiresIn: 7200,
+  });
+  const delMod = await import('../app/api/integrations/x/route');
+  const sess = authm.createSession(aliceId);
+  const res = await delMod.DELETE(
+    new Request('http://localhost/api/integrations/x', {
+      method: 'DELETE',
+      headers: { cookie: `hermes-session=${sess}` },
+    }),
+  );
+  assert.equal(res.status, 200);
+  assert.equal(conn.getXConnectionByUserId(aliceId), null);
+
+  const audits = dbm.getDb().prepare(
+    "SELECT target, detail FROM audit_log WHERE action = 'x.disconnect' ORDER BY id DESC",
+  ).all() as { target: string; detail: string }[];
+  const entry = audits.find((a) => a.target === 'x:xuid-alice');
+  assert.ok(entry, 'expected an x.disconnect audit entry for the manual disconnect');
+  const detail = JSON.parse(entry.detail) as Record<string, unknown>;
+  assert.equal(detail.reason, 'user_disconnect');
+  const detailJson = entry.detail;
+  assert.ok(!detailJson.includes('oauth-token-alice'), 'audit must never contain access tokens');
+  assert.ok(!detailJson.includes('rt-alice'), 'audit must never contain refresh tokens');
 });

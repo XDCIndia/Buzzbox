@@ -1,5 +1,6 @@
 import { getDb } from './db';
 import { refreshXAccessToken } from './x-oauth';
+import { logAudit } from './audit';
 
 // Persistent storage for per-user X OAuth connections.
 //
@@ -200,10 +201,25 @@ export async function getValidAccessTokenForConnection(
     return { accessToken: refreshed.access_token, username: row.x_username, xUserId: row.x_user_id };
   } catch (err) {
     // Revoked authorization or otherwise dead refresh token: drop the
-    // connection so callers surface "reconnect" instead of 502s.
+    // connection so callers surface "reconnect" instead of 502s. Audit it
+    // (identity only, never tokens) so a vanished connection is explainable.
     if ((err as Error & { code?: string }).code === 'invalid_grant') {
       ensureXConnectionsTable();
       getDb().prepare('DELETE FROM x_connections WHERE id = ?').run(row.id);
+      const owner = getDb().prepare('SELECT username FROM users WHERE id = ?').get(row.user_id) as
+        | { username?: string }
+        | undefined;
+      logAudit({
+        actor: null,
+        action: 'x.disconnect',
+        target: `x:${row.x_user_id}`,
+        detail: {
+          x_username: row.x_username,
+          buzzbox_user_id: row.user_id,
+          buzzbox_username: owner?.username ?? null,
+          reason: 'invalid_grant_cleanup',
+        },
+      });
       return null;
     }
     // Transient refresh failure (network, 5xx): hand out the stale token so
