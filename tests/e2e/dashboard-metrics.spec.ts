@@ -30,16 +30,9 @@ function stubOverview(page: import('@playwright/test').Page, metrics: object[] =
   });
 }
 
-async function login(page: import('@playwright/test').Page) {
-  const res = await page.request.post('/api/auth/login', {
-    data: { username: 'admin_e2e', password: 'super-secure-pass' },
-  });
-  expect(res.status()).toBe(200);
-}
-
 test.describe('dashboard metric bar', () => {
   test('each KPI label renders exactly once (#117)', async ({ page }) => {
-    await login(page);
+
     await stubOverview(page);
     await page.goto('/dashboard');
 
@@ -49,7 +42,7 @@ test.describe('dashboard metric bar', () => {
   });
 
   test('Pipeline card shows no foreign delta/sparkline (#139)', async ({ page }) => {
-    await login(page);
+
     const metrics = Array.from({ length: 14 }, (_, i) => ({
       date: `2026-09-${String(i + 1).padStart(2, '0')}`,
       x_posts: 0,

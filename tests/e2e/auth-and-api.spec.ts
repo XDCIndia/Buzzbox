@@ -1,49 +1,28 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test.describe('auth and api gate', () => {
-  const loginPayload = {
-    username: 'admin_e2e',
-    password: 'super-secure-pass',
-  };
-
-  // Reuse one session across all tests: each Playwright test gets a fresh
-  // request context, and logging in per test would exhaust the login rate
-  // limiter (10 attempts/min/IP) now that the suite has 17+ tests.
-  let cachedCookie: string | null = null;
-
-  async function getAuthHeaders(request: APIRequestContext) {
-    if (cachedCookie) return { cookie: cachedCookie };
-    const login = await request.post('/api/auth/login', {
-      data: loginPayload,
-    });
-    expect(login.status()).toBe(200);
-    const sessionCookie = login.headers()['set-cookie'];
-    expect(sessionCookie).toContain('hermes-session=');
-    cachedCookie = sessionCookie;
-    return { cookie: sessionCookie };
-  }
-
-  test('blocks protected api without authentication', async ({ request }) => {
-    const res = await request.get('/api/overview');
+  // Authenticated via the suite-wide storage state (global-setup.ts); no
+  // per-test login, keeping the suite under the login rate limiter (#201).
+  test('blocks protected api without authentication', async ({ playwright, baseURL }) => {
+    // Fresh context with explicitly empty storage: the suite-wide session
+    // must not leak in here (newContext inherits config storageState).
+    const fresh = await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
+    const res = await fresh.get('/api/overview');
     expect(res.status()).toBe(401);
     const body = await res.json();
     expect(body).toEqual({ error: 'Unauthorized' });
+    await fresh.dispose();
   });
 
   test('allows protected api after login', async ({ request }) => {
-    const headers = await getAuthHeaders(request);
-
-    const res = await request.get('/api/overview', {
-      headers,
-    });
+    const res = await request.get('/api/overview');
     expect(res.status()).toBe(200);
     const payload = await res.json();
     expect(payload).toHaveProperty('stats');
   });
 
   test('crm api returns leads and summary after login', async ({ request }) => {
-    const headers = await getAuthHeaders(request);
-    const res = await request.get('/api/crm', { headers });
+    const res = await request.get('/api/crm');
     expect(res.status()).toBe(200);
     const payload = await res.json();
     expect(Array.isArray(payload.leads)).toBeTruthy();
@@ -52,8 +31,7 @@ test.describe('auth and api gate', () => {
   });
 
   test('outreach api returns funnel payload after login', async ({ request }) => {
-    const headers = await getAuthHeaders(request);
-    const res = await request.get('/api/outreach', { headers });
+    const res = await request.get('/api/outreach');
     expect(res.status()).toBe(200);
     const payload = await res.json();
     expect(Array.isArray(payload.leads)).toBeTruthy();
@@ -62,16 +40,14 @@ test.describe('auth and api gate', () => {
   });
 
   test('content api returns post list after login', async ({ request }) => {
-    const headers = await getAuthHeaders(request);
-    const res = await request.get('/api/content', { headers });
+    const res = await request.get('/api/content');
     expect(res.status()).toBe(200);
     const payload = await res.json();
     expect(Array.isArray(payload)).toBeTruthy();
   });
 
   test('analytics api returns provider payload after login', async ({ request }) => {
-    const headers = await getAuthHeaders(request);
-    const res = await request.get('/api/analytics?days=30', { headers });
+    const res = await request.get('/api/analytics?days=30');
     expect(res.status()).toBe(200);
     const payload = await res.json();
     expect(payload.days).toBe(30);
@@ -81,8 +57,7 @@ test.describe('auth and api gate', () => {
   });
 
   test('cron api returns jobs payload after login', async ({ request }) => {
-    const headers = await getAuthHeaders(request);
-    const res = await request.get('/api/cron', { headers });
+    const res = await request.get('/api/cron');
     expect(res.status()).toBe(200);
     const payload = await res.json();
     expect(Array.isArray(payload.jobs)).toBeTruthy();
@@ -90,8 +65,7 @@ test.describe('auth and api gate', () => {
   });
 
   test('settings api returns db summary after login', async ({ request }) => {
-    const headers = await getAuthHeaders(request);
-    const res = await request.get('/api/settings', { headers });
+    const res = await request.get('/api/settings');
     expect(res.status()).toBe(200);
     const payload = await res.json();
     expect(Array.isArray(payload.tables)).toBeTruthy();
@@ -99,8 +73,7 @@ test.describe('auth and api gate', () => {
   });
 
   test('cycle-time benchmark api returns before/after deltas after login', async ({ request }) => {
-    const headers = await getAuthHeaders(request);
-    const res = await request.get('/api/benchmarks/cycle-time?days=30', { headers });
+    const res = await request.get('/api/benchmarks/cycle-time?days=30');
     expect(res.status()).toBe(200);
     const payload = await res.json();
     expect(payload.metric).toBe('lead_to_approved_campaign_cycle_time_hours');

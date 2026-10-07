@@ -6,15 +6,8 @@ import { expect, test } from '@playwright/test';
  * field /api/settings never returns), so "Connect the X account" stayed
  * incomplete forever even with @buzzboxtest connected.
  *
- * Single login for the whole spec: the e2e login endpoint is rate-limited
- * (10/min), so both phases share one session and reload between stubs. */
-
-async function login(page: import('@playwright/test').Page) {
-  const res = await page.request.post('/api/auth/login', {
-    data: { username: 'admin_e2e', password: 'super-secure-pass' },
-  });
-  expect(res.status()).toBe(200);
-}
+ * Authenticated via the suite-wide storage state (global-setup.ts); no
+ * per-test login, keeping the suite under the login rate limiter (#201). */
 
 // The checklist only renders on an empty workspace (all overview stats
 // zero); the shared e2e database accumulates rows from other specs, so pin
@@ -44,7 +37,6 @@ function stubXStatus(page: import('@playwright/test').Page, body: object) {
 
 test.describe('dashboard setup checklist X step', () => {
   test('X step follows /api/integrations/x (OAuth, not env)', async ({ page }) => {
-    await login(page);
     await stubEmptyOverview(page);
 
     // Disconnected (as Integrations reports it): hint visible = incomplete.
