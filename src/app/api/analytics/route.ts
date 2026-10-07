@@ -234,6 +234,30 @@ export async function GET(req: NextRequest) {
       // Best-effort enrichment only — env config alone still works.
     }
   }
+  if (!x.configured) {
+    // OAuth-only: the viewer may have a linked X account (posting works)
+    // without the app-level bearer token analytics reads need. Surface it
+    // (read-only row lookup, no refresh side effects) so the UI can tell
+    // "account linked" apart from "nothing connected" (#206).
+    try {
+      const { getUserFromRequest } = await import("@/lib/auth");
+      const viewer = getUserFromRequest(req as Request);
+      if (viewer && viewer.id !== 0) {
+        const { getXConnectionByUserId } = await import("@/lib/x-connections");
+        const row = getXConnectionByUserId(viewer.id);
+        if (row) {
+          x = {
+            provider: "x",
+            configured: false,
+            oauthConnected: true,
+            oauthUsername: row.x_username,
+          };
+        }
+      }
+    } catch {
+      // Read-only enrichment only — env config alone still works.
+    }
+  }
   if (xBearer && xUsername) {
     // Same user-context credential posting uses (maybePublishToX); when set,
     // the X provider can also read non_public_metrics (impressions).
