@@ -103,6 +103,15 @@ export function insertBrandMention(m: Omit<BrandMention, 'created_at'>): boolean
 export function getBrandMentionStats(brand_id: string, filters?: { source_type?: string; excludeSeed?: boolean }): BrandMentionStats {
   const mentions = getBrandMentions({ brand_id, source_type: filters?.source_type, excludeSeed: filters?.excludeSeed, sort: 'newest' });
 
+  // Freshness of the underlying sync ingest (same scope as the stats above),
+  // so the UI can show stale data as stale instead of implying it is live.
+  let maxSql = 'SELECT MAX(created_at) AS m FROM brand_mentions WHERE brand_id = ?';
+  const maxParams: unknown[] = [brand_id];
+  if (filters?.source_type) { maxSql += ' AND source_type = ?'; maxParams.push(filters.source_type); }
+  if (filters?.excludeSeed) { maxSql += ` ${seedFilter('brand_mentions')}`; }
+  const maxRow = getDb().prepare(maxSql).get(...maxParams) as { m?: string | null } | undefined;
+  const lastSyncAt = maxRow?.m ?? null;
+
   const positive = mentions.filter(m => m.sentiment === 'positive').length;
   const negative = mentions.filter(m => m.sentiment === 'negative').length;
   const neutral = mentions.filter(m => m.sentiment === 'neutral' || !m.sentiment).length;
@@ -148,6 +157,7 @@ export function getBrandMentionStats(brand_id: string, filters?: { source_type?:
     highImpactCount: mentions.filter(m => m.is_high_impact).length,
     totalArticles: mentions.filter(m => m.source_type === 'news').length,
     topMention: mentions.slice().sort((a, b) => (b.likes + b.comments) - (a.likes + a.comments))[0] || null,
+    lastSyncAt,
   };
 }
 
