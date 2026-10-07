@@ -22,7 +22,7 @@ const UPSTREAM_HTML = `<!DOCTYPE html><html><body><h1>cloudflare</h1>...big erro
 
 // Mutable so each test can pick the upstream failure mode; askDicompute
 // always POSTs to the fixed /chat/completions path.
-let mode: 'html-502' | 'plain-521' | 'ok-capture' = 'html-502';
+let mode: 'html-502' | 'plain-521' | 'ok-capture' | 'forbidden-403' = 'html-502';
 let lastRequestBody: unknown = null;
 
 const server = http.createServer((req, res) => {
@@ -38,6 +38,11 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ choices: [{ message: { content: '{"action":"respond","message":"hi"}' } }] }));
     });
+    return;
+  }
+  if (mode === 'forbidden-403') {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: { message: 'invalid key', type: 'auth' } }));
     return;
   }
   if (mode === 'html-502') {
@@ -98,8 +103,7 @@ test('unknown upstream statuses map to a generic HTTP status message', async () 
   );
 });
 
-test('outgoing completions request caps max_tokens for small context windows', async () => {
-  mode = 'ok-capture';
+test('outgoing completions request caps max_tokens for small context windows', async () => {  mode = 'ok-capture';
   lastRequestBody = null;
   const out = await dicompute.askDicompute(messages);
   assert.equal(out.content, '{"action":"respond","message":"hi"}');
@@ -108,4 +112,21 @@ test('outgoing completions request caps max_tokens for small context windows', a
   assert.equal(body.max_tokens, 256);
   assert.equal(body.stream, false);
   assert.ok(typeof body.model === 'string' && body.model.length > 0);
+});
+
+test('provider 403 surfaces config guidance, not retry advice (#205)', async () => {
+  mode = 'forbidden-403';
+  await assert.rejects(
+    () => dicompute.askDicompute(messages),
+    (err: unknown) => {
+      assert.ok(err instanceof dicompute.UpstreamProviderError);
+      assert.equal(err.status, 403);
+      assert.match(err.message, /DICOMPUTE_API_KEY/);
+      assert.match(err.message, /DICOMPUTE_BASE_URL/);
+      assert.ok(!err.message.includes('try again later'), 'config states must not advise retry');
+      assert.ok(!err.message.includes('invalid key'), 'provider body must not leak');
+      assert.ok(err.message.length < 200, 'message must stay concise');
+      return true;
+    },
+  );
 });

@@ -50,13 +50,19 @@ const HTTP_STATUS_REASONS: Record<number, string> = {
 /** Thrown when the upstream LLM provider answers non-2xx. The raw response
  * body (which can be a large Cloudflare/provider HTML error page) is logged
  * server-side only -- the exposed message is a concise, status-based summary
- * so the UI never renders provider HTML (#51). */
+ * so the UI never renders provider HTML (#51).
+ *
+ * 401/403 are configuration states (bad, revoked, or endpoint-mismatched
+ * key), not transient outages, so they carry actionable guidance instead of
+ * retry advice (#205). */
 export class UpstreamProviderError extends Error {
   readonly status: number;
   constructor(status: number) {
     const reason = HTTP_STATUS_REASONS[status] ?? `HTTP ${status}`;
     super(
-      `Buzz AI is temporarily unavailable. The AI provider returned ${status} ${reason}. Please try again later.`,
+      status === 401 || status === 403
+        ? `Buzz AI rejected the request (${status} ${reason}). Check DICOMPUTE_API_KEY and its DICOMPUTE_BASE_URL pairing.`
+        : `Buzz AI is temporarily unavailable. The AI provider returned ${status} ${reason}. Please try again later.`,
     );
     this.name = 'UpstreamProviderError';
     this.status = status;
