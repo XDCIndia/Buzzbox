@@ -485,6 +485,12 @@ export function createBuzzContentDraft({
 
   const now = new Date().toISOString();
 
+  // format must stay inside the ContentFormat union ('post' was never a
+  // member): one-shot social drafts are short posts, longer-form targets get
+  // text_post (#204). Legacy rows already stored as 'post' are harmless --
+  // nothing filters by format -- so no backfill is needed.
+  const format = canonicalPlatform === 'x' ? 'short_post' : 'text_post';
+
   db.prepare(`
     INSERT INTO content_posts (
       id,
@@ -500,7 +506,7 @@ export function createBuzzContentDraft({
   `).run(
     id,
     canonicalPlatform,
-    'post',
+    format,
     1,
     content.slice(0, 160),
     content,

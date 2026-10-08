@@ -96,3 +96,12 @@ test("createBuzzContentDraft normalizes legacy 'twitter' to publishable 'x' (#15
   const normal = createBuzzContentDraft({ platform: 'linkedin', content: 'hello li' }) as { platform: string };
   assert.equal(normal.platform, 'linkedin');
 });
+
+test('createBuzzContentDraft writes a ContentFormat union member (#204)', () => {
+  const x = createBuzzContentDraft({ platform: 'x', content: 'hello x' }) as { format: string };
+  assert.equal(x.format, 'short_post');
+  const li = createBuzzContentDraft({ platform: 'linkedin', content: 'hello li' }) as { format: string };
+  assert.equal(li.format, 'text_post');
+  const blog = createBuzzContentDraft({ platform: 'blog', content: 'hello blog' }) as { format: string };
+  assert.equal(blog.format, 'text_post');
+});
