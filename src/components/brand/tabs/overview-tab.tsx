@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AtSign, Users2, ThumbsUp, HeartHandshake, MessageSquare } from 'lucide-react';
+import { timeAgo } from '@/lib/utils';
 import { StatTile } from '@/components/brand/stat-tile';
 import { BarBreakdown } from '@/components/brand/bar-breakdown';
 import { TrendChart } from '@/components/ui/trend-chart';
@@ -99,6 +100,13 @@ export function OverviewTab({ brandId, realOnly }: { brandId: string; realOnly: 
 
   return (
     <div className="space-y-4">
+      {stats.mentions > 0 && (
+        <div className="text-[11px] text-muted-foreground">
+          {stats.lastSyncAt
+            ? `Mention data synced ${timeAgo(stats.lastSyncAt)} — connecting a different account does not refresh history.`
+            : 'Mention sync time unavailable.'}
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile label="Mentions" value={stats.mentions} icon={AtSign} />
         <StatTile label="Reach" value={stats.reach} icon={Users2} color="var(--info)" />

@@ -462,6 +462,8 @@ export interface BrandMentionStats {
   highImpactCount: number;
   totalArticles: number;
   topMention: BrandMention | null;
+  /** Newest brand_mentions.created_at in scope (i.e. last sync ingest), null when empty. */
+  lastSyncAt: string | null;
 }
 
 export interface BrandCreator {

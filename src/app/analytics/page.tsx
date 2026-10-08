@@ -122,6 +122,10 @@ interface AnalyticsPayload {
     series?: { date: string; posts: number; likes: number; replies: number; reposts: number; quotes: number; impressions?: number | null }[];
     error?: string;
     health?: ProviderHealth;
+    /** Set when the viewer has a linked X OAuth account but the app-level
+     * bearer token analytics reads need is missing (#206). */
+    oauthConnected?: boolean;
+    oauthUsername?: string;
   };
   linkedin: {
     provider: "linkedin";
@@ -680,6 +684,16 @@ function XPanel({ x, days }: { x: AnalyticsPayload["x"]; days: number }) {
               </div>
             )}
           </>
+        ) : x.oauthConnected ? (
+          <ProviderConfigCard
+            providerName="X (Twitter)"
+            title={`X account linked${x.oauthUsername ? ` (@${x.oauthUsername})` : ''}`}
+            description="Posting works from your linked account. Add X_BEARER_TOKEN (and X_USERNAME) to also load follower counts and impression analytics."
+            configureHref="/integrations"
+            configureLabel="Configure Integration"
+            error={x.error}
+            icon={X}
+          />
         ) : (
           <ProviderConfigCard
             providerName="X (Twitter)"
