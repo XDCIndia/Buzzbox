@@ -11,18 +11,10 @@ import { expect, test } from '@playwright/test';
  * (pure container space — the old code's silent-failure geometry) and asserts
  * the move toast plus server-side persistence. */
 
-async function login(page: import('@playwright/test').Page) {
-  const res = await page.request.post('/api/auth/login', {
-    data: { username: 'admin_e2e', password: 'super-secure-pass' },
-  });
-  expect(res.status()).toBe(200);
-}
-
 test.describe('kanban clipped drop', () => {
   test('drop into container-space gap moves the lead with feedback (#173)', async ({ page }) => {
     // Timing-sensitive native drag: triple the default 30s timeout.
     test.slow();
-    await login(page);
 
     // #183: over-length creates are rejected with a field error, never sliced.
     const overlong = await page.request.post('/api/leads', {

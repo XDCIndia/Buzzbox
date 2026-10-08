@@ -3,10 +3,17 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
+  // Cap parallel browsers: context/page setup times out when too many
+  // Chromium instances storm one machine (#201).
+  workers: 2,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
+  // Suite-wide session (tests/e2e/global-setup.ts): every page and request
+  // fixture starts authenticated, so specs must not log in per test (#201).
+  globalSetup: './tests/e2e/global-setup.ts',
   use: {
     baseURL: 'http://127.0.0.1:3010',
+    storageState: 'test-results/.auth/state.json',
     trace: 'on-first-retry',
   },
   webServer: {

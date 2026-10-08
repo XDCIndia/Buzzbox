@@ -13,11 +13,6 @@ test.describe('command palette', () => {
     });
     expect(created.status()).toBe(200);
 
-    const login = await page.request.post('/api/auth/login', {
-      data: { username: 'admin_e2e', password: 'super-secure-pass' },
-    });
-    expect(login.status()).toBe(200);
-
     await page.goto('/dashboard');
     // Open via the header button (not a blind Cmd+K): the click waits for
     // hydration, so the palette listener is guaranteed to be attached.

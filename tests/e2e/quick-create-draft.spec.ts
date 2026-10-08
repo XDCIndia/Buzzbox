@@ -4,16 +4,8 @@ import { expect, test } from '@playwright/test';
  * composer (/content/new) — no AI/Buzz involved. Saving stores a draft that
  * appears in the Content queue without publishing. */
 
-async function login(page: import('@playwright/test').Page) {
-  const res = await page.request.post('/api/auth/login', {
-    data: { username: 'admin_e2e', password: 'super-secure-pass' },
-  });
-  expect(res.status()).toBe(200);
-}
-
 test.describe('manual content composer', () => {
   test('New content draft opens the composer and saves an X draft to the queue', async ({ page }) => {
-    await login(page);
     await page.goto('/content');
     await expect(page.getByText('Content pipeline')).toBeVisible();
 
@@ -35,14 +27,12 @@ test.describe('manual content composer', () => {
   });
 
   test('empty composer cannot be saved', async ({ page }) => {
-    await login(page);
     await page.goto('/content/new');
     await expect(page.getByPlaceholder('Write your post…')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save Draft', exact: true })).toBeDisabled();
   });
 
   test('draft can be submitted for approval and appears in Approvals', async ({ page }) => {
-    await login(page);
     await page.goto('/content/new');
     const unique = `E2E approval draft ${Date.now()}`;
     await page.getByPlaceholder('Write your post…').fill(unique);

@@ -5,19 +5,10 @@ import { expect, test } from '@playwright/test';
  * the hook) only dismissed on outside mousedown — Escape did nothing. All
  * four now share useDismiss (Escape + outside pointer-down).
  *
- * One login for both viewports: the suite shares a 10-attempts/min login
- * budget (see auth-and-api.spec.ts), so page specs must not log in per test. */
-
-async function login(page: import('@playwright/test').Page) {
-  const res = await page.request.post('/api/auth/login', {
-    data: { username: 'admin_e2e', password: 'super-secure-pass' },
-  });
-  expect(res.status()).toBe(200);
-}
+ * Authenticated via the suite-wide storage state (global-setup.ts). */
 
 test.describe('escape dismissal', () => {
   test('mobile sheet and quick-create menu close on Escape (#175, #176)', async ({ page }) => {
-    await login(page);
 
     // #175: mobile nav sheet at a phone viewport.
     await page.setViewportSize({ width: 375, height: 720 });

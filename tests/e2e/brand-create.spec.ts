@@ -9,13 +9,6 @@ import { expect, test } from '@playwright/test';
 const BRAND_ID = '97cdb115-2c90-42a8-b904-d14abce1d682';
 const ORIGIN = { origin: 'http://127.0.0.1:3010' };
 
-async function login(page: import('@playwright/test').Page) {
-  const res = await page.request.post('/api/auth/login', {
-    data: { username: 'admin_e2e', password: 'super-secure-pass' },
-  });
-  expect(res.status()).toBe(200);
-}
-
 async function apiList(page: import('@playwright/test').Page, kind: 'alerts' | 'campaigns') {
   const res = await page.request.get(`/api/brand/${BRAND_ID}/${kind}`, {});
   expect(res.status()).toBe(200);
@@ -30,10 +23,10 @@ async function apiDigestList(page: import('@playwright/test').Page) {
 
 test.describe('brand create validation', () => {
   test('empty alert submit toasts instead of silently doing nothing (#174)', async ({ page }) => {
-    // Long multi-flow test (alerts + digests share one login for the suite
-    // budget): triple the default 30s timeout.
+    // Long multi-flow test: triple the default 30s timeout.
+    // (Authenticated via suite storage state, #201.)
     test.slow();
-    await login(page);
+
     const before = await apiList(page, 'alerts');
 
     await page.goto(`/brand/${BRAND_ID}/create/alerts`);
@@ -102,7 +95,7 @@ test.describe('brand create validation', () => {
     await expect(page.getByText(alertName)).toBeHidden({ timeout: 10_000 });
     expect(await apiList(page, 'alerts').then((l) => l.some((a) => a.name === alertName))).toBe(false);
 
-    // #180: digest flows share this login (suite login budget). Start clean.
+    // #180: Start clean.
     for (const d of await apiDigestList(page)) {
       await page.request.delete(`/api/brand/${BRAND_ID}/digests/${d.id}`, { headers: ORIGIN });
     }
@@ -132,7 +125,7 @@ test.describe('brand create validation', () => {
   });
 
   test('empty campaign submit toasts instead of silently doing nothing (#174)', async ({ page }) => {
-    await login(page);
+
     const before = await apiList(page, 'campaigns');
 
     await page.goto(`/brand/${BRAND_ID}/create/campaigns`);
@@ -211,7 +204,7 @@ test.describe('brand create validation', () => {
     await page.unroute('**/api/brand/*/mentions/*');
     await page.unroute('**/api/brand/*/mentions?*');
 
-    // #182: competitor add/delete flows share this login (suite login budget).
+    // #182: competitor add/delete flows.
     const apiCompetitors = async () => {
       const res = await page.request.get(`/api/brand/${BRAND_ID}/competitors`, {});
       expect(res.status()).toBe(200);
