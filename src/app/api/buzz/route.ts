@@ -6,6 +6,7 @@ import { getUserFromRequest } from '@/lib/auth';
 import { getClientIp, rateLimit } from '@/lib/rate-limit';
 import { getOverviewStats, getAlerts, getPendingApprovals, getLeadFunnel, getDailyMetrics, createBuzzContentDraft } from '@/lib/queries';
 import { computeSocialAnalytics } from '@/lib/analytics';
+import { compactApprovalsForPrompt } from '@/lib/prompt-budget';
 import { parseAndValidate } from '@/lib/api-validate';
 import { z } from 'zod';
 
@@ -193,6 +194,9 @@ export async function POST(request: NextRequest) {
           If there are no pending approvals, clearly say:
           "There are currently no pending approvals."
 
+          Only the first items are shown when there are many; always report
+          the total counts, never infer totals from the visible items.
+
           Do not invent information.
           Only use the supplied data.
           `,
@@ -202,7 +206,7 @@ export async function POST(request: NextRequest) {
           content: `
           Pending Buzzbox approvals:
 
-    ${JSON.stringify(approvals, null, 2)}
+    ${compactApprovalsForPrompt(approvals)}
     `,
         },
       ]);
