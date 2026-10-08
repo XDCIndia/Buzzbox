@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
+import { logAudit } from '@/lib/audit';
 import {
   deleteXConnectionByUserId,
   getXConnectionByUserId,
@@ -34,6 +35,18 @@ export async function DELETE(request: Request) {
   if (user.role !== 'admin' && user.role !== 'editor') {
     return NextResponse.json({ error: 'Editor access required' }, { status: 403 });
   }
-  if (user.id !== 0) deleteXConnectionByUserId(user.id);
+  if (user.id !== 0) {
+    // Capture identity before deletion for the audit trail (tokens never logged).
+    const row = getXConnectionByUserId(user.id);
+    deleteXConnectionByUserId(user.id);
+    if (row) {
+      logAudit({
+        actor: user,
+        action: 'x.disconnect',
+        target: `x:${row.x_user_id}`,
+        detail: { x_username: row.x_username, reason: 'user_disconnect' },
+      });
+    }
+  }
   return NextResponse.json({ ok: true, connected: false });
 }
