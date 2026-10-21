@@ -60,6 +60,8 @@ test('POST /api/buzz returns 412 with a stable body when DICOMPUTE_API_KEY is un
   const body = await res.json();
   assert.equal(body.ok, false);
   assert.match(String(body.error), /DICOMPUTE_API_KEY is not configured/);
+  // A config state is not transient: the chat must NOT offer a retry (#225).
+  assert.equal(body.retryable, false);
 });
 
 test('POST /api/buzz rejects oversized messages with 400 (#132)', async () => {

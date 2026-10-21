@@ -7,6 +7,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 ## [Unreleased] - 2026-09-23
 
 ### Added
+- Buzz can fall back to a local Ollama server when DiCompute fails transiently: with `OLLAMA_BASE_URL` (and optional `OLLAMA_MODEL`) set, the same request is served locally after the primary's retries are exhausted (#225). Connector behaviour is env-driven: `DICOMPUTE_MAX_ATTEMPTS`, `DICOMPUTE_RETRY_BACKOFF_MS`, `DICOMPUTE_TIMEOUT_MS`, `DICOMPUTE_TOTAL_TIMEOUT_MS`, `DICOMPUTE_CONTEXT_WINDOW`.
 - X OAuth 2.0 "Connect X" (Authorization Code + PKCE): per-user `x_connections` storage (schema v5) with token refresh, user-bound state cookie, and a token-free `/api/integrations/x` status endpoint surfaced on the Integrations page.
 - Manual content composer (`/content/new`) and `POST /api/content`: drafts enter the normal Draft -> Approval -> Publish pipeline without any LLM provider; draft rows gain Submit for Approval (`draft` -> `pending_approval`, never publishes directly).
 - Dashboard setup checklist reads the authoritative per-user X connection status instead of unset env/nonexistent settings fields.
@@ -32,6 +33,8 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - X posting/analytics resolve the acting user's own OAuth connection, then the shared `X_ACCESS_TOKEN` env sender, then 412 -- never another user's account; revoked refresh tokens invalidate only their own connection; a second user connecting the same X account gets a clear conflict error.
 - `HERMES_HOST_LOCK=local` also accepts the operator-declared `PUBLIC_BASE_URL` host for tunnel development; session cookie is `SameSite=Lax` so cross-site OAuth return navigations carry the session.
 - Dicompute requests cap `max_tokens` (default 256, `DICOMPUTE_MAX_TOKENS` override) and the Buzz decision prompt is compacted ~3868 to ~1620 chars so prompt+output fits small context windows.
+- Buzz rides out the provider's intermittent Cloudflare 502s (#225): transient failures (5xx/429, timeouts, dropped sockets, non-JSON 200s) are retried with backoff inside a bounded per-call deadline instead of failing the chat on the first bad attempt, and the chat renders a clean Retry/Dismiss error bubble instead of a permanent crash -- retrying replaces the failure bubble and never duplicates or corrupts the thread.
+- "What is Buzzbox?"-style what-is questions classify as `respond` instead of being misrouted to `overview`, and Buzz step-2 data payloads are sent without JSON indentation so prompt+output stay inside the 1024-token serving window (#225).
 - Agent-sessions cards link to the real `/agents/comms?conv=` route; dashboard uses the default brand id instead of a hardcoded UUID (#95, fixes #67).
 - `PATCH /api/content` answers 404 for unknown ids instead of reporting success (fixes #135).
 - `PATCH /api/content-item` validates status against the content enum, caps payloads at 128k, and writes the queue file atomically (fixes #134).
