@@ -82,3 +82,20 @@ test('POST /api/buzz answers 502 + retryable on a persistent upstream failure (#
 test('the failing provider is called exactly once when attempts are capped at 1', () => {
   assert.equal(dicomputeHits, 1);
 });
+
+test('GET /api/buzz/status reports isAiConfigured: true when the connector has a key (#225)', async () => {
+  const { GET } = await import('../app/api/buzz/status/route');
+
+  const res = await GET(
+    new Request('http://localhost/api/buzz/status', {
+      headers: { 'x-api-key': 'test-api-key' },
+    }),
+  );
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.isAiConfigured, true);
+  // Client-safe: only the boolean crosses the wire -- never the credential.
+  assert.deepEqual(Object.keys(body).sort(), ['isAiConfigured', 'ok']);
+  assert.equal(res.headers.get('cache-control'), 'no-store');
+});

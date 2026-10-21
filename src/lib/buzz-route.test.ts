@@ -64,6 +64,26 @@ test('POST /api/buzz returns 412 with a stable body when DICOMPUTE_API_KEY is un
   assert.equal(body.retryable, false);
 });
 
+test('GET /api/buzz/status reports isAiConfigured: false and never leaks config (#225)', async () => {
+  const { GET } = await import('../app/api/buzz/status/route');
+
+  // Unauthenticated callers get nothing: the flag is admin-scoped like POST.
+  const anonymous = await GET(new Request('http://localhost/api/buzz/status'));
+  assert.equal(anonymous.status, 401);
+
+  const res = await GET(
+    new Request('http://localhost/api/buzz/status', {
+      headers: { 'x-api-key': 'test-api-key' },
+    }),
+  );
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.isAiConfigured, false);
+  // Client-safe: a boolean crosses the wire, nothing else (#225).
+  assert.deepEqual(Object.keys(body).sort(), ['isAiConfigured', 'ok']);
+});
+
 test('POST /api/buzz rejects oversized messages with 400 (#132)', async () => {
   const res = await buzzPost(
     new NextRequest('http://localhost/api/buzz', {

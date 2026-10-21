@@ -96,6 +96,16 @@ const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || '').replace(/\/+$/, '');
 
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:3b';
 
+/**
+ * Client-safe capability flag (#225): the chat modal probes this BEFORE
+ * inviting the user to type, so it can disable the composer and explain the
+ * missing credential instead of letting a guaranteed failure into the thread.
+ * Exposes only a boolean -- never the key itself.
+ */
+export function isDicomputeConfigured(): boolean {
+  return Boolean(DICOMPUTE_API_KEY);
+}
+
 /** Thrown when the Dicompute connector lacks configuration (e.g. no API key).
  * Route handlers catch this to answer 4xx "precondition failed" instead of
  * masking a configuration state as a 500 server error (#88). */

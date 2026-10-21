@@ -34,6 +34,17 @@ async function mockBuzz(page: Page, scripts: Payload[]) {
 }
 
 async function openBuzz(page: Page, message: string) {
+  // These specs exercise the failure UX, not the pre-flight: pin the connector
+  // as configured so they don't depend on the server's real DICOMPUTE_* env
+  // (the unconfigured state has its own dedicated test below).
+  await page.route('**/api/buzz/status', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, isAiConfigured: true }),
+    }),
+  );
+
   await page.goto('/dashboard');
   await page.getByRole('button', { name: 'Open Buzz AI assistant' }).click();
   const input = page.getByPlaceholder('Ask Buzz anything...');
@@ -142,5 +153,59 @@ test.describe('Buzz chat failure UX', () => {
     await expect(page.locator('body')).not.toContainText('Unexpected token');
     await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
     await expect(page.getByText('What is Buzzbox?', { exact: true })).toHaveCount(1);
+  });
+
+  test('unconfigured connector: offline badge, disabled composer, no request (#225)', async ({
+    page,
+  }) => {
+    const buzzCalls: number[] = [];
+
+    await page.route('**/api/buzz/status', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, isAiConfigured: false }),
+      }),
+    );
+    await page.route('**/api/buzz', async (route) => {
+      buzzCalls.push(1);
+      await route.fulfill({
+        status: 412,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: false,
+          error: 'DICOMPUTE_API_KEY is not configured. Buzz requires the Dicompute LLM connector -- set DICOMPUTE_API_KEY in the environment to enable it.',
+          retryable: false,
+        }),
+      });
+    });
+
+    await page.goto('/dashboard');
+    await page.getByRole('button', { name: 'Open Buzz AI assistant' }).click();
+
+    // Status badge flips from the green active dot to Unconfigured.
+    await expect(page.getByText('Unconfigured')).toBeVisible();
+
+    // The greeting no longer invites a chat that cannot work, and the
+    // warning card explains how to fix it.
+    await expect(page.getByText('What would you like me to do?')).toHaveCount(0);
+    await expect(page.getByText('Set DICOMPUTE_API_KEY in your environment')).toBeVisible();
+
+    // Composer and quick suggestions are unavailable.
+    await expect(page.getByPlaceholder('Ask Buzz anything...')).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Send message' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: "Today's overview" })).toHaveCount(0);
+
+    // Even a programmatic quick-action must not reach the server: no user
+    // bubble, no guaranteed failure in the thread.
+    await page.evaluate(() =>
+      window.dispatchEvent(
+        new CustomEvent('buzz:ask', { detail: { prompt: 'hii' } }),
+      ),
+    );
+    await page.waitForTimeout(750);
+    expect(buzzCalls.length).toBe(0);
+    await expect(page.getByText('hii', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Retry' })).toHaveCount(0);
   });
 });
