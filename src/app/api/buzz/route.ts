@@ -20,12 +20,13 @@ Actions (message is the exact string unless noted):
 - analytics: social performance, engagement, impressions, X/LinkedIn metrics. "Analyze the current Buzzbox social media performance"
 - create_content: user wants posts drafted/written (never publish). "Create the requested content as a draft. Do not publish it." Keep the user's topic/count in this message.
 - execute: user wants an agent to DO something. The exact task for the orchestrator.
-- respond: plain questions/explanations. Your brief answer.
+- respond: plain questions, explanations and definitions -- including questions that ASK what something is, why, or how it works (e.g. "What is Buzzbox?"). Your brief answer.
 Examples:
 User: "How many interested leads do we have?" Response: {"action": "pipeline", "message": "Get the current Buzzbox lead pipeline"}
 User: "Write 5 Instagram posts about our product" Response: {"action": "create_content", "message": "Create 5 Instagram posts about our product as drafts. Do not publish them."}
 User: "What is a marketing funnel?" Response: {"action": "respond", "message": "A marketing funnel describes the journey from awareness to conversion."}
-Rules: valid JSON only, no markdown fences; never expose keys, tokens, or secrets; never claim an action completed; keep answers concise; content creation is drafts only, never publish automatically.`;
+User: "What is Buzzbox?" Response: {"action": "respond", "message": "Buzzbox is a marketing operations command center: one dashboard for content, campaigns, emails, and lead pipelines."}
+Rules: valid JSON only, no markdown fences; naming Buzzbox does not by itself make a message an overview/pipeline/analytics request -- messages that ASK what something is, why, or how it works are respond; never expose keys, tokens, or secrets; never claim an action completed; keep answers concise; content creation is drafts only, never publish automatically.`;
 
 type BuzzDecision = {
   action: 'respond' | 'execute' | 'overview' | 'analytics' | 'approvals' | 'create_content' | 'pipeline';
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
   if (!limit.allowed) {
     const retryAfterSec = Math.ceil(limit.retryAfterMs / 1000);
     return NextResponse.json(
-      { ok: false, error: 'Too many Buzz requests. Try again later.' },
+      { ok: false, error: 'Too many Buzz requests. Try again later.', retryable: true },
       { status: 429, headers: { 'Retry-After': String(retryAfterSec) } },
     );
   }
@@ -255,7 +256,7 @@ export async function POST(request: NextRequest) {
             content: `
       Current Buzzbox lead pipeline:
 
-      ${JSON.stringify(funnel, null, 2)}
+      ${JSON.stringify(funnel)}
       `,
           },
         ]);
@@ -311,7 +312,7 @@ export async function POST(request: NextRequest) {
           content: `
     Buzzbox social analytics for the last 30 days:
 
-    ${JSON.stringify(analytics, null, 2)}
+    ${JSON.stringify(analytics)}
     `,
         },
       ]);
@@ -363,10 +364,10 @@ export async function POST(request: NextRequest) {
     Today's Buzzbox overview:
 
     Statistics:
-    ${JSON.stringify(stats, null, 2)}
+    ${JSON.stringify(stats)}
 
     Alerts:
-    ${JSON.stringify(alerts, null, 2)}
+    ${JSON.stringify(alerts)}
     `,
         },
       ]);
@@ -554,7 +555,7 @@ export async function POST(request: NextRequest) {
     // error -- answer 412 like the X posting path does for missing tokens (#88).
     if (error instanceof MissingConfigError) {
       return NextResponse.json(
-        { ok: false, error: error.message },
+        { ok: false, error: error.message, retryable: false },
         { status: 412 },
       );
     }
@@ -563,7 +564,7 @@ export async function POST(request: NextRequest) {
     // response body was already logged server-side in dicompute.ts (#51).
     if (error instanceof UpstreamProviderError) {
       return NextResponse.json(
-        { ok: false, error: error.message },
+        { ok: false, error: error.message, retryable: error.retryable },
         { status: 502 },
       );
     }
@@ -577,6 +578,7 @@ export async function POST(request: NextRequest) {
           error instanceof Error
             ? error.message
             : 'Buzz encountered an unexpected error',
+        retryable: false,
       },
       { status: 500 },
     );

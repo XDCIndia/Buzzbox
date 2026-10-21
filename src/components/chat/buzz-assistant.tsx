@@ -1,17 +1,46 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bot, Send, X, Sparkles, Loader2 } from 'lucide-react';
+import { Bot, Send, X, Sparkles, Loader2, RotateCcw } from 'lucide-react';
 
 type Message = {
   role: 'user' | 'assistant';
   content: string;
+  /** Marks a failed request bubble instead of a real answer (#225). */
+  error?: boolean;
+  /** The original user text, so Retry re-sends it without duplicating the thread. */
+  retryOf?: string;
+  /** False for non-transient failures (missing config / bad request): no retry UI. */
+  retryable?: boolean;
 };
+
+/** Client-side ceiling. The server bounds its own upstream calls; this only
+ * catches a stalled connection so the thread can never sit on "Buzz is
+ * thinking..." forever (#225). */
+const CLIENT_TIMEOUT_MS = 120_000;
+
+type ConnectorStatus = 'unknown' | 'ready' | 'unconfigured';
+
+/** Shown instead of the greeting while the LLM connector is unconfigured (#225). */
+const OFFLINE_GREETING =
+  'Buzz AI is currently inactive. Configure DICOMPUTE_API_KEY in your environment to enable chat.';
+
+/** Carries the server's retryable flag alongside the clean error message. */
+class BuzzRequestError extends Error {
+  readonly retryable: boolean;
+  constructor(message: string, retryable: boolean) {
+    super(message);
+    this.name = 'BuzzRequestError';
+    this.retryable = retryable;
+  }
+}
 
 export function BuzzAssistant() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [connector, setConnector] = useState<ConnectorStatus>('unknown');
+  const unconfigured = connector === 'unconfigured';
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -22,6 +51,47 @@ export function BuzzAssistant() {
   ]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Latest-status ref: the buzz:ask listener is registered once at mount, so
+  // it reads this instead of the render's state -- otherwise a quick-action
+  // dispatched while unconfigured would still fire a doomed request (#225).
+  const unconfiguredRef = useRef(false);
+
+  useEffect(() => {
+    unconfiguredRef.current = unconfigured;
+  }, [unconfigured]);
+
+  // Pre-flight (#225): know whether the LLM connector is configured before
+  // inviting the user to type. A failed probe leaves the status 'unknown' so
+  // the composer stays usable and the server answers authoritatively instead
+  // of locking chat behind a network hiccup.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/buzz/status', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = (await res.json()) as { isAiConfigured?: boolean };
+        if (cancelled) return;
+        setConnector(data?.isAiConfigured === false ? 'unconfigured' : 'ready');
+      } catch {
+        // Keep 'unknown' -- never block on a failed capability probe.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // While unconfigured the greeting must not invite a chat that cannot work.
+  useEffect(() => {
+    if (connector !== 'unconfigured') return;
+    setMessages(prev =>
+      prev.length === 1 && prev[0].role === 'assistant'
+        ? [{ ...prev[0], content: OFFLINE_GREETING }]
+        : prev,
+    );
+  }, [connector]);
 
   useEffect(() => {
     if (open) {
@@ -46,22 +116,36 @@ export function BuzzAssistant() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function sendMessage(override?: string) {
+  async function sendMessage(
+    override?: string,
+    options?: { resend?: boolean },
+  ) {
     const message = (override ?? input).trim();
 
-    if (!message || loading) return;
+    // Unconfigured environments never reach the server: no user bubble, no
+    // guaranteed failure in the thread -- the ref keeps this true even for
+    // listeners captured before the status resolved (#225).
+    if (!message || loading || unconfiguredRef.current) return;
 
-    setInput('');
+    // A retry re-sends the SAME user text, so it is only appended to the
+    // thread when it is a new message -- a failed exchange can therefore
+    // never duplicate or corrupt the thread (#225).
+    if (!options?.resend) {
+      setInput('');
 
-    setMessages(prev => [
-      ...prev,
-      {
-        role: 'user',
-        content: message,
-      },
-    ]);
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'user',
+          content: message,
+        },
+      ]);
+    }
 
     setLoading(true);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
 
     try {
       const response = await fetch('/api/buzz', {
@@ -73,13 +157,28 @@ export function BuzzAssistant() {
         body: JSON.stringify({
           message,
         }),
+        signal: controller.signal,
       });
 
-      const data = await response.json();
+      // Error bodies are JSON, but a proxy/edge can answer HTML -- never let a
+      // parse failure replace the real status message with a raw SyntaxError.
+      const raw = await response.text();
+      let data: {
+        message?: string;
+        error?: string;
+        retryable?: boolean;
+      } | null = null;
+      try {
+        data = raw ? JSON.parse(raw) : null;
+      } catch {
+        data = null;
+      }
 
       if (!response.ok) {
-        throw new Error(
+        throw new BuzzRequestError(
           data?.error || `Request failed with status ${response.status}`,
+          // Absent flag (older server) still means "worth retrying".
+          data?.retryable !== false,
         );
       }
 
@@ -95,19 +194,49 @@ export function BuzzAssistant() {
     } catch (error) {
       console.error('Buzz request failed:', error);
 
+      const timedOut =
+        (error as { name?: string } | null)?.name === 'AbortError';
+      const unreachable = error instanceof TypeError;
+
+      const content = timedOut
+        ? 'Buzz took too long to respond.'
+        : unreachable
+          ? 'Buzz could not reach the server. Check your connection and try again.'
+          : error instanceof Error
+            ? error.message
+            : 'Buzz ran into an unexpected error.';
+
+      // Network/timeout failures are transient by definition; explicit server
+      // answers carry their own retryable flag (config errors are not retryable).
+      const retryable =
+        error instanceof BuzzRequestError ? error.retryable : true;
+
       setMessages(prev => [
         ...prev,
         {
           role: 'assistant',
-          content:
-            error instanceof Error
-              ? `I ran into an error: ${error.message}`
-              : 'I ran into an unexpected error.',
+          content,
+          error: true,
+          retryOf: message,
+          retryable,
         },
       ]);
     } finally {
+      clearTimeout(timer);
       setLoading(false);
     }
+  }
+
+  /** Replace the failure bubble with a fresh attempt of the same message. */
+  function handleRetry(index: number, retryOf?: string) {
+    if (!retryOf || loading) return;
+
+    setMessages(prev => prev.filter((_, i) => i !== index));
+    void sendMessage(retryOf, { resend: true });
+  }
+
+  function handleDismiss(index: number) {
+    setMessages(prev => prev.filter((_, i) => i !== index));
   }
 
   function handleKeyDown(
@@ -160,8 +289,12 @@ export function BuzzAssistant() {
                 </div>
 
                 <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                  <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                  AI Assistant
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      unconfigured ? 'bg-destructive' : 'bg-success'
+                    }`}
+                  />
+                  {unconfigured ? 'Unconfigured' : 'AI Assistant'}
                 </div>
               </div>
             </div>
@@ -191,10 +324,38 @@ export function BuzzAssistant() {
                   className={`max-w-[84%] rounded-xl px-3 py-2.5 text-xs leading-relaxed whitespace-pre-wrap ${
                     message.role === 'user'
                       ? 'bg-primary text-primary-foreground rounded-br-sm'
-                      : 'bg-surface-1 border border-border text-foreground rounded-bl-sm'
+                      : message.error
+                        ? 'bg-destructive/10 border border-destructive/30 text-foreground rounded-bl-sm'
+                        : 'bg-surface-1 border border-border text-foreground rounded-bl-sm'
                   }`}
                 >
                   {message.content}
+
+                  {message.error && (
+                    <div className="mt-2 flex items-center gap-1.5">
+                      {message.retryable !== false && (
+                        <button
+                          type="button"
+                          onClick={() => handleRetry(index, message.retryOf)}
+                          disabled={loading}
+                          aria-label="Retry"
+                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-destructive/15 text-destructive hover:bg-destructive/25 transition-colors disabled:opacity-50 text-[11px] font-medium"
+                        >
+                          <RotateCcw size={11} />
+                          Retry
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleDismiss(index)}
+                        disabled={loading}
+                        className="px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors disabled:opacity-50"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -217,7 +378,7 @@ export function BuzzAssistant() {
           </div>
 
           {/* Suggestions */}
-          {messages.length === 1 && (
+          {messages.length === 1 && !unconfigured && (
             <div className="px-3 pb-2">
               <div className="text-[10px] text-muted-foreground mb-1.5 px-1">
                 Try asking Buzz
@@ -263,6 +424,25 @@ export function BuzzAssistant() {
             </div>
           )}
 
+          {/* Unconfigured warning (#225): say how to fix it instead of letting
+              a guaranteed failure into the transcript */}
+          {unconfigured && (
+            <div
+              role="status"
+              className="mx-3 mb-2 rounded-lg border border-warning/30 bg-warning/10 p-2.5 space-y-1"
+            >
+              <div className="text-[11px] font-semibold text-warning">
+                Buzz AI is currently inactive.
+              </div>
+
+              <div className="text-[10px] text-muted-foreground leading-relaxed">
+                Set DICOMPUTE_API_KEY in your environment to enable chat.
+                Optionally set OLLAMA_BASE_URL to keep a local Ollama
+                fallback, then restart Buzzbox.
+              </div>
+            </div>
+          )}
+
           {/* Input */}
           <div className="p-3 border-t border-border bg-surface-0">
             <div className="flex items-center gap-2">
@@ -272,7 +452,7 @@ export function BuzzAssistant() {
                   setInput(event.target.value)
                 }
                 onKeyDown={handleKeyDown}
-                disabled={loading}
+                disabled={loading || unconfigured}
                 placeholder="Ask Buzz anything..."
                 className="flex-1 h-9 px-3 rounded-lg bg-surface-1 border border-border text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30 disabled:opacity-50"
               />
@@ -280,7 +460,7 @@ export function BuzzAssistant() {
               <button
                 type="button"
                 onClick={() => sendMessage()}
-                disabled={!input.trim() || loading}
+                disabled={!input.trim() || loading || unconfigured}
                 className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label="Send message"
               >
@@ -297,4 +477,3 @@ export function BuzzAssistant() {
     </div>
   );
 }
-
