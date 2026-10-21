@@ -1,7 +1,25 @@
 import { fetchWithTimeout, TimeoutError } from './fetch-with-timeout';
 
-const DICOMPUTE_BASE_URL =
-  process.env.DICOMPUTE_BASE_URL || 'https://api.dicompute.ai/v1';
+const DEFAULT_DICOMPUTE_BASE_URL = 'https://dicompute.ai/openai/v1';
+
+/**
+ * The legacy host `api.dicompute.ai/v1` answers every request with a 308 to
+ * `dicompute.ai/openai/v1`. Node's fetch follows that redirect, but the hop is
+ * cross-origin and Authorization is a CORS non-wildcard header, so it is
+ * stripped -- the retried request reaches the provider unauthenticated and
+ * comes back `401 invalid api key` even for a perfectly valid key. Rewrite the
+ * legacy host to the canonical endpoint (and drop any trailing slash) so the
+ * key survives the trip.
+ */
+export function normalizeDicomputeBaseUrl(raw: string | undefined): string {
+  const trimmed = (raw ?? '').trim().replace(/\/+$/, '');
+  if (!trimmed) return DEFAULT_DICOMPUTE_BASE_URL;
+  return trimmed.replace(/^https?:\/\/api\.dicompute\.ai(?:\/v1)?$/i, DEFAULT_DICOMPUTE_BASE_URL);
+}
+
+const DICOMPUTE_BASE_URL = normalizeDicomputeBaseUrl(
+  process.env.DICOMPUTE_BASE_URL,
+);
 
 const DICOMPUTE_MODEL =
   process.env.DICOMPUTE_MODEL || 'qwen2.5-7b-instruct';
